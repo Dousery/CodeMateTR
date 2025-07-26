@@ -47,6 +47,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
+  const [clearingSessions, setClearingSessions] = useState(false);
 
   useEffect(() => {
     // Eğer ilgi alanı yoksa önce backend'den çek
@@ -75,6 +76,18 @@ export default function Dashboard() {
       alert('Alan kaydedilemedi!');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleClearSessions = async () => {
+    setClearingSessions(true);
+    try {
+      await axios.post('http://localhost:5000/debug/clear_user_sessions', {}, { withCredentials: true });
+      alert('Session\'lar temizlendi!');
+    } catch (err) {
+      alert('Session temizleme hatası: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setClearingSessions(false);
     }
   };
 

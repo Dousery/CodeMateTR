@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Box, Typography, Paper, TextField, Button, Alert, Link } from '@mui/material';
+import { Box, Typography, Paper, TextField, Button, Alert, Link, FormControl, InputLabel, Select, MenuItem } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 export default function Register({ setIsLoggedIn }) {
-  const [form, setForm] = useState({ username: '', password: '', confirmPassword: '' });
+  const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', interest: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -21,13 +21,21 @@ export default function Register({ setIsLoggedIn }) {
       return;
     }
     
+    if (!form.interest) {
+      setError('Lütfen bir ilgi alanı seçin.');
+      setLoading(false);
+      return;
+    }
+    
     try {
       const res = await axios.post('http://localhost:5000/register', {
         username: form.username,
-        password: form.password
+        password: form.password,
+        interest: form.interest
       }, { withCredentials: true });
       
       localStorage.setItem('username', form.username);
+      localStorage.setItem('interest', form.interest);
       setIsLoggedIn(true);
       setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err) {
@@ -140,6 +148,64 @@ export default function Register({ setIsLoggedIn }) {
               },
             }}
           />
+          
+          <FormControl fullWidth sx={{ mb: 3 }}>
+            <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>İlgi Alanı</InputLabel>
+            <Select
+              value={form.interest}
+              onChange={(e) => setForm({ ...form, interest: e.target.value })}
+              required
+              sx={{
+                color: 'white',
+                '& .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255,255,255,0.3)',
+                },
+                '&:hover .MuiOutlinedInput-notchedOutline': {
+                  borderColor: 'rgba(255,255,255,0.5)',
+                },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': {
+                  borderColor: '#4f46e5',
+                },
+                '& .MuiSvgIcon-root': {
+                  color: 'rgba(255,255,255,0.7)',
+                },
+                '& .MuiPaper-root': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                },
+                '& .MuiMenu-paper': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                  backdropFilter: 'blur(10px)',
+                },
+              }}
+              MenuProps={{
+                PaperProps: {
+                  sx: {
+                    backgroundColor: 'rgba(0, 0, 0, 0.9)',
+                    backdropFilter: 'blur(10px)',
+                    '& .MuiMenuItem-root': {
+                      color: 'white',
+                      '&:hover': {
+                        backgroundColor: 'rgba(79, 70, 229, 0.3)',
+                      },
+                      '&.Mui-selected': {
+                        backgroundColor: 'rgba(79, 70, 229, 0.5)',
+                        '&:hover': {
+                          backgroundColor: 'rgba(79, 70, 229, 0.6)',
+                        },
+                      },
+                    },
+                  },
+                },
+              }}
+            >
+              <MenuItem value="AI">AI Developer</MenuItem>
+              <MenuItem value="Data Science">Data Scientist</MenuItem>
+              <MenuItem value="Web Development">Web Developer</MenuItem>
+              <MenuItem value="Mobile">Mobile Developer</MenuItem>
+              <MenuItem value="Cyber Security">Cyber Security Specialist</MenuItem>
+            </Select>
+          </FormControl>
           
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
           
