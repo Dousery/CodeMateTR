@@ -28,6 +28,12 @@ CORS(app,
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///btk_project.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Session ayarları
+app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
+app.config['SESSION_COOKIE_SECURE'] = False  # Development için
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
 # Tek bir db instance oluştur
 db = SQLAlchemy(app)
 
@@ -49,6 +55,20 @@ class UserHistory(db.Model):
     username = db.Column(db.String(80), nullable=False)
     activity_type = db.Column(db.String(32), nullable=False)  # test, code, case, interview
     detail = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+class TestPerformance(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=False)
+    interest = db.Column(db.String(80), nullable=False)
+    total_questions = db.Column(db.Integer, nullable=False)
+    correct_answers = db.Column(db.Integer, nullable=False)
+    success_rate = db.Column(db.Float, nullable=False)
+    skill_level = db.Column(db.String(20), nullable=False)
+    time_taken = db.Column(db.Integer, nullable=False)  # saniye cinsinden
+    difficulty = db.Column(db.String(20), nullable=False)
+    weak_areas = db.Column(db.Text, nullable=True)  # JSON string
+    strong_areas = db.Column(db.Text, nullable=True)  # JSON string
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 with app.app_context():
@@ -74,27 +94,54 @@ class CaseSession(db.Model):
     audio_messages = db.Column(db.Text, nullable=True)  # JSON string
     evaluations = db.Column(db.Text, nullable=True)  # JSON string
 
+# Test session'ları için database tablosu
+class TestSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    questions = db.Column(db.Text, nullable=False)  # JSON string
+    difficulty = db.Column(db.String(20), nullable=False)
+    num_questions = db.Column(db.Integer, nullable=False)
+    duration = db.Column(db.Integer, nullable=False)  # saniye
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='active')  # active, completed, expired
+
 # Database'den session'ları yükle
 def load_sessions_from_db():
-    try:
-        sessions = CaseSession.query.filter_by(status='active').all()
-        for session_db in sessions:
-            session_data = {
-                'users': json.loads(session_db.users),
-                'case': json.loads(session_db.case_data),
-                'start_time': session_db.start_time,
-                'duration': 30,
-                'messages': json.loads(session_db.messages) if session_db.messages else [],
-                'audio_messages': json.loads(session_db.audio_messages) if session_db.audio_messages else [],
-                'status': session_db.status
-            }
-            active_case_sessions[session_db.session_id] = session_data
-        print(f"Database'den {len(sessions)} aktif session yüklendi.")
-    except Exception as e:
-        print(f"Session yükleme hatası: {e}")
+    with app.app_context():
+        try:
+            sessions = CaseSession.query.filter_by(status='active').all()
+            for session_db in sessions:
+                session_data = {
+                    'users': json.loads(session_db.users),
+                    'case': json.loads(session_db.case_data),
+                    'start_time': session_db.start_time,
+                    'duration': 30,
+                    'messages': json.loads(session_db.messages) if session_db.messages else [],
+                    'audio_messages': json.loads(session_db.audio_messages) if session_db.audio_messages else [],
+                    'status': session_db.status
+                }
+                active_case_sessions[session_db.session_id] = session_data
+            print(f"Database'den {len(sessions)} aktif session yüklendi.")
+        except Exception as e:
+            print(f"Session yükleme hatası: {e}")
 
-# Uygulama başladığında session'ları yükle
-load_sessions_from_db()
+# Uygulama context'i oluşturulduktan sonra session'ları yükle
+def init_app():
+    with app.app_context():
+        db.create_all()
+        load_sessions_from_db()
+        # Eski test session'larını temizle
+        expired_sessions = TestSession.query.filter_by(status='active').all()
+        for test_session in expired_sessions:
+            session_age = (datetime.utcnow() - test_session.start_time).total_seconds()
+            if session_age > test_session.duration:
+                test_session.status = 'expired'
+        db.session.commit()
+        print(f"Cleaned {len([s for s in expired_sessions if s.status == 'expired'])} expired test sessions")
+
+# Session yüklemeyi app başladığında değil, route çağrıldığında yap
+# load_sessions_from_db()
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -164,14 +211,60 @@ def test_your_skill():
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    num_questions = data.get('num_questions', 10)
+    difficulty = data.get('difficulty', 'mixed')
+    
     try:
         agent = TestAIAgent(user.interest)
-        questions = agent.generate_questions()
+        questions = agent.generate_questions(num_questions, difficulty)
+        
+        # Test sessionu oluştur
+        test_session_id = f"test_{int(time.time())}_{user.username}"
+        
+        # Eski session'ları temizle (30 dakikadan eski olanlar)
+        old_sessions = TestSession.query.filter(
+            TestSession.username == user.username,
+            TestSession.status == 'active'
+        ).all()
+        
+        for old_session in old_sessions:
+            session_age = (datetime.utcnow() - old_session.start_time).total_seconds()
+            if session_age > 1800:  # 30 dakika
+                old_session.status = 'expired'
+        
+        # Yeni test session'ını database'e kaydet
+        test_session = TestSession(
+            session_id=test_session_id,
+            username=user.username,
+            questions=json.dumps(questions),
+            difficulty=difficulty,
+            num_questions=num_questions,
+            duration=30 * 60  # 30 dakika
+        )
+        db.session.add(test_session)
+        db.session.commit()
+        
+        print(f"Test session created and saved to DB: {test_session_id}")
+        
+        # Sorulardan doğru cevapları çıkar (frontend'e gönderme)
+        questions_for_frontend = []
+        for q in questions:
+            question_copy = q.copy()
+            question_copy.pop('correct_answer', None)  # Doğru cevabı gizle
+            question_copy.pop('explanation', None)     # Açıklamayı gizle
+            questions_for_frontend.append(question_copy)
+        
+        return jsonify({
+            'questions': questions_for_frontend,
+            'test_session_id': test_session_id,
+            'duration': 30 * 60,  # 30 dakika
+            'total_questions': len(questions_for_frontend)
+        })
+        
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
-    for q in questions:
-        q.pop('answer', None)
-    return jsonify({'questions': questions})
 
 @app.route('/interview_simulation', methods=['POST'])
 def interview_simulation():
@@ -543,6 +636,76 @@ def code_room():
         'coding_question': coding_question
     })
 
+@app.route('/user_test_stats', methods=['GET'])
+def user_test_stats():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    username = session['username']
+    
+    # Son test performansları
+    recent_tests = TestPerformance.query.filter_by(username=username)\
+        .order_by(TestPerformance.created_at.desc()).limit(10).all()
+    
+    # Genel istatistikler
+    all_tests = TestPerformance.query.filter_by(username=username).all()
+    
+    if not all_tests:
+        return jsonify({
+            'total_tests': 0,
+            'average_score': 0,
+            'best_score': 0,
+            'current_level': 'Henüz test alınmadı',
+            'improvement_trend': 'Veri yok',
+            'recent_tests': []
+        })
+    
+    # İstatistikleri hesapla
+    total_tests = len(all_tests)
+    average_score = sum(test.success_rate for test in all_tests) / total_tests
+    best_score = max(test.success_rate for test in all_tests)
+    current_level = recent_tests[0].skill_level if recent_tests else 'Bilinmiyor'
+    
+    # Gelişim trendi (son 5 test)
+    if len(recent_tests) >= 2:
+        recent_scores = [test.success_rate for test in recent_tests[:5]]
+        recent_scores.reverse()  # Chronological order
+        
+        if len(recent_scores) >= 2:
+            trend_diff = recent_scores[-1] - recent_scores[0]
+            if trend_diff > 5:
+                improvement_trend = 'Yükseliş'
+            elif trend_diff < -5:
+                improvement_trend = 'Düşüş'
+            else:
+                improvement_trend = 'Stabil'
+        else:
+            improvement_trend = 'Yeterli veri yok'
+    else:
+        improvement_trend = 'Yeterli veri yok'
+    
+    # Son testleri formatla
+    recent_tests_data = []
+    for test in recent_tests:
+        recent_tests_data.append({
+            'date': test.created_at.strftime('%Y-%m-%d %H:%M'),
+            'score': test.success_rate,
+            'level': test.skill_level,
+            'questions': f"{test.correct_answers}/{test.total_questions}",
+            'time': f"{test.time_taken // 60}dk {test.time_taken % 60}sn",
+            'difficulty': test.difficulty,
+            'interest': test.interest
+        })
+    
+    return jsonify({
+        'total_tests': total_tests,
+        'average_score': round(average_score, 1),
+        'best_score': round(best_score, 1),
+        'current_level': current_level,
+        'improvement_trend': improvement_trend,
+        'recent_tests': recent_tests_data
+    })
+
 @app.route('/user_history', methods=['GET'])
 def user_history():
     if 'username' not in session:
@@ -564,23 +727,94 @@ def test_your_skill_evaluate():
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
     data = request.json
     user_answers = data.get('user_answers')
-    questions = data.get('questions')
-    if not user_answers or not questions:
-        return jsonify({'error': 'Cevaplar ve sorular gerekli.'}), 400
+    test_session_id = data.get('test_session_id')
+    
+    if not user_answers or not test_session_id:
+        return jsonify({'error': 'Cevaplar ve test session ID gerekli.'}), 400
+    
+    # Test session'ını database'den al
+    test_session = TestSession.query.filter_by(
+        session_id=test_session_id,
+        username=user.username,
+        status='active'
+    ).first()
+    
+    if not test_session:
+        print(f"Test session not found in DB: {test_session_id}")
+        return jsonify({'error': 'Geçersiz test session.'}), 400
+    
+    # Session süre aşımı kontrolü
+    session_age = (datetime.utcnow() - test_session.start_time).total_seconds()
+    if session_age > test_session.duration:
+        test_session.status = 'expired'
+        db.session.commit()
+        return jsonify({'error': 'Test süresi aşıldı.'}), 400
+    
+    # Soruları JSON'dan yükle
+    questions = json.loads(test_session.questions)
+    time_taken = session_age
+    
+    # Test değerlendirmesi
     agent = TestAIAgent(user.interest)
-    results = agent.evaluate_answers(user_answers, questions)
-    wrong_topics = [r['question'] for r in results if not r['is_correct']]
+    evaluation_result = agent.evaluate_answers(user_answers, questions, time_taken)
+    
+    # Summary'yi al
+    summary = evaluation_result['summary']
+    
+    # Zayıf olunan konular için kaynak önerileri
     resources = []
-    if wrong_topics:
-        resources = agent.suggest_resources(wrong_topics[0])
-    # Geçmişe kaydet
-    detail = f"{sum(r['is_correct'] for r in results)}/{len(results)} doğru. İlgi alanı: {user.interest}"
-    history = UserHistory(username=user.username, activity_type='test', detail=detail)
+    web_resources = {}
+    if evaluation_result['weak_areas']:
+        weak_topic = evaluation_result['weak_areas'][0]['category']
+        resources = agent.suggest_resources(weak_topic)
+        # Web search ile YouTube ve website önerileri
+        web_resources = agent.search_web_resources(weak_topic)
+    
+    # Test performansını veritabanına kaydet
+    test_performance = TestPerformance(
+        username=user.username,
+        interest=user.interest,
+        total_questions=summary['total_questions'],
+        correct_answers=summary['correct_answers'],
+        success_rate=summary['success_rate'],
+        skill_level=summary['skill_level'],
+        time_taken=int(time_taken),
+        difficulty=test_session.difficulty,
+        weak_areas=json.dumps(evaluation_result['weak_areas']),
+        strong_areas=json.dumps(evaluation_result['strong_areas'])
+    )
+    db.session.add(test_performance)
+    detail = (f"{summary['correct_answers']}/{summary['total_questions']} doğru "
+             f"({summary['success_rate']}%) - Seviye: {summary['skill_level']} - "
+             f"Süre: {int(time_taken//60)}dk {int(time_taken%60)}sn")
+    
+    history = UserHistory(
+        username=user.username, 
+        activity_type='test', 
+        detail=detail
+    )
     db.session.add(history)
     db.session.commit()
-    return jsonify({'results': results, 'resources': resources})
+    
+    # Test session'ını tamamlandı olarak işaretle
+    test_session.status = 'completed'
+    db.session.commit()
+    
+    print(f"Test session completed: {test_session_id}")
+    
+    return jsonify({
+        'evaluation': evaluation_result,
+        'resources': resources,
+        'web_resources': web_resources,
+        'time_taken': {
+            'total_seconds': int(time_taken),
+            'minutes': int(time_taken // 60),
+            'seconds': int(time_taken % 60)
+        }
+    })
 
 # Code Room çözümü kaydı
 @app.route('/code_room/evaluate', methods=['POST'])
@@ -761,4 +995,5 @@ def test_case_generation():
         })
 
 if __name__ == '__main__':
+    init_app()  # Database'i başlat ve session'ları yükle
     app.run(debug=True)
