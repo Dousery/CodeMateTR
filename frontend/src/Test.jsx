@@ -20,6 +20,7 @@ export default function Test() {
   const [totalTime, setTotalTime] = useState(0);
   const [difficulty, setDifficulty] = useState('mixed');
   const [numQuestions, setNumQuestions] = useState(10);
+  const [showTimer, setShowTimer] = useState(false);
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
@@ -68,6 +69,13 @@ export default function Test() {
     return () => clearInterval(timer);
   }, [step, timeLeft, handleSubmit]);
 
+  // Son 5 dakikada otomatik olarak timer'ı göster
+  useEffect(() => {
+    if (timeLeft <= 300 && timeLeft > 0) { // Son 5 dakika
+      setShowTimer(true);
+    }
+  }, [timeLeft]);
+
   const fetchQuestions = async () => {
     setLoading(true);
     setError('');
@@ -83,6 +91,12 @@ export default function Test() {
       setTimeLeft(res.data.duration);
       setTotalTime(res.data.duration);
       setStep('quiz');
+      
+      // İlk sınava girdiğinde 5 saniye timer'ı göster
+      setShowTimer(true);
+      setTimeout(() => {
+        setShowTimer(false);
+      }, 5000);
     } catch (err) {
       setError(err.response?.data?.error || 'Soru alınamadı.');
     } finally {
@@ -202,58 +216,121 @@ export default function Test() {
     
     return (
       <Box sx={{ minHeight: '100vh', width: '100vw', py: 4 }}>
-        {/* Timer ve Progress Bar */}
-        <Paper 
-          elevation={4}
-          sx={{ 
-            position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
+        {/* Timer Bar */}
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 80,
+            left: 20,
             zIndex: 1000,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            backdropFilter: 'blur(10px)',
-            p: 2
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
           }}
         >
-          <Grid container alignItems="center" spacing={2}>
-            <Grid item xs={12} md={6}>
-              <LinearProgress 
-                variant="determinate" 
-                value={progressPercentage}
-                sx={{ 
-                  height: 8, 
-                  borderRadius: 4,
-                  backgroundColor: 'rgba(255,255,255,0.2)',
-                  '& .MuiLinearProgress-bar': {
-                    background: isTimeRunningOut 
-                      ? 'linear-gradient(45deg, #f44336 0%, #ff9800 100%)'
-                      : 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)'
-                  }
+          {/* Progress Ring - Clickable */}
+          <Box 
+            sx={{ 
+              position: 'relative', 
+              display: 'inline-flex',
+              cursor: 'pointer',
+              transition: 'transform 0.2s ease',
+              '&:hover': {
+                transform: 'scale(1.05)'
+              }
+            }}
+            onClick={() => setShowTimer(!showTimer)}
+          >
+            <CircularProgress
+              variant="determinate"
+              value={progressPercentage}
+              size={60}
+              thickness={4}
+              sx={{
+                color: isTimeRunningOut 
+                  ? 'rgba(255, 107, 107, 0.2)'
+                  : 'rgba(255, 255, 255, 0.2)',
+                '& .MuiCircularProgress-circle': {
+                  strokeLinecap: 'round',
+                }
+              }}
+            />
+            <CircularProgress
+              variant="determinate"
+              value={progressPercentage}
+              size={60}
+              thickness={4}
+              sx={{
+                position: 'absolute',
+                color: isTimeRunningOut 
+                  ? '#ff6b6b'
+                  : '#ffffff',
+                '& .MuiCircularProgress-circle': {
+                  strokeLinecap: 'round',
+                },
+                filter: 'drop-shadow(0 0 6px rgba(255,255,255,0.4))'
+              }}
+            />
+            <Box
+              sx={{
+                top: 0,
+                left: 0,
+                bottom: 0,
+                right: 0,
+                position: 'absolute',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <AccessTime sx={{ 
+                color: isTimeRunningOut ? '#ff6b6b' : '#ffffff',
+                fontSize: 22,
+                filter: 'drop-shadow(0 0 4px rgba(255,255,255,0.3))'
+              }} />
+            </Box>
+          </Box>
+
+          {/* Timer Display - Conditional */}
+          {showTimer && (
+            <Paper
+              component={motion.div}
+              initial={{ opacity: 0, scale: 0.8, x: -20 }}
+              animate={{ opacity: 1, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.8, x: -20 }}
+              transition={{ duration: 0.3 }}
+              elevation={8}
+              sx={{
+                background: 'rgba(0,0,0,0.7)',
+                backdropFilter: 'blur(15px)',
+                border: `2px solid ${isTimeRunningOut ? 'rgba(255, 107, 107, 0.3)' : 'rgba(255, 255, 255, 0.3)'}`,
+                borderRadius: '20px',
+                px: 3,
+                py: 1.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1,
+                minWidth: 120,
+                justifyContent: 'center'
+              }}
+            >
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 700,
+                  color: isTimeRunningOut ? '#ff6b6b' : '#ffffff',
+                  fontFamily: 'monospace',
+                  fontSize: '1.2rem'
                 }}
-              />
-            </Grid>
-            <Grid item xs={12} md={6} display="flex" justifyContent="flex-end" alignItems="center">
-              <Chip 
-                icon={<AccessTime />}
-                label={formatTime(timeLeft)}
-                color={isTimeRunningOut ? "error" : "primary"}
-                variant="filled"
-                sx={{ 
-                  fontWeight: 600,
-                  fontSize: '1.1rem',
-                  backgroundColor: isTimeRunningOut ? '#f44336' : '#4f46e5'
-                }}
-              />
-              <Typography color="white" ml={2}>
-                Soru {Object.keys(answers).length}/{questions.length}
+              >
+                {formatTime(timeLeft)}
               </Typography>
-            </Grid>
-          </Grid>
-        </Paper>
+            </Paper>
+          )}
+        </Box>
 
         {/* Sorular */}
-        <Box sx={{ mt: 10 }}>
+        <Box sx={{ mt: 20 }}>
           <Paper 
             component={motion.div} 
             initial={{ opacity: 0, y: 40 }} 

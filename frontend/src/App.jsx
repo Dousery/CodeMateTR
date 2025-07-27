@@ -63,8 +63,24 @@ function App() {
   // localStorage değişirse state'i güncelle (başka sekmeden logout vs için)
   useEffect(() => {
     const syncLogin = () => setIsLoggedIn(Boolean(localStorage.getItem('username')));
+    
+    // Sayfa yüklendiğinde kontrol et
+    syncLogin();
+    
+    // localStorage değişikliklerini dinle
     window.addEventListener('storage', syncLogin);
-    return () => window.removeEventListener('storage', syncLogin);
+    
+    // Custom event listener ekle (aynı sekmede localStorage değişiklikleri için)
+    const handleStorageChange = () => {
+      syncLogin();
+    };
+    
+    window.addEventListener('localStorageChange', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', syncLogin);
+      window.removeEventListener('localStorageChange', handleStorageChange);
+    };
   }, []);
 
   return (
