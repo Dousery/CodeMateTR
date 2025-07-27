@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Box, Typography, Paper, Button, TextField, CircularProgress, Alert, Chip, Avatar, Stack, IconButton, Divider } from '@mui/material';
 import { Mic, MicOff, Send, VolumeUp } from '@mui/icons-material';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 import axios from 'axios';
 
 export default function Case() {
@@ -31,6 +32,8 @@ export default function Case() {
   const messagesEndRef = useRef(null);
   const recognitionRef = useRef(null);
   const mediaRecorderRef = useRef(null);
+  const location = useLocation();
+  const previousLocationRef = useRef(location.pathname);
 
   // Kullanıcı bilgisini al
   useEffect(() => {
@@ -44,6 +47,94 @@ export default function Case() {
     };
     getUserInfo();
   }, []);
+
+  // Sayfa değişikliklerini dinle ve session'ı temizle
+  useEffect(() => {
+    const currentPath = location.pathname;
+    const previousPath = previousLocationRef.current;
+    
+    // Eğer case study sayfasından başka bir sayfaya geçiyorsa
+    if (previousPath === '/case' && currentPath !== '/case') {
+      console.log('Case study sayfasından çıkılıyor, session temizleniyor...');
+      
+      // Kuyruktan çık ve session'ı temizle
+      const cleanupSession = async () => {
+        try {
+          // Aktif session varsa tamamla
+          if (sessionId && step === 'case') {
+            await axios.post('http://localhost:5000/case_study_room/complete_session', {
+              session_id: sessionId
+            }, { withCredentials: true });
+            console.log('Session tamamlandı');
+          }
+          
+          // Kuyruktan çık
+          await axios.post('http://localhost:5000/case_study_room/leave_queue', {}, { withCredentials: true });
+          console.log('Kuyruktan çıkıldı');
+        } catch (err) {
+          console.error('Session temizleme hatası:', err);
+        }
+      };
+      
+      cleanupSession();
+      
+      // State'i sıfırla
+      setStep('start');
+      setSessionId(null);
+      setCaseStudy('');
+      setPartner(null);
+      setMessages([]);
+      setError('');
+    }
+    
+    previousLocationRef.current = currentPath;
+  }, [location.pathname, sessionId, step]);
+
+  // Sayfa kapatılırken veya yenilenirken session'ı temizle
+  useEffect(() => {
+    const handleBeforeUnload = (event) => {
+      // Eğer aktif session varsa
+      if (sessionId && (step === 'case' || step === 'waiting')) {
+        console.log('Sayfa kapatılıyor, session temizleniyor...');
+        
+        // beforeunload'ta async işlem yapamayız, sadece event'i engelleyebiliriz
+        // Session temizleme işlemi backend'de otomatik olarak yapılacak
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [sessionId, step]);
+
+  // Component unmount olduğunda session'ı temizle
+  useEffect(() => {
+    return () => {
+      // Component unmount olduğunda cleanup
+      if (sessionId && (step === 'case' || step === 'waiting')) {
+        console.log('Component unmount, session temizleniyor...');
+        
+        // Session'ı tamamla ve kuyruktan çık
+        const cleanup = async () => {
+          try {
+            if (sessionId && step === 'case') {
+              await axios.post('http://localhost:5000/case_study_room/complete_session', {
+                session_id: sessionId
+              }, { withCredentials: true });
+            }
+            await axios.post('http://localhost:5000/case_study_room/leave_queue', {}, { withCredentials: true });
+          } catch (err) {
+            console.error('Cleanup hatası:', err);
+          }
+        };
+        cleanup();
+      }
+    };
+  }, [sessionId, step]);
 
   // Timer efekti
   useEffect(() => {
@@ -465,7 +556,16 @@ export default function Case() {
           <Button 
             variant="outlined" 
             color="primary" 
-            onClick={() => { setStep('start'); setError(''); }}
+            onClick={async () => {
+              try {
+                // Kuyruktan çık
+                await axios.post('http://localhost:5000/case_study_room/leave_queue', {}, { withCredentials: true });
+              } catch (err) {
+                console.error('Kuyruktan çıkma hatası:', err);
+              }
+              setStep('start');
+              setError('');
+            }}
             sx={{
               borderColor: 'rgba(255,255,255,0.3)',
               color: 'white',

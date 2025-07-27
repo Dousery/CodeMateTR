@@ -154,11 +154,14 @@ def register():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    interest = data.get('interest')
     if not username or not password:
         return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
+    if not interest:
+        return jsonify({'error': 'İlgi alanı gerekli.'}), 400
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Kullanıcı zaten mevcut.'}), 400
-    user = User(username=username)
+    user = User(username=username, interest=interest)
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
@@ -173,11 +176,48 @@ def login():
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
         return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
+    
+    # Kullanıcı login olduğunda eski session'larını temizle
+    # Kullanıcıyı tüm kuyruklardan çıkar
+    for interest in case_study_queue:
+        if username in case_study_queue[interest]:
+            case_study_queue[interest].remove(username)
+    
+    # Kullanıcıyı tüm aktif session'lardan çıkar
+    for session_id, session_data in list(active_case_sessions.items()):
+        if username in session_data['users']:
+            session_data['users'].remove(username)
+            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
+            if not session_data['users']:
+                del active_case_sessions[session_id]
+    
     session['username'] = username
     return jsonify({'message': 'Giriş başarılı.'})
 
 @app.route('/logout', methods=['POST'])
 def logout():
+    if 'username' in session:
+        username = session['username']
+        
+        # Kullanıcıyı tüm case study kuyruklarından çıkar
+        for interest in case_study_queue:
+            if username in case_study_queue[interest]:
+                case_study_queue[interest].remove(username)
+        
+        # Kullanıcının aktif session'larını tamamla
+        for session_id, session_data in list(active_case_sessions.items()):
+            if username in session_data['users'] and session_data['status'] == 'active':
+                # Session'ı completed olarak işaretle
+                session_data['status'] = 'completed'
+                session_data['end_time'] = datetime.now()
+                
+                # Kullanıcıyı session'dan çıkar
+                session_data['users'].remove(username)
+                
+                # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
+                if not session_data['users']:
+                    del active_case_sessions[session_id]
+    
     session.pop('username', None)
     return jsonify({'message': 'Çıkış başarılı.'})
 
@@ -294,6 +334,11 @@ def case_study_room():
     username = session['username']
     interest = user.interest
     
+    # Kullanıcının aktif session'da olup olmadığını kontrol et
+    for session_id, session_data in active_case_sessions.items():
+        if username in session_data['users'] and session_data['status'] == 'active':
+            return jsonify({'error': 'Zaten aktif bir case study session\'ınız var.'}), 400
+    
     # Kullanıcıyı kuyruğa ekle
     if interest not in case_study_queue:
         case_study_queue[interest] = []
@@ -354,7 +399,7 @@ def check_case_match():
     interest = user.interest
     
     # Aktif session'da mı kontrol et
-    for session_id, session_data in active_case_sessions.items():
+    for session_id, session_data in list(active_case_sessions.items()):
         if username in session_data['users'] and session_data['status'] == 'active':
             return jsonify({
                 'status': 'matched',
@@ -364,6 +409,12 @@ def check_case_match():
                 'start_time': session_data['start_time'].isoformat(),
                 'duration': session_data['duration']
             })
+        elif username in session_data['users'] and session_data['status'] == 'completed':
+            # Completed session'da kullanıcı varsa, onu temizle
+            session_data['users'].remove(username)
+            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
+            if not session_data['users']:
+                del active_case_sessions[session_id]
     
     # Kuyrukta mı kontrol et
     if interest in case_study_queue and username in case_study_queue[interest]:
@@ -584,6 +635,13 @@ def complete_session():
 
     session_data['evaluations'] = evaluations
     db.session.commit()
+    
+    # Session tamamlandıktan sonra kullanıcıları kuyruktan temizle
+    # Interest'i case data'dan al
+    case_interest = session_data['case'].get('interest', 'general')
+    for user in session_data['users']:
+        if case_interest in case_study_queue and user in case_study_queue[case_interest]:
+            case_study_queue[case_interest].remove(user)
     
     return jsonify({'message': 'Oturum tamamlandı.'})
 
@@ -974,6 +1032,29 @@ def clear_sessions():
     case_study_queue.clear()
     return jsonify({'status': 'success', 'message': 'Tüm sessionlar temizlendi'})
 
+@app.route('/case_study_room/leave_queue', methods=['POST'])
+def leave_queue():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    username = session['username']
+    user = User.query.filter_by(username=username).first()
+    interest = user.interest
+    
+    # Kullanıcıyı kuyruktan çıkar
+    if interest in case_study_queue and username in case_study_queue[interest]:
+        case_study_queue[interest].remove(username)
+    
+    # Kullanıcıyı aktif session'lardan çıkar
+    for session_id, session_data in list(active_case_sessions.items()):
+        if username in session_data['users']:
+            session_data['users'].remove(username)
+            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
+            if not session_data['users']:
+                del active_case_sessions[session_id]
+    
+    return jsonify({'message': 'Tüm session\'lardan çıkarıldınız.'})
+
 @app.route('/debug/test_case_generation', methods=['POST'])
 def test_case_generation():
     data = request.json
@@ -993,6 +1074,28 @@ def test_case_generation():
             'error': str(e),
             'message': 'Case generation hatası'
         })
+
+@app.route('/debug/clear_user_sessions', methods=['POST'])
+def clear_user_sessions():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    username = session['username']
+    
+    # Kullanıcıyı tüm kuyruklardan çıkar
+    for interest in case_study_queue:
+        if username in case_study_queue[interest]:
+            case_study_queue[interest].remove(username)
+    
+    # Kullanıcıyı tüm session'lardan çıkar
+    for session_id, session_data in list(active_case_sessions.items()):
+        if username in session_data['users']:
+            session_data['users'].remove(username)
+            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
+            if not session_data['users']:
+                del active_case_sessions[session_id]
+    
+    return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
