@@ -1,8 +1,8 @@
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import os
 import json
 import traceback
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -12,21 +12,11 @@ class CodeAIAgent:
     def __init__(self, interest, language='python'):
         self.interest = interest
         self.language = language
-        # Configure the client with API key
-        try:
-            self.client = genai.Client(api_key=GEMINI_API_KEY)
-        except Exception as e:
-            print(f"Google GenAI client initialization error: {e}")
-            # Fallback: Set environment variable
-            os.environ['GOOGLE_API_KEY'] = GEMINI_API_KEY
-            try:
-                self.client = genai.Client()
-            except Exception as e2:
-                print(f"Fallback client initialization error: {e2}")
-                self.client = None
-        
-        # Dil bazlı model seçimi
-        self.model = "gemini-2.0-flash-exp"
+        # Configure Gemini API
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        genai.configure(api_key=GEMINI_API_KEY)
+        self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Dil konfigürasyonları
         self.language_configs = {
@@ -68,7 +58,7 @@ class CodeAIAgent:
         """
         Belirtilen zorluk seviyesinde kodlama sorusu üretir
         """
-        if not self.client:
+        if not self.model:
             return "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin."
             
         difficulty_levels = {
@@ -92,11 +82,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
-            
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
@@ -106,7 +92,7 @@ class CodeAIAgent:
         """
         Kullanıcının kodunu çalıştırarak değerlendirir
         """
-        if not self.client:
+        if not self.model:
             return {
                 "evaluation": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
                 "execution_output": "",
@@ -135,13 +121,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            response = self.model.generate_content(prompt)
             
             result = {
                 "evaluation": "",
@@ -151,14 +131,8 @@ class CodeAIAgent:
                 "corrected_code": ""
             }
             
-            # Tüm parçaları birleştir
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    result["evaluation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    result["code_suggestions"] += f"Kod:\n{part.executable_code.code}\n"
-                elif part.code_execution_result is not None:
-                    result["execution_output"] += f"Çıktı:\n{part.code_execution_result.output}\n"
+            # Yanıtı parse et
+            result["evaluation"] = response.text
             
             return result
             
@@ -173,31 +147,35 @@ class CodeAIAgent:
 
     def generate_code_solution(self, question):
         """
-        Verilen soru için örnek çözüm üretir ve test eder
+        Verilen soru için örnek çözüm üretir
         """
         config = self.language_configs.get(self.language, self.language_configs['python'])
         
         prompt = f"""
-        Bu {config['name']} sorusu için çalışan kod yaz ve test et:
+        {config['name']} dilinde bu soruyu çöz:
         
         Soru: {question}
         
-        Sadece:
-        1. Kısa açıklama (2 cümle)
-        2. {config['name']} kodu yaz ve çalıştır
-        3. Test sonucu göster
+        Lütfen aşağıdaki formatı kullan:
         
-        Uzun açıklama yapma, direkt kod ver.
+        **Açıklama:**
+        Sorunun nasıl çözüleceğini kısaca açıkla (2-3 cümle)
+        
+        **Kod:**
+        ```{self.language}
+        # Çözüm kodunu buraya yaz
+        ```
+        
+        **Test:**
+        Kodun nasıl çalıştığını göster ve test sonuçlarını açıkla.
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            # Yeni Gemini API kullan
+            response = self.model.generate_content(prompt)
+            
+            # Yanıtı parse et
+            response_text = response.text
             
             result = {
                 "explanation": "",
@@ -206,24 +184,70 @@ class CodeAIAgent:
                 "complexity_analysis": ""
             }
             
-            # Yanıtı parçalara ayır
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    result["explanation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    result["code"] += part.executable_code.code + "\n"
-                elif part.code_execution_result is not None:
-                    result["test_results"] += part.code_execution_result.output + "\n"
+            # Text'i parse et
+            lines = response_text.split('\n')
+            current_section = "explanation"
+            code_block = False
+            
+            for line in lines:
+                line = line.strip()
+                
+                # Section başlıklarını tespit et
+                if "**Açıklama:**" in line or "Açıklama:" in line:
+                    current_section = "explanation"
+                    continue
+                elif "**Kod:**" in line or "Kod:" in line:
+                    current_section = "code"
+                    continue
+                elif "**Test:**" in line or "Test:" in line:
+                    current_section = "test_results"
+                    continue
+                
+                # Kod bloğu başlangıcı
+                if line.startswith("```") and current_section == "code":
+                    code_block = not code_block
+                    continue
+                
+                # İçeriği ilgili bölüme ekle
+                if current_section == "explanation" and line:
+                    result["explanation"] += line + "\n"
+                elif current_section == "code" and code_block and line:
+                    result["code"] += line + "\n"
+                elif current_section == "code" and not code_block and line and not line.startswith("```"):
+                    result["code"] += line + "\n"
+                elif current_section == "test_results" and line:
+                    result["test_results"] += line + "\n"
+            
+            # Eğer parsing başarısız olduysa, tüm metni explanation'a ekle
+            if not result["explanation"] and not result["code"]:
+                result["explanation"] = response_text
+                
+                # Kod bloğunu manuel olarak bul
+                code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+                if code_matches:
+                    result["code"] = code_matches[0].strip()
+            
+            # Boş alanları temizle
+            result["explanation"] = result["explanation"].strip()
+            result["code"] = result["code"].strip()
+            result["test_results"] = result["test_results"].strip()
             
             return result
             
         except Exception as e:
+            print(f"Code solution generation error: {e}")
             return {
-                "explanation": f"Çözüm hatası: {str(e)}",
-                "code": "",
-                "test_results": "",
+                "explanation": f"Çözüm oluşturma hatası: {str(e)}",
+                "code": "# Kod oluşturulamadı",
+                "test_results": "Test sonucu mevcut değil",
                 "complexity_analysis": ""
             }
+
+    def generate_solution(self, question):
+        """
+        Frontend'den çağrılacak generate_solution metodu
+        """
+        return self.generate_code_solution(question)
 
     def debug_code(self, code_with_error):
         """
@@ -245,13 +269,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            response = self.model.generate_content(prompt)
             
             debug_result = {
                 "error_explanation": "",
@@ -260,13 +278,14 @@ class CodeAIAgent:
                 "prevention_tips": ""
             }
             
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    debug_result["error_explanation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    debug_result["corrected_code"] += part.executable_code.code + "\n"
-                elif part.code_execution_result is not None:
-                    debug_result["execution_result"] += part.code_execution_result.output + "\n"
+            # Parse response text
+            response_text = response.text
+            debug_result["error_explanation"] = response_text
+            
+            # Try to extract corrected code
+            code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+            if code_matches:
+                debug_result["corrected_code"] = code_matches[0].strip()
             
             return debug_result
             
@@ -297,19 +316,12 @@ class CodeAIAgent:
         """
         
         try:
-            # Google Search tool ile gerçek kaynakları ara
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())]
-                ),
-            )
-            
+            # Basit text generation kullan
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
-            # Fallback: Google Search başarısız olursa basit öneri
+            # Fallback: Basit öneri
             fallback_prompt = f"""
             {config['name']} dili için {topic} konusunda {num_resources} kaynak öner.
             
@@ -322,10 +334,7 @@ class CodeAIAgent:
             """
             
             try:
-                fallback_response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=fallback_prompt
-                )
+                fallback_response = self.model.generate_content(fallback_prompt)
                 return fallback_response.text.strip()
             except:
                 return f"Kaynak hatası: {str(e)}"
@@ -353,10 +362,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
+            response = self.model.generate_content(prompt)
             
             return response.text.strip()
             
@@ -388,11 +394,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
-            
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:

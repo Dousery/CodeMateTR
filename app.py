@@ -1007,6 +1007,31 @@ def code_room():
         'coding_question': coding_question
     })
 
+@app.route('/code_room/generate_solution', methods=['POST'])
+def code_room_generate_solution():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    question = data.get('question')
+    
+    if not question:
+        return jsonify({'error': 'Soru gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest)
+        solution = agent.generate_solution(question)
+        return jsonify({
+            'success': True,
+            'solution': solution
+        })
+    except Exception as e:
+        return jsonify({'error': f'Çözüm oluşturma hatası: {str(e)}'}), 500
+
 @app.route('/user_test_stats', methods=['GET'])
 def user_test_stats():
     if 'username' not in session:
