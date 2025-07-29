@@ -191,6 +191,9 @@ class TestAIAgent:
         weak_topics = [area['category'] for area in weak_areas]
         suggested_resources = self.suggest_resources(weak_topics, num_resources=8) if weak_topics else []
         
+        # Yanlış cevaplanan sorular için spesifik kaynak önerileri
+        wrong_question_resources = self._generate_wrong_question_resources(results)
+        
         return {
             'results': results,
             'summary': {
@@ -205,7 +208,8 @@ class TestAIAgent:
             'recommendations': recommendations,
             'weak_areas': weak_areas,
             'strong_areas': strong_areas,
-            'suggested_resources': suggested_resources  # Dinamik kaynak önerileri
+            'suggested_resources': suggested_resources,  # Genel dinamik kaynak önerileri
+            'wrong_question_resources': wrong_question_resources  # Yanlış sorular için özel kaynaklar
         }
     
     def _determine_skill_level(self, success_rate, difficulty_stats):
@@ -305,6 +309,309 @@ class TestAIAgent:
             recommendations.append("Yeni teknolojileri takip etmeye devam edin")
         
         return recommendations
+
+    def _generate_wrong_question_resources(self, results):
+        """Yanlış cevaplanan sorular için spesifik kaynak önerileri üret"""
+        wrong_questions = [result for result in results if not result['is_correct']]
+        
+        if not wrong_questions:
+            return {
+                'message': 'Tebrikler! Tüm soruları doğru yanıtladınız.',
+                'resources': []
+            }
+        
+        question_resources = []
+        
+        for wrong_q in wrong_questions:
+            # Her yanlış soru için spesifik kaynaklar bul
+            question_topic = self._extract_topic_from_question(wrong_q['question'])
+            specific_resources = self._get_question_specific_resources(
+                question_topic, 
+                wrong_q['question'], 
+                wrong_q['explanation'],
+                wrong_q['difficulty']
+            )
+            
+            question_resource = {
+                'question_id': wrong_q['question_id'],
+                'question_preview': wrong_q['question'][:100] + "..." if len(wrong_q['question']) > 100 else wrong_q['question'],
+                'identified_topic': question_topic,
+                'difficulty': wrong_q['difficulty'],
+                'explanation': wrong_q['explanation'],
+                'your_answer': wrong_q['user_answer'],
+                'correct_answer': wrong_q['correct_answer'],
+                'learning_resources': specific_resources
+            }
+            
+            question_resources.append(question_resource)
+        
+        # Aynı konulardaki yanlış soruları grupla
+        grouped_resources = self._group_resources_by_topic(question_resources)
+        
+        return {
+            'message': f'{len(wrong_questions)} soru yanlış yanıtlandı. Her yanlış soru için özel öğrenme kaynakları:',
+            'total_wrong_questions': len(wrong_questions),
+            'individual_question_resources': question_resources,
+            'grouped_by_topic': grouped_resources,
+            'priority_topics': self._identify_priority_topics_from_wrong_questions(wrong_questions)
+        }
+    
+    def _extract_topic_from_question(self, question_text):
+        """Soru metninden ana konuyu çıkar"""
+        
+        # Alan-spesifik anahtar kelimeler
+        topic_keywords = {
+            'Data Science': {
+                'pandas': ['pandas', 'dataframe', 'series', 'csv', 'data manipulation'],
+                'numpy': ['numpy', 'array', 'ndarray', 'mathematical operations'],
+                'matplotlib': ['matplotlib', 'plot', 'graph', 'visualization', 'chart'],
+                'machine learning': ['model', 'training', 'prediction', 'algorithm', 'classification', 'regression'],
+                'statistics': ['mean', 'median', 'standard deviation', 'correlation', 'probability'],
+                'data analysis': ['analysis', 'insights', 'trends', 'patterns', 'data exploration']
+            },
+            'Web Development': {
+                'javascript': ['javascript', 'js', 'function', 'variable', 'dom', 'event'],
+                'html': ['html', 'tag', 'element', 'attribute', 'semantic'],
+                'css': ['css', 'style', 'selector', 'property', 'flexbox', 'grid'],
+                'react': ['react', 'component', 'jsx', 'state', 'props', 'hook'],
+                'node.js': ['node', 'server', 'npm', 'express', 'backend'],
+                'database': ['database', 'sql', 'query', 'table', 'schema']
+            },
+            'Mobile Development': {
+                'flutter': ['flutter', 'dart', 'widget', 'scaffold', 'stateful', 'stateless'],
+                'android': ['android', 'activity', 'intent', 'lifecycle', 'manifest'],
+                'ios': ['ios', 'swift', 'objective-c', 'xcode', 'storyboard'],
+                'ui/ux': ['design', 'user interface', 'user experience', 'navigation']
+            },
+            'AI': {
+                'machine learning': ['machine learning', 'ml', 'algorithm', 'model', 'training'],
+                'deep learning': ['deep learning', 'neural network', 'tensorflow', 'pytorch'],
+                'natural language processing': ['nlp', 'text processing', 'language model'],
+                'computer vision': ['image', 'vision', 'opencv', 'image processing']
+            },
+            'Cyber Security': {
+                'penetration testing': ['penetration', 'pentest', 'vulnerability', 'exploit'],
+                'network security': ['network', 'firewall', 'intrusion', 'protocol'],
+                'cryptography': ['encryption', 'hash', 'cipher', 'key', 'certificate'],
+                'web security': ['xss', 'sql injection', 'csrf', 'owasp']
+            }
+        }
+        
+        question_lower = question_text.lower()
+        
+        # Kullanıcının alanına göre anahtar kelime kontrolü
+        if self.interest in topic_keywords:
+            for topic, keywords in topic_keywords[self.interest].items():
+                for keyword in keywords:
+                    if keyword in question_lower:
+                        return topic
+        
+        # Genel anahtar kelime analizi
+        general_topics = {
+            'algorithm': ['algorithm', 'sorting', 'searching', 'complexity'],
+            'data structures': ['array', 'list', 'stack', 'queue', 'tree', 'graph'],
+            'programming basics': ['variable', 'function', 'loop', 'condition'],
+            'testing': ['test', 'unit test', 'debugging', 'quality assurance'],
+            'version control': ['git', 'github', 'commit', 'branch', 'merge']
+        }
+        
+        for topic, keywords in general_topics.items():
+            for keyword in keywords:
+                if keyword in question_lower:
+                    return topic
+        
+        # Eğer spesifik konu bulunamazsa, alan adını döndür
+        return self.interest.lower()
+    
+    def _get_question_specific_resources(self, topic, question, explanation, difficulty):
+        """Belirli bir soru ve konu için özel kaynaklar üret"""
+        
+        # Zorluk seviyesine göre kaynak türü belirle
+        resource_types = {
+            'beginner': ['Tutorial', 'Video', 'Documentation'],
+            'intermediate': ['Tutorial', 'Practice', 'Documentation', 'Course'],
+            'advanced': ['Documentation', 'Research', 'Advanced Course', 'Community']
+        }
+        
+        preferred_types = resource_types.get(difficulty.lower(), ['Tutorial', 'Video'])
+        
+        # Konu-spesifik kaynak templates
+        resources = []
+        
+        # 1. Konu odaklı YouTube videosu
+        youtube_query = f"{self.interest} {topic} tutorial explanation".replace(' ', '+')
+        resources.append({
+            'title': f'{topic.title()} Detaylı Açıklama - YouTube',
+            'url': f'https://www.youtube.com/results?search_query={youtube_query}',
+            'type': 'Video Tutorial',
+            'description': f'{topic} konusunu detaylı açıklayan videolar',
+            'level': difficulty,
+            'recommended_for': 'Görsel öğrenme',
+            'estimated_time': '15-30 dakika'
+        })
+        
+        # 2. Konu odaklı dokümantasyon
+        doc_query = f"{self.interest} {topic} documentation guide".replace(' ', '+')
+        resources.append({
+            'title': f'{topic.title()} Resmi Dokümantasyonu',
+            'url': f'https://www.google.com/search?q={doc_query}',
+            'type': 'Documentation',
+            'description': f'{topic} için resmi dokümantasyon ve rehberler',
+            'level': difficulty,
+            'recommended_for': 'Derinlemesine öğrenme',
+            'estimated_time': '30-45 dakika'
+        })
+        
+        # 3. Pratik örnekler
+        practice_query = f"{self.interest} {topic} examples practice".replace(' ', '+')
+        resources.append({
+            'title': f'{topic.title()} Pratik Örnekleri',
+            'url': f'https://www.google.com/search?q={practice_query}',
+            'type': 'Practice Examples',
+            'description': f'{topic} ile ilgili kod örnekleri ve pratik uygulamalar',
+            'level': difficulty,
+            'recommended_for': 'Uygulamalı öğrenme',
+            'estimated_time': '45-60 dakika'
+        })
+        
+        # 4. Alan-spesifik özel kaynaklar
+        if self.interest == 'Data Science':
+            if 'pandas' in topic.lower():
+                resources.append({
+                    'title': 'Pandas 10 Minutes Tutorial',
+                    'url': 'https://pandas.pydata.org/docs/user_guide/10min.html',
+                    'type': 'Quick Tutorial',
+                    'description': 'Pandas hızlı başlangıç rehberi',
+                    'level': 'beginner',
+                    'recommended_for': 'Hızlı öğrenme',
+                    'estimated_time': '10-15 dakika'
+                })
+            elif 'machine learning' in topic.lower():
+                resources.append({
+                    'title': 'Kaggle Machine Learning Course',
+                    'url': 'https://www.kaggle.com/learn/intro-to-machine-learning',
+                    'type': 'Interactive Course',
+                    'description': 'Ücretsiz interaktif ML kursu',
+                    'level': 'intermediate',
+                    'recommended_for': 'Uygulamalı öğrenme',
+                    'estimated_time': '2-3 saat'
+                })
+        
+        elif self.interest == 'Web Development':
+            if 'javascript' in topic.lower():
+                resources.append({
+                    'title': 'MDN JavaScript Guide',
+                    'url': 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide',
+                    'type': 'Official Documentation',
+                    'description': 'JavaScript resmi rehberi',
+                    'level': 'all',
+                    'recommended_for': 'Kapsamlı öğrenme',
+                    'estimated_time': '1-2 saat'
+                })
+            elif 'react' in topic.lower():
+                resources.append({
+                    'title': 'React Official Tutorial',
+                    'url': 'https://react.dev/learn',
+                    'type': 'Official Tutorial',
+                    'description': 'React resmi öğretici',
+                    'level': 'beginner',
+                    'recommended_for': 'Baştan öğrenme',
+                    'estimated_time': '2-3 saat'
+                })
+        
+        # 5. Soru-spesifik açıklama kaynağı (eğer explanation varsa)
+        if explanation and explanation.strip():
+            resources.append({
+                'title': f'Bu Soru Hakkında Detaylı Açıklama',
+                'url': f'https://www.google.com/search?q="{explanation[:50]}..." {self.interest}'.replace(' ', '+'),
+                'type': 'Specific Explanation',
+                'description': 'Bu sorunun açıklamasına benzer konular',
+                'level': difficulty,
+                'recommended_for': 'Soruyu anlama',
+                'estimated_time': '10-15 dakika'
+            })
+        
+        return resources[:4]  # En fazla 4 kaynak döndür
+    
+    def _group_resources_by_topic(self, question_resources):
+        """Yanlış soruları konularına göre grupla"""
+        topic_groups = {}
+        
+        for q_resource in question_resources:
+            topic = q_resource['identified_topic']
+            
+            if topic not in topic_groups:
+                topic_groups[topic] = {
+                    'topic': topic,
+                    'wrong_question_count': 0,
+                    'questions': [],
+                    'combined_resources': [],
+                    'priority_level': 'medium'
+                }
+            
+            topic_groups[topic]['wrong_question_count'] += 1
+            topic_groups[topic]['questions'].append({
+                'id': q_resource['question_id'],
+                'preview': q_resource['question_preview'],
+                'difficulty': q_resource['difficulty']
+            })
+            
+            # Kaynakları birleştir (duplicate'ları temizle)
+            for resource in q_resource['learning_resources']:
+                if not any(r['title'] == resource['title'] for r in topic_groups[topic]['combined_resources']):
+                    topic_groups[topic]['combined_resources'].append(resource)
+        
+        # Öncelik seviyelerini belirle
+        for topic_data in topic_groups.values():
+            wrong_count = topic_data['wrong_question_count']
+            if wrong_count >= 3:
+                topic_data['priority_level'] = 'high'
+            elif wrong_count >= 2:
+                topic_data['priority_level'] = 'medium'
+            else:
+                topic_data['priority_level'] = 'low'
+        
+        # Öncelik sırasına göre sırala
+        priority_order = {'high': 3, 'medium': 2, 'low': 1}
+        sorted_groups = dict(sorted(
+            topic_groups.items(), 
+            key=lambda x: priority_order[x[1]['priority_level']], 
+            reverse=True
+        ))
+        
+        return sorted_groups
+    
+    def _identify_priority_topics_from_wrong_questions(self, wrong_questions):
+        """Yanlış sorulardan öncelikli konuları belirle"""
+        topic_counts = {}
+        
+        for wrong_q in wrong_questions:
+            topic = self._extract_topic_from_question(wrong_q['question'])
+            topic_counts[topic] = topic_counts.get(topic, 0) + 1
+        
+        # En çok yanlış yapılan konuları belirle
+        sorted_topics = sorted(topic_counts.items(), key=lambda x: x[1], reverse=True)
+        
+        priority_topics = []
+        for topic, count in sorted_topics:
+            priority_level = 'high' if count >= 3 else 'medium' if count >= 2 else 'low'
+            priority_topics.append({
+                'topic': topic,
+                'wrong_count': count,
+                'priority': priority_level,
+                'recommendation': self._get_topic_learning_recommendation(topic, count)
+            })
+        
+        return priority_topics
+    
+    def _get_topic_learning_recommendation(self, topic, wrong_count):
+        """Konu ve yanlış sayısına göre öğrenme önerisi"""
+        if wrong_count >= 3:
+            return f"{topic} konusunda temel eksiklikleriniz var. Bu konuyu baştan öğrenmenizi öneririz."
+        elif wrong_count >= 2:
+            return f"{topic} konusunda ek pratik yapmanız gerekiyor. Örnekler üzerinde çalışın."
+        else:
+            return f"{topic} konusunda küçük bir eksiklik. Kısa bir tekrar yeterli olacaktır."
 
     def suggest_resources(self, topics, num_resources=8):
         """Birden fazla zayıf konu için dinamik kaynak önerisi - kişiselleştirilmiş"""
