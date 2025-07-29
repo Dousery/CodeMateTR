@@ -11,10 +11,8 @@ import AutoInterview from './AutoInterview';
 import History from './History';
 import Header from './Header';
 import Profile from './Profile';
-import Box from '@mui/material/Box';
-import { ThemeProvider } from '@mui/material/styles';
-import { createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import '@mui/material/styles';
 
 // Context ile login durumunu paylaş
 const AuthContext = createContext();
