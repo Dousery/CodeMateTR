@@ -545,7 +545,7 @@ export default function Test() {
           </Grid>
 
           {/* Öneriler ve Kaynaklar */}
-          <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
             <Paper 
               component={motion.div} 
               initial={{ opacity: 0, y: 40 }} 
@@ -557,13 +557,13 @@ export default function Test() {
             >
               <Typography variant="h6" fontWeight={700} mb={3} color="white">
                 <School sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Öneriler ve Kaynaklar
+                Öneriler ve Gelişim Tavsiyeleri
               </Typography>
               
               {evaluation?.recommendations && (
                 <Stack spacing={2} mb={3}>
                   <Typography variant="subtitle2" color="rgba(255,255,255,0.9)" fontWeight={600}>
-                    Gelişim Önerileri:
+                    📈 Gelişim Önerileri:
                   </Typography>
                   {evaluation.recommendations.map((rec, i) => (
                     <Alert key={i} severity="info" sx={{ backgroundColor: 'rgba(33, 150, 243, 0.1)' }}>
@@ -572,36 +572,220 @@ export default function Test() {
                   ))}
                 </Stack>
               )}
-              
-              {result.resources && result.resources.length > 0 && (
-                <Stack spacing={2}>
-                  <Typography variant="subtitle2" color="rgba(255,255,255,0.9)" fontWeight={600}>
-                    Önerilen Kaynaklar:
-                  </Typography>
-                  {result.resources.slice(0, 3).map((resource, i) => (
-                    <Card key={i} sx={{ backgroundColor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                      <CardContent sx={{ py: 2 }}>
-                        <Typography color="white" fontWeight={600} variant="body2">
-                          {resource.title || resource}
-                        </Typography>
-                        {resource.type && (
-                          <Chip label={resource.type} size="small" sx={{ mt: 1 }} />
-                        )}
-                        {resource.description && (
-                          <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mt: 1 }}>
-                            {resource.description}
-                          </Typography>
-                        )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </Stack>
-              )}
             </Paper>
           </Grid>
 
-          {/* Web Kaynakları */}
-          {result.web_resources && (result.web_resources.youtube_videos || result.web_resources.websites) && (
+          {/* Tüm Kaynaklar - Birleştirilmiş Bölüm */}
+          {((result.resources && result.resources.length > 0) || 
+            (result.web_resources && (result.web_resources.youtube_videos || result.web_resources.websites))) && (
+            <Grid item xs={12}>
+                <Paper 
+                  component={motion.div} 
+                  initial={{ opacity: 0, y: 40 }} 
+                  animate={{ opacity: 1, y: 0 }} 
+                  transition={{ duration: 1.0 }} 
+                  elevation={8} 
+                  className="glass-card"
+                  sx={{ p: 4, borderRadius: 4, mt: 3 }}
+                >
+                  <Typography variant="h6" fontWeight={700} mb={3} color="white">
+                    🌐 Önerilen Öğrenme Kaynakları
+                  </Typography>
+                  
+                  <Grid container spacing={3}>
+                    {/* Direkt URL Kaynakları */}
+                    {result.resources && result.resources.length > 0 && (
+                      <Grid item xs={12}>
+                        <Typography variant="subtitle2" color="#4f46e5" fontWeight={600} mb={2}>
+                          🎯 Doğrudan Erişim Kaynakları:
+                        </Typography>
+                        <Grid container spacing={2}>
+                          {result.resources.slice(0, 6).map((resource, i) => (
+                            <Grid item xs={12} sm={6} md={4} key={i}>
+                              <Card sx={{ 
+                                backgroundColor: 'rgba(79,70,229,0.1)', 
+                                border: '1px solid rgba(79,70,229,0.2)',
+                                height: '100%',
+                                display: 'flex',
+                                flexDirection: 'column'
+                              }}>
+                                <CardContent sx={{ py: 2, flexGrow: 1 }}>
+                                  <Stack spacing={1}>
+                                    <Typography color="white" fontWeight={600} variant="body2">
+                                      {resource.title || resource}
+                                    </Typography>
+                                    
+                                    <Stack direction="row" spacing={1} flexWrap="wrap">
+                                      {resource.type && (
+                                        <Chip 
+                                          label={resource.type} 
+                                          size="small" 
+                                          sx={{ backgroundColor: '#4f46e5', color: 'white', fontSize: '0.7rem' }}
+                                        />
+                                      )}
+                                      {resource.level && (
+                                        <Chip 
+                                          label={resource.level} 
+                                          size="small" 
+                                          variant="outlined"
+                                          sx={{ borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem' }}
+                                        />
+                                      )}
+                                    </Stack>
+                                    
+                                    {resource.description && (
+                                      <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block">
+                                        {resource.description}
+                                      </Typography>
+                                    )}
+                                    
+                                    {resource.url && (
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => window.open(resource.url, '_blank')}
+                                        sx={{
+                                          borderColor: '#4f46e5',
+                                          color: '#4f46e5',
+                                          textTransform: 'none',
+                                          fontSize: '0.75rem',
+                                          mt: 'auto',
+                                          '&:hover': {
+                                            borderColor: '#7c3aed',
+                                            backgroundColor: 'rgba(79,70,229,0.1)'
+                                          }
+                                        }}
+                                      >
+                                        🔗 Kaynağa Git
+                                      </Button>
+                                    )}
+                                  </Stack>
+                                </CardContent>
+                              </Card>
+                            </Grid>
+                          ))}
+                        </Grid>
+                      </Grid>
+                    )}
+                    
+                    {/* YouTube Videoları */}
+                    {result.web_resources && result.web_resources.youtube_videos && result.web_resources.youtube_videos.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="#ff4444" fontWeight={600} mb={2}>
+                          📺 YouTube Videoları:
+                        </Typography>
+                        <Stack spacing={2}>
+                          {result.web_resources.youtube_videos.slice(0, 3).map((video, i) => (
+                            <Card key={i} sx={{ backgroundColor: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.2)' }}>
+                              <CardContent sx={{ py: 2 }}>
+                                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                                  <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
+                                    {video.title}
+                                  </Typography>
+                                  {video.level && (
+                                    <Chip 
+                                      label={video.level} 
+                                      size="small" 
+                                      sx={{ backgroundColor: '#ff4444', color: 'white' }}
+                                    />
+                                  )}
+                                </Stack>
+                                {video.description && (
+                                  <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
+                                    {video.description}
+                                  </Typography>
+                                )}
+                                {video.duration_estimate && (
+                                  <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
+                                    ⏱️ Süre: {video.duration_estimate}
+                                  </Typography>
+                                )}
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => window.open(video.url, '_blank')}
+                                  sx={{
+                                    borderColor: '#ff4444',
+                                    color: '#ff4444',
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    '&:hover': {
+                                      borderColor: '#ff6666',
+                                      backgroundColor: 'rgba(255,68,68,0.1)'
+                                    }
+                                  }}
+                                >
+                                  📺 YouTube'da Ara
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </Stack>
+                      </Grid>
+                    )}
+                    
+                    {/* Web Siteleri */}
+                    {result.web_resources && result.web_resources.websites && result.web_resources.websites.length > 0 && (
+                      <Grid item xs={12} md={6}>
+                        <Typography variant="subtitle2" color="#4fc3f7" fontWeight={600} mb={2}>
+                          🌐 Web Kaynakları ve Makaleler:
+                        </Typography>
+                        <Stack spacing={2}>
+                          {result.web_resources.websites.slice(0, 3).map((website, i) => (
+                            <Card key={i} sx={{ backgroundColor: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.2)' }}>
+                              <CardContent sx={{ py: 2 }}>
+                                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+                                  <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
+                                    {website.title}
+                                  </Typography>
+                                  {website.type && (
+                                    <Chip 
+                                      label={website.type} 
+                                      size="small" 
+                                      sx={{ backgroundColor: '#4fc3f7', color: 'white' }}
+                                    />
+                                  )}
+                                </Stack>
+                                {website.description && (
+                                  <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
+                                    {website.description}
+                                  </Typography>
+                                )}
+                                {website.level && (
+                                  <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
+                                    📚 Seviye: {website.level}
+                                  </Typography>
+                                )}
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => window.open(website.url, '_blank')}
+                                  sx={{
+                                    borderColor: '#4fc3f7',
+                                    color: '#4fc3f7',
+                                    textTransform: 'none',
+                                    fontSize: '0.75rem',
+                                    '&:hover': {
+                                      borderColor: '#81d4fa',
+                                      backgroundColor: 'rgba(79,195,247,0.1)'
+                                    }
+                                  }}
+                                >
+                                  🔗 Siteye Git
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </Stack>
+                      </Grid>
+                    )}
+                  </Grid>
+                </Paper>
+            </Grid>
+          )}
+
+          {/* Dinamik Öğrenme Kaynakları */}
+          {evaluation?.suggested_resources && evaluation.suggested_resources.length > 0 && (
             <Grid item xs={12}>
               <Paper 
                 component={motion.div} 
@@ -613,122 +797,171 @@ export default function Test() {
                 sx={{ p: 4, borderRadius: 4 }}
               >
                 <Typography variant="h6" fontWeight={700} mb={3} color="white">
-                  🌐 Web'den Önerilen Kaynaklar
+                  <School sx={{ mr: 1, verticalAlign: 'middle' }} />
+                  🌐 Zayıf Alanlarınız İçin Öğrenme Kaynakları
                 </Typography>
                 
                 <Grid container spacing={3}>
-                  {/* YouTube Videoları */}
-                  {result.web_resources.youtube_videos && result.web_resources.youtube_videos.length > 0 && (
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" color="#ff4444" fontWeight={600} mb={2}>
-                        📺 YouTube Videoları:
-                      </Typography>
-                      <Stack spacing={2}>
-                        {result.web_resources.youtube_videos.slice(0, 3).map((video, i) => (
-                          <Card key={i} sx={{ backgroundColor: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.2)' }}>
-                            <CardContent sx={{ py: 2 }}>
-                              <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                                <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
-                                  {video.title}
-                                </Typography>
-                                {video.level && (
-                                  <Chip 
-                                    label={video.level} 
-                                    size="small" 
-                                    sx={{ backgroundColor: '#ff4444', color: 'white' }}
-                                  />
-                                )}
-                              </Stack>
-                              {video.description && (
-                                <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
-                                  {video.description}
-                                </Typography>
+                  {evaluation.suggested_resources.map((resource, index) => (
+                    <Grid item xs={12} sm={6} md={4} key={index}>
+                      <Card
+                        component={motion.div}
+                        whileHover={{ scale: 1.02 }}
+                        sx={{
+                          background: 'linear-gradient(135deg, rgba(79,70,229,0.2) 0%, rgba(124,58,237,0.2) 100%)',
+                          backdropFilter: 'blur(10px)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          borderRadius: 3,
+                          height: '100%',
+                          display: 'flex',
+                          flexDirection: 'column'
+                        }}
+                      >
+                        <CardContent sx={{ flexGrow: 1, p: 3 }}>
+                          <Stack spacing={2}>
+                            {/* Kaynak Türü Chip */}
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <Chip 
+                                label={resource.type || 'Kaynak'} 
+                                size="small" 
+                                sx={{ 
+                                  background: 'linear-gradient(45deg, #4f46e5, #7c3aed)',
+                                  color: 'white',
+                                  fontWeight: 600,
+                                  fontSize: '0.7rem'
+                                }} 
+                              />
+                              {resource.level && (
+                                <Chip 
+                                  label={resource.level} 
+                                  size="small" 
+                                  variant="outlined"
+                                  sx={{ 
+                                    borderColor: 'rgba(255,255,255,0.3)',
+                                    color: 'rgba(255,255,255,0.8)',
+                                    fontSize: '0.65rem'
+                                  }} 
+                                />
                               )}
-                              {video.duration_estimate && (
-                                <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
-                                  ⏱️ Süre: {video.duration_estimate}
+                            </Box>
+                            
+                            {/* Başlık */}
+                            <Typography 
+                              variant="subtitle2" 
+                              fontWeight={700} 
+                              color="white"
+                              sx={{ 
+                                fontSize: '0.9rem',
+                                lineHeight: 1.3,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 2,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {resource.title}
+                            </Typography>
+                            
+                            {/* Açıklama */}
+                            <Typography 
+                              color="rgba(255,255,255,0.7)" 
+                              variant="caption" 
+                              sx={{ 
+                                fontSize: '0.75rem',
+                                lineHeight: 1.4,
+                                display: '-webkit-box',
+                                WebkitLineClamp: 3,
+                                WebkitBoxOrient: 'vertical',
+                                overflow: 'hidden'
+                              }}
+                            >
+                              {resource.description}
+                            </Typography>
+                            
+                            {/* İlgili Konu */}
+                            {resource.related_topic && (
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <Typography 
+                                  color="rgba(255,255,255,0.6)" 
+                                  variant="caption"
+                                  sx={{ fontSize: '0.7rem' }}
+                                >
+                                  📚 Konu:
                                 </Typography>
-                              )}
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => window.open(video.url, '_blank')}
-                                sx={{
-                                  borderColor: '#ff4444',
-                                  color: '#ff4444',
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  '&:hover': {
-                                    borderColor: '#ff6666',
-                                    backgroundColor: 'rgba(255,68,68,0.1)'
-                                  }
-                                }}
+                                <Typography 
+                                  color="#4fc3f7" 
+                                  variant="caption" 
+                                  fontWeight={600}
+                                  sx={{ fontSize: '0.7rem' }}
+                                >
+                                  {resource.related_topic}
+                                </Typography>
+                              </Box>
+                            )}
+                            
+                            {/* Süre Bilgisi */}
+                            {resource.estimated_duration && (
+                              <Typography 
+                                color="rgba(255,255,255,0.6)" 
+                                variant="caption"
+                                sx={{ fontSize: '0.7rem' }}
                               >
-                                YouTube'da Ara
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </Stack>
+                                ⏱️ {resource.estimated_duration}
+                              </Typography>
+                            )}
+                          </Stack>
+                          
+                          {/* Kaynak Erişim Butonu */}
+                          <Button
+                            variant="contained"
+                            size="small"
+                            fullWidth
+                            onClick={() => window.open(resource.url, '_blank')}
+                            sx={{
+                              mt: 2,
+                              background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                              borderRadius: '20px',
+                              textTransform: 'none',
+                              fontWeight: 600,
+                              fontSize: '0.75rem',
+                              py: 1,
+                              boxShadow: '0 2px 10px rgba(79, 70, 229, 0.3)',
+                              '&:hover': {
+                                background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                                boxShadow: '0 4px 15px rgba(79, 70, 229, 0.5)',
+                                transform: 'translateY(-1px)'
+                              }
+                            }}
+                          >
+                            {resource.type === 'YouTube Video' || resource.type === 'Video' || resource.type === 'YouTube Kanal' ? '📹' : 
+                             resource.type === 'Kurs' ? '🎓' :
+                             resource.type === 'Doküman' ? '📖' :
+                             resource.type === 'Tutorial' ? '📝' :
+                             resource.type === 'Oyun' ? '🎮' :
+                             resource.type === 'Challenge' ? '🏆' : '🌐'} 
+                            {' '}{resource.type === 'YouTube Video' || resource.type === 'Video' ? 'İzle' : 
+                                 resource.type === 'YouTube Kanal' ? 'Kanala Git' :
+                                 resource.type === 'Kurs' ? 'Kursa Başla' : 
+                                 'Kaynaşa Git'}
+                          </Button>
+                        </CardContent>
+                      </Card>
                     </Grid>
-                  )}
-                  
-                  {/* Web Siteleri */}
-                  {result.web_resources.websites && result.web_resources.websites.length > 0 && (
-                    <Grid item xs={12} md={6}>
-                      <Typography variant="subtitle2" color="#4fc3f7" fontWeight={600} mb={2}>
-                        🌐 Web Siteleri ve Makaleler:
-                      </Typography>
-                      <Stack spacing={2}>
-                        {result.web_resources.websites.slice(0, 3).map((website, i) => (
-                          <Card key={i} sx={{ backgroundColor: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.2)' }}>
-                            <CardContent sx={{ py: 2 }}>
-                              <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                                <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
-                                  {website.title}
-                                </Typography>
-                                {website.type && (
-                                  <Chip 
-                                    label={website.type} 
-                                    size="small" 
-                                    sx={{ backgroundColor: '#4fc3f7', color: 'white' }}
-                                  />
-                                )}
-                              </Stack>
-                              {website.description && (
-                                <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
-                                  {website.description}
-                                </Typography>
-                              )}
-                              {website.level && (
-                                <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
-                                  📚 Seviye: {website.level}
-                                </Typography>
-                              )}
-                              <Button
-                                variant="outlined"
-                                size="small"
-                                onClick={() => window.open(website.url, '_blank')}
-                                sx={{
-                                  borderColor: '#4fc3f7',
-                                  color: '#4fc3f7',
-                                  textTransform: 'none',
-                                  fontSize: '0.75rem',
-                                  '&:hover': {
-                                    borderColor: '#81d4fa',
-                                    backgroundColor: 'rgba(79,195,247,0.1)'
-                                  }
-                                }}
-                              >
-                                Google'da Ara
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        ))}
-                      </Stack>
-                    </Grid>
-                  )}
+                  ))}
                 </Grid>
+                
+                {/* Kaynak İstatistikleri */}
+                <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
+                  <Typography variant="body2" color="rgba(255,255,255,0.8)" textAlign="center">
+                    💡 Bu kaynaklar yanlış cevapladığınız konulara göre özelleştirilmiştir
+                  </Typography>
+                  <Typography variant="caption" color="rgba(255,255,255,0.6)" textAlign="center" display="block" sx={{ mt: 1 }}>
+                    Toplam {evaluation.suggested_resources.length} kişiselleştirilmiş kaynak • 
+                    {evaluation.suggested_resources.filter(r => r.type?.includes('Video')).length} Video • 
+                    {evaluation.suggested_resources.filter(r => r.type === 'Kurs').length} Kurs • 
+                    {evaluation.suggested_resources.filter(r => r.type === 'Doküman').length} Doküman
+                  </Typography>
+                </Box>
               </Paper>
             </Grid>
           )}
