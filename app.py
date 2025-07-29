@@ -2587,24 +2587,35 @@ def get_user_activity(username):
 
 @app.route('/forum/leaderboard', methods=['GET'])
 def get_leaderboard():
-    """Liderlik tablosunu getirir"""
+    """Liderlik tablosunu getirir - En iyi çözüm seçilen 3 kullanıcı"""
     try:
-        # En aktif kullanıcıları hesapla
-        user_stats = db.session.query(
-            UserActivity.username,
-            db.func.sum(UserActivity.points_earned).label('total_points'),
-            db.func.count(UserActivity.id).label('activity_count')
-        ).group_by(UserActivity.username)\
-         .order_by(db.func.sum(UserActivity.points_earned).desc())\
-         .limit(20).all()
+        # En iyi çözüm seçilen kullanıcıları hesapla
+        solution_leaders = db.session.query(
+            ForumComment.author_username,
+            db.func.count(ForumComment.id).label('solution_count')
+        ).filter(
+            ForumComment.is_solution == True
+        ).group_by(
+            ForumComment.author_username
+        ).order_by(
+            db.func.count(ForumComment.id).desc()
+        ).limit(3).all()
         
         leaderboard_data = []
-        for i, (username, points, count) in enumerate(user_stats, 1):
+        for i, (username, solution_count) in enumerate(solution_leaders, 1):
+            # Kullanıcının toplam aktivite puanlarını da hesapla
+            total_points = db.session.query(
+                db.func.sum(UserActivity.points_earned)
+            ).filter(
+                UserActivity.username == username
+            ).scalar() or 0
+            
             leaderboard_data.append({
                 'rank': i,
                 'username': username,
-                'total_points': points or 0,
-                'activity_count': count or 0
+                'solution_count': solution_count,
+                'total_points': total_points,
+                'avatar': username[0].upper() if username else 'U'  # İlk harf avatar olarak
             })
         
         return jsonify({'leaderboard': leaderboard_data})

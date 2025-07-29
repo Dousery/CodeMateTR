@@ -47,7 +47,9 @@ import {
   CheckCircle as CheckCircleIcon,
   Report as ReportIcon,
   Star as StarIcon,
-  StarBorder as StarBorderIcon
+  StarBorder as StarBorderIcon,
+  AddComment as AddCommentIcon,
+  Send as SendIcon
 } from '@mui/icons-material';
 
 const Forum = () => {
@@ -614,51 +616,149 @@ const Forum = () => {
 
       {/* Leaderboard Panel */}
       {showLeaderboard && (
-        <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.05)' }}>
+        <Card sx={{ 
+          mb: 3, 
+          background: 'rgba(255,255,255,0.05)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+        }}>
           <CardContent>
-            <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-              🏆 Liderlik Tablosu
+            <Typography variant="h6" sx={{ 
+              color: 'white', 
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+              fontWeight: 'bold'
+            }}>
+              🏆 En İyi Çözüm Verenler
             </Typography>
             {leaderboard.length === 0 ? (
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
-                Henüz yeterli veri yok.
+                Henüz çözüm seçilmemiş.
               </Typography>
             ) : (
-              <List>
-                {leaderboard.slice(0, 10).map((user, index) => (
-                  <ListItem key={user.username} sx={{ 
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: index < 3 ? 'rgba(255, 215, 0, 0.1)' : 'transparent'
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {leaderboard.map((user, index) => (
+                  <Card key={user.username} sx={{ 
+                    background: index === 0 ? 'rgba(255, 215, 0, 0.1)' : 
+                              index === 1 ? 'rgba(192, 192, 192, 0.1)' : 
+                              index === 2 ? 'rgba(205, 127, 50, 0.1)' : 'rgba(255,255,255,0.02)',
+                    border: index === 0 ? '2px solid #FFD700' : 
+                           index === 1 ? '2px solid #C0C0C0' : 
+                           index === 2 ? '2px solid #CD7F32' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 2,
+                    transition: 'all 0.3s ease',
+                    '&:hover': {
+                      transform: 'translateY(-2px)',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                    }
                   }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                      <Typography variant="h6" sx={{ 
-                        color: index < 3 ? '#FFD700' : 'white',
-                        minWidth: 40
-                      }}>
-                        #{user.rank}
-                      </Typography>
-                      <Avatar sx={{ bgcolor: '#4f46e5' }}>
-                        {user.username.charAt(0).toUpperCase()}
+                    <CardContent sx={{ py: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {/* Sıralama */}
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center',
+                          width: 40,
+                          height: 40,
+                          borderRadius: '50%',
+                          background: index === 0 ? 'linear-gradient(45deg, #FFD700 0%, #FFA500 100%)' :
+                                      index === 1 ? 'linear-gradient(45deg, #C0C0C0 0%, #A9A9A9 100%)' :
+                                      index === 2 ? 'linear-gradient(45deg, #CD7F32 0%, #B8860B 100%)' :
+                                      'rgba(255,255,255,0.1)',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '1.2rem',
+                          boxShadow: '0 4px 12px rgba(0,0,0,0.3)'
+                        }}>
+                          {index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `#${user.rank}`}
+                        </Box>
+                        
+                        {/* Avatar */}
+                        <Avatar sx={{ 
+                          width: 50, 
+                          height: 50, 
+                          background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                          fontWeight: 'bold',
+                          fontSize: '1.2rem',
+                          boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)'
+                        }}>
+                          {user.avatar}
                       </Avatar>
+                        
+                        {/* Kullanıcı Bilgileri */}
                       <Box sx={{ flex: 1 }}>
-                        <Typography variant="body1" sx={{ color: 'white' }}>
+                          <Typography variant="h6" sx={{ 
+                            color: 'white', 
+                            fontWeight: 'bold',
+                            fontSize: '1.1rem'
+                          }}>
                           {user.username}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                          {user.total_points} puan • {user.activity_count} aktivite
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mt: 0.5 }}>
+                            <Typography variant="body2" sx={{ 
+                              color: index === 0 ? '#FFD700' : 
+                                     index === 1 ? '#C0C0C0' : 
+                                     index === 2 ? '#CD7F32' : 'rgba(255,255,255,0.8)',
+                              fontWeight: 'bold',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5
+                            }}>
+                              <CheckCircleIcon sx={{ fontSize: 16 }} />
+                              {user.solution_count} çözüm
+                            </Typography>
+                            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                              {user.total_points} puan
                         </Typography>
                       </Box>
                     </Box>
-                  </ListItem>
+                        
+                        {/* Başarı Rozeti */}
+                        {index < 3 && (
+                          <Box sx={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            alignItems: 'center',
+                            gap: 0.5
+                          }}>
+                            <Typography variant="caption" sx={{ 
+                              color: index === 0 ? '#FFD700' : 
+                                     index === 1 ? '#C0C0C0' : '#CD7F32',
+                              fontWeight: 'bold',
+                              textAlign: 'center'
+                            }}>
+                              {index === 0 ? 'Altın' : index === 1 ? 'Gümüş' : 'Bronz'}
+                            </Typography>
+                            <Typography variant="caption" sx={{ 
+                              color: 'rgba(255,255,255,0.6)',
+                              textAlign: 'center'
+                            }}>
+                              Çözüm
+                            </Typography>
+                          </Box>
+                        )}
+                      </Box>
+                    </CardContent>
+                  </Card>
                 ))}
-              </List>
+              </Box>
             )}
           </CardContent>
         </Card>
       )}
 
-      {/* Filters and Search */}
-      <Card sx={{ mb: 3, bgcolor: 'rgba(255,255,255,0.05)' }}>
+      {/* Filtering and Search */}
+      <Card sx={{ 
+        mb: 3, 
+        background: 'rgba(255,255,255,0.05)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(255,255,255,0.1)',
+        boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+      }}>
         <CardContent>
           <Grid container spacing={2} alignItems="center">
             <Grid item xs={12} md={4}>
@@ -672,13 +772,20 @@ const Forum = () => {
                     <InputAdornment position="start">
                       <SearchIcon sx={{ color: 'rgba(255,255,255,0.7)' }} />
                     </InputAdornment>
-                  )
+                  ),
                 }}
                 sx={{
                   '& .MuiOutlinedInput-root': {
                     color: 'white',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' }
+                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                    '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: 1
+                  },
+                  '& .MuiInputBase-input::placeholder': {
+                    color: 'rgba(255,255,255,0.5)',
+                    opacity: 1
                   }
                 }}
               />
@@ -692,7 +799,9 @@ const Forum = () => {
                   sx={{
                     color: 'white',
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' }
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: 1
                   }}
                 >
                   <MenuItem value="all">Tümü</MenuItem>
@@ -711,7 +820,9 @@ const Forum = () => {
                   sx={{
                     color: 'white',
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' }
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                    background: 'rgba(255,255,255,0.05)',
+                    borderRadius: 1
                   }}
                 >
                   {sortOptions.map(option => (
@@ -726,7 +837,18 @@ const Forum = () => {
                 variant="contained"
                 onClick={() => setOpenPostDialog(true)}
                 startIcon={<AddIcon />}
-                sx={{ bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } }}
+                sx={{ 
+                  background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                    transform: 'translateY(-1px)'
+                  },
+                  borderRadius: '20px',
+                  py: 1.5,
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
               >
                 Yeni Gönderi
               </Button>
@@ -742,13 +864,17 @@ const Forum = () => {
             key={post.id}
             sx={{
               mb: 2,
-              bgcolor: post.is_solved ? 'rgba(76, 175, 80, 0.1)' : 'rgba(255,255,255,0.05)',
+              background: post.is_solved ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.05)',
+              backdropFilter: 'blur(20px)',
               border: post.is_solved ? '2px solid #4CAF50' : '1px solid rgba(255,255,255,0.1)',
               cursor: 'pointer',
               transition: 'all 0.3s ease',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
               '&:hover': {
-                bgcolor: post.is_solved ? 'rgba(76, 175, 80, 0.15)' : 'rgba(255,255,255,0.08)',
-                transform: 'translateY(-2px)'
+                background: post.is_solved ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.08)',
+                transform: 'translateY(-4px)',
+                boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
+                border: post.is_solved ? '2px solid #66BB6A' : '1px solid rgba(255,255,255,0.2)'
               }
             }}
             onClick={() => handlePostClick(post)}
@@ -757,7 +883,7 @@ const Forum = () => {
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                 <Box sx={{ flex: 1 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Typography variant="h6" sx={{ color: 'white' }}>
+                    <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
                       {post.title}
                     </Typography>
                     {post.is_solved && (
@@ -765,15 +891,16 @@ const Forum = () => {
                         label="✅ Çözüldü"
                         size="small"
                         sx={{
-                          bgcolor: '#4CAF50',
+                          background: 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)',
                           color: 'white',
                           fontWeight: 'bold',
-                          fontSize: '0.7rem'
+                          fontSize: '0.7rem',
+                          boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
                         }}
                       />
                     )}
                   </Box>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 2 }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 2, lineHeight: 1.6 }}>
                     {post.content}
                   </Typography>
                 </Box>
@@ -783,26 +910,39 @@ const Forum = () => {
                       label="SOLVED"
                       size="small"
                       sx={{
-                        bgcolor: '#4CAF50',
+                        background: 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)',
                         color: 'white',
                         fontWeight: 'bold',
                         fontSize: '0.6rem',
-                        alignSelf: 'flex-end'
+                        alignSelf: 'flex-end',
+                        boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
                       }}
                     />
                   )}
                   <Chip
                     label={postTypes.find(t => t.value === post.post_type)?.label || post.post_type}
                     color={getPostTypeColor(post.post_type)}
-                    size="small"
-                  />
+                      size="small"
+                      sx={{ 
+                      background: 'rgba(255,255,255,0.1)',
+                      backdropFilter: 'blur(10px)',
+                      border: '1px solid rgba(255,255,255,0.2)'
+                      }}
+                    />
                 </Box>
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <PersonIcon />
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  <Avatar sx={{ 
+                    width: 28, 
+                    height: 28, 
+                    background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                    fontWeight: 'bold'
+                  }}>
+                    {post.author.charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
                     {post.author}
                   </Typography>
                 </Box>
@@ -819,7 +959,14 @@ const Forum = () => {
                       label={tag}
                       size="small"
                       icon={<TagIcon />}
-                      sx={{ mr: 1, mb: 1, bgcolor: 'rgba(79, 70, 229, 0.2)', color: 'white' }}
+                      sx={{ 
+                        mr: 1, 
+                        mb: 1, 
+                        background: 'rgba(79, 70, 229, 0.2)',
+                        backdropFilter: 'blur(10px)',
+                        color: 'white',
+                        border: '1px solid rgba(79, 70, 229, 0.3)'
+                      }}
                     />
                   ))}
                 </Box>
@@ -833,7 +980,14 @@ const Forum = () => {
                       e.stopPropagation();
                       handleLikePost(post.id);
                     }}
-                    sx={{ color: post.user_liked ? '#4f46e5' : 'rgba(255,255,255,0.7)' }}
+                    sx={{ 
+                      color: post.user_liked ? '#4f46e5' : 'rgba(255,255,255,0.7)',
+                      '&:hover': { 
+                        bgcolor: 'rgba(79, 70, 229, 0.1)',
+                        transform: 'scale(1.1)'
+                      },
+                      transition: 'all 0.2s ease'
+                    }}
                   >
                     {post.user_liked ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />}
                   </IconButton>
@@ -850,7 +1004,14 @@ const Forum = () => {
                       setReportData(prev => ({ ...prev, post_id: post.id, comment_id: null }));
                       setShowReportDialog(true);
                     }}
-                    sx={{ color: 'rgba(255,255,255,0.7)' }}
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      '&:hover': { 
+                        bgcolor: 'rgba(244, 67, 54, 0.1)',
+                        transform: 'scale(1.1)'
+                      },
+                      transition: 'all 0.2s ease'
+                    }}
                   >
                     <ReportIcon />
                   </IconButton>
@@ -902,13 +1063,28 @@ const Forum = () => {
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: 'rgba(30, 30, 30, 0.95)',
+            background: 'rgba(20, 20, 40, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
             color: 'white'
           }
         }}
       >
-        <DialogTitle>Yeni Gönderi Oluştur</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ 
+          background: 'rgba(30, 30, 50, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          fontWeight: 600
+        }}>
+          Yeni Gönderi Oluştur
+        </DialogTitle>
+        <DialogContent sx={{ 
+          background: 'rgba(20, 20, 40, 0.9)',
+          backdropFilter: 'blur(20px)',
+          pt: 3
+        }}>
           <TextField
             fullWidth
             label="Başlık"
@@ -918,9 +1094,14 @@ const Forum = () => {
             sx={{
               '& .MuiOutlinedInput-root': {
                 color: 'white',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' }
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 1
               },
-              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
             }}
           />
           <TextField
@@ -934,9 +1115,14 @@ const Forum = () => {
             sx={{
               '& .MuiOutlinedInput-root': {
                 color: 'white',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' }
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 1
               },
-              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+              '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+              '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
             }}
           />
           <FormControl fullWidth margin="normal">
@@ -946,7 +1132,11 @@ const Forum = () => {
               onChange={(e) => setNewPost(prev => ({ ...prev, post_type: e.target.value }))}
               sx={{
                 color: 'white',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' }
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#4f46e5' },
+                background: 'rgba(255,255,255,0.05)',
+                borderRadius: 1
               }}
             >
               {postTypes.map(type => (
@@ -956,14 +1146,37 @@ const Forum = () => {
           </FormControl>
           
         </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenPostDialog(false)} sx={{ color: 'rgba(255,255,255,0.7)' }}>
+        <DialogActions sx={{ 
+          background: 'rgba(30, 30, 50, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          p: 2
+        }}>
+          <Button 
+            onClick={() => setOpenPostDialog(false)} 
+              sx={{
+              color: 'rgba(255,255,255,0.7)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+            }}
+          >
             İptal
           </Button>
           <Button
             onClick={handleCreatePost}
             variant="contained"
-            sx={{ bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } }}
+            sx={{ 
+              background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+              '&:hover': { 
+                background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                transform: 'translateY(-1px)'
+              },
+              borderRadius: '20px',
+              px: 3,
+              py: 1,
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+              transition: 'all 0.2s ease'
+            }}
           >
             Oluştur
           </Button>
@@ -974,87 +1187,282 @@ const Forum = () => {
       <Dialog
         open={openCommentDialog}
         onClose={() => setOpenCommentDialog(false)}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
-            bgcolor: 'rgba(30, 30, 30, 0.95)',
-            color: 'white',
-            maxHeight: '80vh'
+            background: 'rgba(20, 20, 40, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            maxHeight: '90vh',
+            color: 'white'
           }
         }}
       >
         {selectedPost && (
           <>
-            <DialogTitle>
-              <Typography variant="h6">{selectedPost.post.title}</Typography>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-                {selectedPost.post.author} • {formatDate(selectedPost.post.created_at)}
+            {/* Header */}
+            <DialogTitle sx={{ 
+              borderBottom: '1px solid rgba(255,255,255,0.1)', 
+              pb: 2,
+              background: 'rgba(30, 30, 50, 0.9)',
+              backdropFilter: 'blur(20px)',
+              fontWeight: 600
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                <Typography variant="h5" sx={{ fontWeight: 'bold', color: 'white' }}>
+                  {selectedPost.post.title}
               </Typography>
+                {selectedPost.post.is_solved && (
+                  <Chip
+                    label="✅ Çözüldü"
+                    size="small"
+                    sx={{
+                      background: 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)',
+                      color: 'white',
+                      fontWeight: 'bold',
+                      fontSize: '0.8rem',
+                      boxShadow: '0 2px 8px rgba(76, 175, 80, 0.3)'
+                    }}
+                  />
+                )}
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Avatar sx={{ 
+                    width: 32, 
+                    height: 32, 
+                    background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                    fontWeight: 'bold'
+                  }}>
+                    {selectedPost.post.author.charAt(0).toUpperCase()}
+                  </Avatar>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
+                    {selectedPost.post.author}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                  {formatDate(selectedPost.post.created_at)}
+                </Typography>
+                <Chip
+                  label={postTypes.find(t => t.value === selectedPost.post.post_type)?.label || selectedPost.post.post_type}
+                  color={getPostTypeColor(selectedPost.post.post_type)}
+                  size="small"
+                  sx={{
+                    background: 'rgba(255,255,255,0.1)',
+                    backdropFilter: 'blur(10px)',
+                    border: '1px solid rgba(255,255,255,0.2)'
+                  }}
+                />
+              </Box>
             </DialogTitle>
-            <DialogContent>
-              <Typography variant="body1" sx={{ mb: 3 }}>
+
+            <DialogContent sx={{ 
+              p: 3,
+              background: 'rgba(20, 20, 40, 0.9)',
+              backdropFilter: 'blur(20px)'
+            }}>
+              {/* Post Content */}
+              <Card sx={{ 
+                mb: 4, 
+                background: 'rgba(255, 255, 255, 0.05)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                borderRadius: 2,
+                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  transform: 'translateY(-2px)'
+                }
+              }}>
+                <CardContent sx={{ p: 3 }}>
+                  <Typography variant="body1" sx={{ 
+                    lineHeight: 1.7, 
+                    fontSize: '1.1rem',
+                    color: 'rgba(255,255,255,0.9)',
+                    mb: 4  // Başlık ve içerik arasındaki boşluğu artır
+                  }}>
                 {selectedPost.post.content}
               </Typography>
               
-              <Divider sx={{ my: 2, borderColor: 'rgba(255,255,255,0.2)' }} />
-              
-              <Typography variant="h6" sx={{ mb: 2 }}>Yorumlar ({selectedPost.comments.length})</Typography>
-              
-              <List>
-                {selectedPost.comments.map((comment) => (
-                  <ListItem key={comment.id} sx={{ 
-                    flexDirection: 'column', 
-                    alignItems: 'flex-start',
-                    border: comment.is_solution ? '2px solid #4CAF50' : '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: 2,
-                    mb: 2,
-                    bgcolor: comment.is_solution ? 'rgba(76, 175, 80, 0.1)' : 'transparent'
+                  {/* Post Stats */}
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 3, 
+                    pt: 3,
+                    borderTop: '1px solid rgba(255,255,255,0.1)'
                   }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1, width: '100%' }}>
-                      <Avatar sx={{ width: 32, height: 32, bgcolor: '#4f46e5' }}>
-                        {comment.author.charAt(0).toUpperCase()}
-                      </Avatar>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleLikePost(selectedPost.post.id)}
+                        sx={{ 
+                          color: selectedPost.post.user_liked ? '#4f46e5' : 'rgba(255,255,255,0.7)',
+                          '&:hover': { 
+                            bgcolor: 'rgba(79, 70, 229, 0.1)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        {selectedPost.post.user_liked ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />}
+                      </IconButton>
                       <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                        {comment.author}
+                        {selectedPost.post.likes_count}
                       </Typography>
-                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                        {formatDate(comment.created_at)}
-                      </Typography>
-                      
-                      {/* Çözüm işareti */}
-                      {comment.is_solution && (
-                        <Chip
-                          label="✅ Çözüm"
-                          size="small"
-                          sx={{ 
-                            bgcolor: '#4CAF50', 
-                            color: 'white',
-                            ml: 'auto'
-                          }}
-                        />
-                      )}
                     </Box>
                     
-                    <Typography variant="body1" sx={{ mb: 2, width: '100%' }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <CommentIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 20 }} />
+                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                        {selectedPost.post.comments_count}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <VisibilityIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 20 }} />
+                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                        {selectedPost.post.views}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </CardContent>
+              </Card>
+              
+              {/* Comments Section */}
+              <Box sx={{ mb: 4 }}>
+                <Typography variant="h6" sx={{ 
+                  mb: 3, 
+                  color: 'white',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1
+                }}>
+                  <CommentIcon sx={{ color: '#4f46e5' }} />
+                  Yorumlar ({selectedPost.comments.length})
+                </Typography>
+              
+                {selectedPost.comments.length === 0 ? (
+                  <Card sx={{ 
+                    background: 'rgba(255,255,255,0.02)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px dashed rgba(255,255,255,0.2)',
+                    borderRadius: 2
+                  }}>
+                    <CardContent sx={{ textAlign: 'center', py: 4 }}>
+                      <CommentIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.3)', mb: 2 }} />
+                      <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                        Henüz yorum yapılmamış. İlk yorumu siz yapın!
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {selectedPost.comments.map((comment) => (
+                      <Card key={comment.id} sx={{ 
+                    border: comment.is_solution ? '2px solid #4CAF50' : '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: 2,
+                        background: comment.is_solution ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.05)',
+                        backdropFilter: 'blur(20px)',
+                        position: 'relative',
+                        overflow: 'visible',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
+                        transition: 'all 0.3s ease',
+                        '&:hover': {
+                          background: comment.is_solution ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.08)',
+                          transform: 'translateY(-2px)',
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.3)'
+                        }
+                      }}>
+                        {comment.is_solution && (
+                          <Box sx={{
+                            position: 'absolute',
+                            top: -10,
+                            right: 20,
+                            background: 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)',
+                            color: 'white',
+                            px: 2,
+                            py: 0.5,
+                            borderRadius: 1,
+                            fontSize: '0.75rem',
+                            fontWeight: 'bold',
+                            boxShadow: '0 4px 12px rgba(76, 175, 80, 0.4)',
+                            backdropFilter: 'blur(10px)'
+                  }}>
+                            ✅ Çözüm
+                          </Box>
+                        )}
+                        
+                        <CardContent>
+                          {/* Comment Header */}
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+                            <Avatar sx={{ 
+                              width: 40, 
+                              height: 40, 
+                              background: comment.is_solution ? 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)' : 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                              fontWeight: 'bold'
+                            }}>
+                        {comment.author.charAt(0).toUpperCase()}
+                      </Avatar>
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body1" sx={{ 
+                                color: 'white', 
+                                fontWeight: 500,
+                                fontSize: '1rem'
+                              }}>
+                        {comment.author}
+                      </Typography>
+                              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                        {formatDate(comment.created_at)}
+                      </Typography>
+                            </Box>
+                    </Box>
+                    
+                          {/* Comment Content */}
+                          <Typography variant="body1" sx={{ 
+                            mb: 3, 
+                            lineHeight: 1.6,
+                            color: 'rgba(255,255,255,0.9)',
+                            fontSize: '1rem'
+                          }}>
                       {comment.content}
                     </Typography>
                     
-                    {/* Yorum aksiyonları */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%' }}>
-                      {/* Beğen butonu */}
+                          {/* Comment Actions */}
+                          <Box sx={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: 2,
+                            pt: 2,
+                            borderTop: '1px solid rgba(255,255,255,0.1)'
+                          }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <IconButton
                         size="small"
                         onClick={() => handleLikeComment(comment.id)}
-                        sx={{ color: comment.user_liked ? '#4f46e5' : 'rgba(255,255,255,0.7)' }}
+                                sx={{ 
+                                  color: comment.user_liked ? '#4f46e5' : 'rgba(255,255,255,0.7)',
+                                  '&:hover': { 
+                                    bgcolor: 'rgba(79, 70, 229, 0.1)',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
                       >
                         {comment.user_liked ? <ThumbUpIcon /> : <ThumbUpOutlinedIcon />}
                       </IconButton>
                       <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                         {comment.likes_count || 0}
                       </Typography>
+                            </Box>
                       
-                      {/* Çözüm olarak işaretle butonu (sadece gönderi sahibi görebilir) */}
+                            {/* Solution Button */}
                       {(selectedPost.post.author_username === localStorage.getItem('username') || 
                         selectedPost.post.author === localStorage.getItem('username')) && 
                        !selectedPost.post.is_solved && !comment.is_solution && (
@@ -1068,68 +1476,137 @@ const Forum = () => {
                             });
                             setShowSolutionDialog(true);
                           }}
+                                startIcon={<CheckCircleIcon />}
                           sx={{ 
-                            bgcolor: '#4CAF50',
+                                  background: 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)',
                             color: 'white',
-                            '&:hover': { bgcolor: '#388E3C' },
-                            fontWeight: 'bold'
+                                  '&:hover': { 
+                                    background: 'linear-gradient(45deg, #388E3C 0%, #4CAF50 100%)',
+                                    transform: 'translateY(-1px)'
+                                  },
+                                  fontWeight: 'bold',
+                                  borderRadius: 2,
+                                  boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)',
+                                  transition: 'all 0.2s ease'
                           }}
                         >
-                          ✅ Çözüm Olarak İşaretle
+                                Çözüm Olarak İşaretle
                         </Button>
                       )}
                       
-                      {/* Gönderi sahibi değilse bilgi mesajı */}
-                      {selectedPost.post.author_username !== localStorage.getItem('username') && 
-                       !selectedPost.post.is_solved && (
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', ml: 1 }}>
-                          💡 Sadece gönderi sahibi çözüm işaretleyebilir
-                        </Typography>
-                      )}
-                      
-                      {/* Rapor butonu */}
+                            {/* Report Button */}
                       <IconButton
                         size="small"
                         onClick={() => {
                           setReportData(prev => ({ ...prev, post_id: selectedPost.post.id, comment_id: comment.id }));
                           setShowReportDialog(true);
                         }}
-                        sx={{ color: 'rgba(255,255,255,0.7)' }}
+                              sx={{ 
+                                color: 'rgba(255,255,255,0.7)',
+                                '&:hover': { 
+                                  bgcolor: 'rgba(244, 67, 54, 0.1)',
+                                  transform: 'scale(1.1)'
+                                },
+                                transition: 'all 0.2s ease'
+                              }}
                       >
                         <ReportIcon />
                       </IconButton>
                     </Box>
-                  </ListItem>
+                        </CardContent>
+                      </Card>
                 ))}
-              </List>
+                  </Box>
+                )}
+              </Box>
               
-              <Box sx={{ mt: 3 }}>
-                <Typography variant="h6" sx={{ mb: 2 }}>Yorum Ekle</Typography>
+              {/* Add Comment Section */}
+              <Card sx={{ 
+                background: 'rgba(79, 70, 229, 0.05)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(79, 70, 229, 0.2)',
+                borderRadius: 2,
+                boxShadow: '0 8px 32px rgba(79, 70, 229, 0.1)',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  background: 'rgba(79, 70, 229, 0.08)',
+                  border: '1px solid rgba(79, 70, 229, 0.3)',
+                  transform: 'translateY(-2px)'
+                }
+              }}>
+                <CardContent>
+                  <Typography variant="h6" sx={{ 
+                    mb: 2, 
+                    color: 'white',
+                    fontWeight: 'bold',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1
+                  }}>
+                    <AddCommentIcon sx={{ color: '#4f46e5' }} />
+                    Yorum Ekle
+                  </Typography>
                 <TextField
                   fullWidth
-                  label="Yorumunuz"
+                    label="Yorumunuzu yazın..."
                   value={newComment.content}
                   onChange={(e) => setNewComment(prev => ({ ...prev, content: e.target.value }))}
                   multiline
-                  rows={3}
+                    rows={4}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       color: 'white',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' }
+                        '& fieldset': { borderColor: 'rgba(79, 70, 229, 0.3)' },
+                        '&:hover fieldset': { borderColor: 'rgba(79, 70, 229, 0.5)' },
+                        '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 1
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' }
+                      '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                      '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
                   }}
                 />
-              </Box>
+                </CardContent>
+              </Card>
             </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOpenCommentDialog(false)} sx={{ color: 'rgba(255,255,255,0.7)' }}>
+            
+            <DialogActions sx={{ 
+              p: 3, 
+              borderTop: '1px solid rgba(255,255,255,0.1)',
+              background: 'rgba(30, 30, 50, 0.9)',
+              backdropFilter: 'blur(20px)'
+            }}>
+              <Button 
+                onClick={() => setOpenCommentDialog(false)} 
+                sx={{ 
+                  color: 'rgba(255,255,255,0.7)',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+                }}
+              >
                 Kapat
               </Button>
               <Button
                 onClick={handleCreateComment}
                 variant="contained"
-                sx={{ bgcolor: '#4f46e5', '&:hover': { bgcolor: '#4338ca' } }}
+                disabled={!newComment.content.trim()}
+                startIcon={<SendIcon />}
+                sx={{ 
+                  background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                  '&:hover': { 
+                    background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                    transform: 'translateY(-1px)'
+                  },
+                  '&:disabled': { 
+                    background: 'rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.3)'
+                  },
+                  borderRadius: '20px',
+                  px: 3,
+                  py: 1,
+                  fontWeight: 'bold',
+                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                  transition: 'all 0.2s ease'
+                }}
               >
                 Yorum Ekle
               </Button>
