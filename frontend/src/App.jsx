@@ -8,6 +8,7 @@ import Test from './Test';
 import Case from './Case';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
+import Forum from './Forum';
 import History from './History';
 import Header from './Header';
 import Profile from './Profile';
@@ -105,6 +106,7 @@ function App() {
               <Route path="/case" element={<ProtectedRoute><Case /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
+              <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
             </Routes>
