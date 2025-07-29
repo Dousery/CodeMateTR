@@ -27,6 +27,14 @@ CORS(app,
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///btk_project.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = 'uploads'
+
+# Upload klasörünü oluştur
+os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+
+# İzin verilen dosya uzantıları
+ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 
 # Session ayarları
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
@@ -43,6 +51,7 @@ class User(db.Model):
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     interest = db.Column(db.String(80), nullable=True)
+    cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -125,6 +134,18 @@ def load_sessions_from_db():
             print(f"Database'den {len(sessions)} aktif session yüklendi.")
         except Exception as e:
             print(f"Session yükleme hatası: {e}")
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def get_file_mimetype(filename):
+    ext = filename.rsplit('.', 1)[1].lower()
+    if ext == 'pdf':
+        return 'application/pdf'
+    elif ext in ['doc', 'docx']:
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    return 'application/octet-stream'
 
 # Uygulama context'i oluşturulduktan sonra session'ları yükle
 def init_app():
@@ -305,6 +326,296 @@ def test_your_skill():
         
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
+
+@app.route('/upload_cv', methods=['POST'])
+def upload_cv():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    if 'cv_file' not in request.files:
+        return jsonify({'error': 'CV dosyası seçilmemiş.'}), 400
+    
+    file = request.files['cv_file']
+    if file.filename == '':
+        return jsonify({'error': 'Dosya seçilmemiş.'}), 400
+    
+    if file and allowed_file(file.filename):
+        try:
+            # Dosyayı bellekte oku
+            cv_data = file.read()
+            mime_type = get_file_mimetype(file.filename)
+            
+            # CV'yi analiz et
+            user = User.query.filter_by(username=session['username']).first()
+            agent = InterviewAIAgent(user.interest)
+            cv_analysis = agent.analyze_cv(cv_data, mime_type)
+            
+            # Analizi veritabanına kaydet
+            user.cv_analysis = cv_analysis
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'CV başarıyla yüklendi ve analiz edildi.',
+                'analysis': cv_analysis
+            })
+            
+        except Exception as e:
+            return jsonify({'error': f'CV analizi sırasında hata: {str(e)}'}), 500
+    else:
+        return jsonify({'error': 'Geçersiz dosya formatı. PDF, DOC veya DOCX dosyası yükleyiniz.'}), 400
+
+@app.route('/interview_cv_based_question', methods=['POST'])
+def interview_cv_based_question():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.cv_analysis:
+        return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
+    
+    try:
+        agent = InterviewAIAgent(user.interest)
+        question = agent.generate_cv_based_question(user.cv_analysis)
+        
+        return jsonify({
+            'message': 'CV\'nize özel mülakat sorusu hazırlandı.',
+            'question': question,
+            'cv_analysis': user.cv_analysis
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Soru oluşturma hatası: {str(e)}'}), 500
+
+@app.route('/interview_personalized_questions', methods=['POST'])
+def interview_personalized_questions():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.cv_analysis:
+        return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
+    
+    data = request.get_json()
+    difficulty = data.get('difficulty', 'orta')
+    
+    try:
+        agent = InterviewAIAgent(user.interest)
+        questions = agent.generate_personalized_questions(user.cv_analysis, difficulty)
+        
+        return jsonify({
+            'message': f'{difficulty} seviyede kişiselleştirilmiş sorular hazırlandı.',
+            'questions': questions,
+            'difficulty': difficulty
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Sorular oluşturma hatası: {str(e)}'}), 500
+
+@app.route('/interview_speech_question', methods=['POST'])
+def interview_speech_question():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.get_json() or {}
+    voice_name = data.get('voice_name', 'Kore')
+    
+    try:
+        agent = InterviewAIAgent(user.interest)
+        result = agent.generate_speech_question(voice_name)
+        
+        if result.get('audio_file'):
+            # Ses dosyasını static klasörüne taşı
+            audio_filename = f"interview_question_{session['username']}_{int(time.time())}.wav"
+            audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+            
+            # Dosyayı kopyala
+            import shutil
+            shutil.move(result['audio_file'], audio_path)
+            
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': f'/static/audio/{audio_filename}',
+                'has_audio': True
+            })
+        else:
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': None,
+                'has_audio': False,
+                'error': result.get('error')
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Sesli soru oluşturma hatası: {str(e)}'}), 500
+
+@app.route('/interview_cv_speech_question', methods=['POST'])
+def interview_cv_speech_question():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.cv_analysis:
+        return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
+    
+    data = request.get_json() or {}
+    voice_name = data.get('voice_name', 'Kore')
+    
+    try:
+        agent = InterviewAIAgent(user.interest)
+        result = agent.generate_cv_based_speech_question(user.cv_analysis, voice_name)
+        
+        if result.get('audio_file'):
+            audio_filename = f"cv_question_{session['username']}_{int(time.time())}.wav"
+            audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+            
+            import shutil
+            shutil.move(result['audio_file'], audio_path)
+            
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': f'/static/audio/{audio_filename}',
+                'has_audio': True
+            })
+        else:
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': None,
+                'has_audio': False,
+                'error': result.get('error')
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'CV tabanlı sesli soru hatası: {str(e)}'}), 500
+
+@app.route('/interview_speech_evaluation', methods=['POST'])
+def interview_speech_evaluation():
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    # Ses dosyası yükleme desteği
+    if 'audio' in request.files:
+        # FormData ile ses dosyası geldi
+        audio_file = request.files['audio']
+        question = request.form.get('question')
+        voice_name = request.form.get('voice_name', 'Enceladus')
+        additional_text = request.form.get('additional_text', '')
+        
+        if not question:
+            return jsonify({'error': 'Soru gerekli.'}), 400
+        
+        # Ses dosyasını geçici olarak kaydet
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.webm') as temp_audio:
+            audio_file.save(temp_audio.name)
+            temp_audio_path = temp_audio.name
+        
+        try:
+            agent = InterviewAIAgent(user.interest)
+            cv_context = user.cv_analysis if user.cv_analysis else None
+            
+            # Ses dosyasını transcript et ve değerlendir
+            result = agent.evaluate_speech_answer(question, temp_audio_path, additional_text, cv_context, voice_name)
+            
+            # Geçici dosyayı sil
+            os.unlink(temp_audio_path)
+            
+            if result.get('audio_file'):
+                audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
+                audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+                
+                import shutil
+                shutil.move(result['audio_file'], audio_path)
+                
+                # Geçmişe kaydet
+                detail = f"Sesli mülakat: {question[:60]}..."
+                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
+                db.session.add(history)
+                db.session.commit()
+                
+                return jsonify({
+                    'evaluation': result['feedback_text'],
+                    'audio_url': f'/static/audio/{audio_filename}',
+                    'has_audio': True,
+                    'has_cv_context': bool(user.cv_analysis),
+                    'transcribed_text': result.get('transcribed_text', '')
+                })
+            else:
+                return jsonify({
+                    'evaluation': result['feedback_text'],
+                    'has_audio': False,
+                    'has_cv_context': bool(user.cv_analysis),
+                    'transcribed_text': result.get('transcribed_text', '')
+                })
+                
+        except Exception as e:
+            # Geçici dosyayı sil
+            if os.path.exists(temp_audio_path):
+                os.unlink(temp_audio_path)
+            return jsonify({'error': f'Ses değerlendirme hatası: {str(e)}'}), 500
+    
+    else:
+        # JSON formatında metin cevap
+        data = request.json
+        question = data.get('question')
+        user_answer = data.get('user_answer')
+        voice_name = data.get('voice_name', 'Enceladus')
+        
+        if not question or not user_answer:
+            return jsonify({'error': 'Soru ve cevap gerekli.'}), 400
+        
+        try:
+            agent = InterviewAIAgent(user.interest)
+            cv_context = user.cv_analysis if user.cv_analysis else None
+            
+            result = agent.generate_speech_feedback(question, user_answer, cv_context, voice_name)
+            
+            if result.get('audio_file'):
+                audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
+                audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+                os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+                
+                import shutil
+                shutil.move(result['audio_file'], audio_path)
+                
+                # Geçmişe kaydet
+                detail = f"Sesli mülakat: {question[:60]}..."
+                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
+                db.session.add(history)
+                db.session.commit()
+                
+                return jsonify({
+                    'evaluation': result['feedback_text'],
+                    'audio_url': f'/static/audio/{audio_filename}',
+                    'has_audio': True,
+                    'has_cv_context': bool(user.cv_analysis)
+                })
+            else:
+                # Geçmişe kaydet
+                detail = f"Mülakat sorusu: {question[:60]}..."
+                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
+                db.session.add(history)
+                db.session.commit()
+                
+                return jsonify({
+                    'evaluation': result['feedback_text'],
+                    'audio_url': None,
+                    'has_audio': False,
+                    'has_cv_context': bool(user.cv_analysis),
+                    'error': result.get('error')
+                })
+                
+        except Exception as e:
+            return jsonify({'error': f'Sesli değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/interview_simulation', methods=['POST'])
 def interview_simulation():
@@ -934,17 +1245,28 @@ def interview_simulation_evaluate():
     user_answer = data.get('user_answer')
     if not question or not user_answer:
         return jsonify({'error': 'Soru ve cevap gerekli.'}), 400
+    
     agent = InterviewAIAgent(user.interest)
     try:
-        evaluation = agent.evaluate_answer(question, user_answer)
+        # CV analizi varsa, CV bağlamında değerlendirme yap
+        if user.cv_analysis:
+            evaluation = agent.evaluate_cv_answer(question, user_answer, user.cv_analysis)
+        else:
+            # CV yoksa normal değerlendirme
+            evaluation = agent.evaluate_answer(question, user_answer)
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
+    
     # Geçmişe kaydet
     detail = f"Mülakat sorusu: {question[:60]}..."
     history = UserHistory(username=user.username, activity_type='interview', detail=detail)
     db.session.add(history)
     db.session.commit()
-    return jsonify({'evaluation': evaluation})
+    
+    return jsonify({
+        'evaluation': evaluation,
+        'has_cv_context': bool(user.cv_analysis)
+    })
 
 @app.route('/change_password', methods=['POST'])
 def change_password():
