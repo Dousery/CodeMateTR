@@ -1234,6 +1234,150 @@ def code_room_evaluate():
     db.session.commit()
     return jsonify({'evaluation': evaluation})
 
+@app.route('/code_room/run', methods=['POST'])
+def code_room_run():
+    """Sadece kodu çalıştırır, değerlendirmez"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    user_code = data.get('user_code')
+    language = data.get('language', 'python')
+    
+    if not user_code:
+        return jsonify({'error': 'Kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        result = agent.run_code(user_code)
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
+
+@app.route('/code_room/debug', methods=['POST'])
+def code_room_debug():
+    """Hatalı kodu debug eder"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    code_with_error = data.get('code')
+    language = data.get('language', 'python')
+    
+    if not code_with_error:
+        return jsonify({'error': 'Hatalı kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        debug_result = agent.debug_code(code_with_error)
+        return jsonify({
+            'success': True,
+            'debug_result': debug_result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Debug hatası: {str(e)}'}), 500
+
+@app.route('/code_room/analyze_complexity', methods=['POST'])
+def code_room_analyze_complexity():
+    """Kod karmaşıklığını analiz eder"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    code = data.get('code')
+    language = data.get('language', 'python')
+    
+    if not code:
+        return jsonify({'error': 'Analiz edilecek kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        analysis = agent.analyze_algorithm_complexity(code)
+        return jsonify({
+            'success': True,
+            'analysis': analysis
+        })
+    except Exception as e:
+        return jsonify({'error': f'Karmaşıklık analizi hatası: {str(e)}'}), 500
+
+@app.route('/code_room/suggest_resources', methods=['POST'])
+def code_room_suggest_resources():
+    """Konuya göre kaynak önerileri"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    topic = data.get('topic')
+    language = data.get('language', 'python')
+    num_resources = data.get('num_resources', 3)
+    
+    if not topic:
+        return jsonify({'error': 'Konu gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        resources = agent.suggest_resources(topic, num_resources)
+        return jsonify({
+            'success': True,
+            'resources': resources
+        })
+    except Exception as e:
+        return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
+
+@app.route('/code_room/evaluate_with_execution', methods=['POST'])
+def code_room_evaluate_with_execution():
+    """Kodu çalıştırarak değerlendirir ve puan verir"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    user_code = data.get('user_code')
+    question = data.get('question')
+    language = data.get('language', 'python')
+    
+    if not user_code or not question:
+        return jsonify({'error': 'Kod ve soru gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        result = agent.evaluate_code_with_execution(user_code, question)
+        
+        # Geçmişe kaydet
+        detail = f"Kodlama değerlendirmesi (Puan: {result.get('score', 0)}): {question[:50]}..."
+        history = UserHistory(username=user.username, activity_type='code', detail=detail)
+        db.session.add(history)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
+
 # Case Study çözümü kaydı
 @app.route('/case_study_room/evaluate', methods=['POST'])
 def case_study_room_evaluate():
