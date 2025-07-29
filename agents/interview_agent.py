@@ -122,15 +122,25 @@ class InterviewAIAgent:
         Sesli mülakat sorusu üretir ve ses dosyası olarak döndürür
         """
         try:
-            prompt = f"""
+            # Önce metin soruyu üret
+            text_prompt = f"""
             {self.interest} alanında bir teknik mülakat sorusu sor. 
-            Soru profesyonel ve samimi bir tonda sorulmalı.
-            Mülakat yapan kişi gibi konuş ve soruyu net bir şekilde sor.
+            Sadece soruyu ver, başka açıklama ekleme.
+            """
+            
+            text_response = self.model.generate_content(text_prompt)
+            question_text = text_response.text.strip()
+            
+            # Sonra bu soruyu sesli hale getir
+            speech_prompt = f"""
+            Şu mülakat sorusunu profesyonel ve samimi bir tonda oku:
+            
+            "{question_text}"
             """
             
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
+                contents=speech_prompt,
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
@@ -150,43 +160,59 @@ class InterviewAIAgent:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
             self._save_wave_file(temp_file.name, audio_data)
             
-            # Metin versiyonunu da al
-            text_response = self.model.generate_content(prompt)
-            
             return {
                 'audio_file': temp_file.name,
-                'question_text': text_response.text.strip(),
+                'question_text': question_text,
                 'audio_data': audio_data
             }
             
         except Exception as e:
             # Hata durumunda sadece metin döndür
-            prompt = f"{self.interest} alanında bir teknik mülakat sorusu sor."
-            response = self.model.generate_content(prompt)
-            return {
-                'audio_file': None,
-                'question_text': response.text.strip(),
-                'audio_data': None,
-                'error': str(e)
-            }
+            try:
+                text_prompt = f"{self.interest} alanında bir teknik mülakat sorusu sor. Sadece soruyu ver."
+                response = self.model.generate_content(text_prompt)
+                return {
+                    'audio_file': None,
+                    'question_text': response.text.strip(),
+                    'audio_data': None,
+                    'error': str(e)
+                }
+            except Exception as e2:
+                return {
+                    'audio_file': None,
+                    'question_text': f"{self.interest} alanında basit bir teknik soru sorun.",
+                    'audio_data': None,
+                    'error': f"Soru üretme hatası: {str(e2)}"
+                }
 
     def generate_cv_based_speech_question(self, cv_analysis, voice_name='Kore'):
         """
         CV analizine göre sesli soru üretir
         """
         try:
-            prompt = f"""
+            # Önce metin soruyu üret
+            text_prompt = f"""
             Aşağıdaki CV analizi sonucuna göre uygun bir teknik mülakat sorusu sor:
             
             CV Analizi: {cv_analysis}
             
             Soruyu kişinin deneyim seviyesine uygun ve gerçekçi yap. 
-            Mülakat yapan kişi gibi profesyonel ve samimi bir tonda konuş.
+            Sadece soruyu ver, başka açıklama ekleme.
+            """
+            
+            text_response = self.model.generate_content(text_prompt)
+            question_text = text_response.text.strip()
+            
+            # Sonra bu soruyu sesli hale getir
+            speech_prompt = f"""
+            Şu mülakat sorusunu profesyonel ve samimi bir tonda oku:
+            
+            "{question_text}"
             """
             
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
+                contents=speech_prompt,
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
@@ -203,16 +229,14 @@ class InterviewAIAgent:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
             self._save_wave_file(temp_file.name, audio_data)
             
-            # Metin versiyonu
-            text_response = self.model.generate_content(prompt)
-            
             return {
                 'audio_file': temp_file.name,
-                'question_text': text_response.text.strip(),
+                'question_text': question_text,
                 'audio_data': audio_data
             }
             
         except Exception as e:
+            # Hata durumunda metin soru döndür
             return self.generate_cv_based_question(cv_analysis)
 
     def generate_speech_feedback(self, question, user_answer, cv_context=None, voice_name='Enceladus'):
@@ -220,28 +244,22 @@ class InterviewAIAgent:
         Kullanıcı cevabına sesli geri bildirim üretir
         """
         try:
+            # Önce metin geri bildirimi üret
             if cv_context:
-                prompt = f"""
-                CV Bağlamı: {cv_context}
-                Mülakat Sorusu: {question}
-                Kullanıcı Cevabı: {user_answer}
-                
-                Bu cevabı kişinin CV'sindeki deneyim seviyesi göz önünde bulundurarak değerlendir.
-                Mülakat yapan kişi gibi yapıcı geri bildirim ver.
-                Olumlu yönleri belirt, eksikleri kibarca söyle ve gelişim önerileri sun.
-                """
+                text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
             else:
-                prompt = f"""
-                Mülakat Sorusu: {question}
-                Kullanıcı Cevabı: {user_answer}
-                
-                Bu cevabı değerlendir ve yapıcı geri bildirim ver.
-                Mülakat yapan kişi gibi profesyonel ve destekleyici bir tonda konuş.
-                """
+                text_feedback = self.evaluate_answer(question, user_answer)
+            
+            # Sonra bu geri bildirimi sesli hale getir
+            speech_prompt = f"""
+            Şu mülakat geri bildirimini profesyonel ve destekleyici bir tonda oku:
+            
+            "{text_feedback}"
+            """
             
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
+                contents=speech_prompt,
                 config=types.GenerateContentConfig(
                     response_modalities=["AUDIO"],
                     speech_config=types.SpeechConfig(
@@ -258,19 +276,14 @@ class InterviewAIAgent:
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
             self._save_wave_file(temp_file.name, audio_data)
             
-            # Metin versiyonu
-            if cv_context:
-                text_response = self.evaluate_cv_answer(question, user_answer, cv_context)
-            else:
-                text_response = self.evaluate_answer(question, user_answer)
-            
             return {
                 'audio_file': temp_file.name,
-                'feedback_text': text_response,
+                'feedback_text': text_feedback,
                 'audio_data': audio_data
             }
             
         except Exception as e:
+            # Hata durumunda sadece metin geri bildirim döndür
             if cv_context:
                 text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
             else:
@@ -323,30 +336,58 @@ class InterviewAIAgent:
         Ses dosyasını metne dönüştürür (Gemini ile)
         """
         try:
+            print(f"Transcribing audio file: {audio_file_path}")
+            
             # Ses dosyasını oku
             with open(audio_file_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
             
-            # Gemini ile transcript et
-            prompt = """
-            Bu ses dosyasındaki konuşmayı metne dönüştür. 
-            Sadece konuşulan metni ver, başka açıklama ekleme.
-            Türkçe konuşma var ise Türkçe olarak transcript et.
-            """
+            # Dosya boyutu kontrolü
+            if len(audio_data) == 0:
+                return "Ses dosyası boş veya okunamadı."
             
-            response = self.model.generate_content([
-                {
-                    "mime_type": "audio/webm",  # Frontend'den gelen format
-                    "data": base64.b64encode(audio_data).decode()
-                },
-                prompt
-            ])
+            file_size_mb = len(audio_data) / (1024 * 1024)
+            print(f"Audio file size for transcription: {file_size_mb:.2f} MB")
             
-            return response.text.strip()
+            if file_size_mb > 20:  # 20MB limit for transcription
+                return "Ses dosyası transcript için çok büyük. Daha kısa kayıt yapın."
             
+            # Gemini ile transcript et - daha kısa ve odaklı prompt
+            prompt = "Bu ses dosyasındaki konuşmayı metne dönüştür. Sadece konuşulan metni ver."
+            
+            # Farklı MIME type'ları dene - hızlı failover
+            mime_types = ["audio/webm", "audio/wav", "audio/mpeg"]
+            
+            for i, mime_type in enumerate(mime_types):
+                try:
+                    print(f"Trying transcription with MIME type: {mime_type} (attempt {i+1})")
+                    
+                    response = self.model.generate_content([
+                        {
+                            "mime_type": mime_type,
+                            "data": base64.b64encode(audio_data).decode()
+                        },
+                        prompt
+                    ])
+                    
+                    result = response.text.strip()
+                    if result and not result.lower().startswith('hata') and len(result) > 3:
+                        print(f"Transcription successful with {mime_type}")
+                        return result
+                except Exception as e:
+                    print(f"MIME type {mime_type} failed: {e}")
+                    if i == len(mime_types) - 1:  # Son deneme
+                        break
+                    continue
+            
+            # Hiçbir MIME type başarılı olmadıysa
+            return "Ses transcript edilemedi. Lütfen daha net konuşun veya metin ile cevap verin."
+            
+        except FileNotFoundError:
+            return "Ses dosyası bulunamadı."
         except Exception as e:
-            # Gemini ile transcript edilemezse, basit placeholder
-            return f"Ses transcript edildi ancak metin çıkarılamadı. Hata: {str(e)}"
+            print(f"Transcription error: {e}")
+            return f"Ses transcript hatası: {str(e)}. Manuel cevap yazabilirsiniz."
 
     def _save_wave_file(self, filename, pcm_data, channels=1, rate=24000, sample_width=2):
         """
