@@ -7,6 +7,7 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from './App';
 
 const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
@@ -36,7 +37,8 @@ function CodeMateLogo({ onClick }) {
 export default function Header() {
   const [anchorEl, setAnchorEl] = useState(null);
   const navigate = useNavigate();
-  const username = localStorage.getItem('username');
+  const { isLoggedIn } = useAuth();
+  const username = isLoggedIn ? localStorage.getItem('username') : null;
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -47,8 +49,14 @@ export default function Header() {
   const handleLogout = () => {
     localStorage.removeItem('username');
     localStorage.removeItem('interest');
+    
+    // localStorage değişikliğini tetikle
+    window.dispatchEvent(new Event('localStorageChange'));
+    
     handleClose();
     navigate('/');
+    // Sayfayı yenilemek için
+    window.location.reload();
   };
   const handleProfile = () => {
     handleClose();

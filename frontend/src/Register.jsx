@@ -27,6 +27,10 @@ export default function Register({ setIsLoggedIn }) {
       return;
     }
     
+    // Eski kullanıcı bilgilerini temizle
+    localStorage.removeItem('username');
+    localStorage.removeItem('interest');
+    
     try {
       const res = await axios.post('http://localhost:5000/register', {
         username: form.username,
@@ -36,6 +40,10 @@ export default function Register({ setIsLoggedIn }) {
       
       localStorage.setItem('username', form.username);
       localStorage.setItem('interest', form.interest);
+      
+      // localStorage değişikliğini tetikle
+      window.dispatchEvent(new Event('localStorageChange'));
+      
       setIsLoggedIn(true);
       setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err) {

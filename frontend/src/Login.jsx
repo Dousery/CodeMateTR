@@ -15,6 +15,10 @@ export default function Login({ setIsLoggedIn }) {
     setLoading(true);
     setError('');
     
+    // Eski kullanıcı bilgilerini temizle
+    localStorage.removeItem('username');
+    localStorage.removeItem('interest');
+    
     try {
       const res = await axios.post('http://localhost:5000/login', form, { withCredentials: true });
       localStorage.setItem('username', form.username);
@@ -24,6 +28,9 @@ export default function Login({ setIsLoggedIn }) {
       if (profileRes.data.interest) {
         localStorage.setItem('interest', profileRes.data.interest);
       }
+      
+      // localStorage değişikliğini tetikle
+      window.dispatchEvent(new Event('localStorageChange'));
       
       setIsLoggedIn(true);
       setTimeout(() => navigate('/dashboard'), 1000);
