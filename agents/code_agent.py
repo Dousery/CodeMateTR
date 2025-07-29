@@ -9,8 +9,9 @@ load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class CodeAIAgent:
-    def __init__(self, interest):
+    def __init__(self, interest, language='python'):
         self.interest = interest
+        self.language = language
         # Configure the client with API key
         try:
             self.client = genai.Client(api_key=GEMINI_API_KEY)
@@ -23,30 +24,70 @@ class CodeAIAgent:
             except Exception as e2:
                 print(f"Fallback client initialization error: {e2}")
                 self.client = None
+        
+        # Dil bazlı model seçimi
         self.model = "gemini-2.0-flash-exp"
+        
+        # Dil konfigürasyonları
+        self.language_configs = {
+            'python': {
+                'name': 'Python',
+                'extension': '.py',
+                'comment': '#',
+                'keywords': ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'try', 'except', 'finally', 'with', 'import', 'from', 'as', 'return', 'yield', 'break', 'continue', 'pass', 'True', 'False', 'None'],
+                'syntax': 'Python syntax',
+                'examples': ['def solution():\n    return "Hello World"\n\nprint(solution())']
+            },
+            'javascript': {
+                'name': 'JavaScript',
+                'extension': '.js',
+                'comment': '//',
+                'keywords': ['function', 'class', 'if', 'else', 'for', 'while', 'try', 'catch', 'finally', 'switch', 'case', 'default', 'return', 'break', 'continue', 'var', 'let', 'const', 'import', 'export', 'async', 'await'],
+                'syntax': 'JavaScript syntax',
+                'examples': ['function solution() {\n    return "Hello World";\n}\n\nconsole.log(solution());']
+            },
+            'java': {
+                'name': 'Java',
+                'extension': '.java',
+                'comment': '//',
+                'keywords': ['public', 'private', 'protected', 'class', 'interface', 'extends', 'implements', 'static', 'final', 'abstract', 'if', 'else', 'for', 'while', 'try', 'catch', 'finally', 'switch', 'case', 'default', 'return', 'break', 'continue', 'new', 'import', 'package'],
+                'syntax': 'Java syntax',
+                'examples': ['public class Solution {\n    public static void main(String[] args) {\n        System.out.println("Hello World");\n    }\n}']
+            },
+            'cpp': {
+                'name': 'C++',
+                'extension': '.cpp',
+                'comment': '//',
+                'keywords': ['int', 'float', 'double', 'char', 'bool', 'string', 'vector', 'class', 'struct', 'public', 'private', 'protected', 'if', 'else', 'for', 'while', 'try', 'catch', 'switch', 'case', 'default', 'return', 'break', 'continue', 'new', 'delete', 'include', 'using', 'namespace'],
+                'syntax': 'C++ syntax',
+                'examples': ['#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello World" << endl;\n    return 0;\n}']
+            }
+        }
         
     def generate_coding_question(self, difficulty="orta"):
         """
-        Belirtilen zorluk seviyesinde Python kodlama sorusu üretir
+        Belirtilen zorluk seviyesinde kodlama sorusu üretir
         """
         if not self.client:
             return "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin."
             
         difficulty_levels = {
-            "kolay": "başlangıç seviyesi, temel Python syntax",
-            "orta": "orta seviye, fonksiyonlar, listeler, döngüler",
-            "zor": "ileri seviye, algoritmalar, veri yapıları, optimizasyon"
+            "kolay": "başlangıç seviyesi, temel syntax",
+            "orta": "orta seviye, fonksiyonlar, döngüler, veri yapıları",
+            "zor": "ileri seviye, algoritmalar, optimizasyon, tasarım desenleri"
         }
         
         level_desc = difficulty_levels.get(difficulty, "orta seviye")
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
         prompt = f"""
-        {self.interest} alanında {level_desc} bir kısa Python kodlama sorusu üret.
+        {self.interest} alanında {config['name']} dili için {level_desc} bir kısa kodlama sorusu üret.
         
         Format:
         - Problem (2-3 cümle)
         - Örnek: input -> output
         
+        {config['name']} dilinde yazılacak şekilde sor.
         Sadece soruyu ver, çözüm yok.
         """
         
@@ -73,14 +114,16 @@ class CodeAIAgent:
                 "has_errors": True,
                 "corrected_code": ""
             }
+        
+        config = self.language_configs.get(self.language, self.language_configs['python'])
             
         prompt = f"""
-        Python kodunu çalıştır ve kısa değerlendir:
+        {config['name']} kodunu çalıştır ve kısa değerlendir:
         
         Soru: {question}
         
         Kod:
-        ```python
+        ```{self.language}
         {user_code}
         ```
         
@@ -132,14 +175,16 @@ class CodeAIAgent:
         """
         Verilen soru için örnek çözüm üretir ve test eder
         """
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+        
         prompt = f"""
-        Bu Python sorusu için çalışan kod yaz ve test et:
+        Bu {config['name']} sorusu için çalışan kod yaz ve test et:
         
         Soru: {question}
         
         Sadece:
         1. Kısa açıklama (2 cümle)
-        2. Python kodu yaz ve çalıştır
+        2. {config['name']} kodu yaz ve çalıştır
         3. Test sonucu göster
         
         Uzun açıklama yapma, direkt kod ver.
@@ -184,10 +229,12 @@ class CodeAIAgent:
         """
         Hatalı kodu debug eder ve düzeltir
         """
-        prompt = f"""
-        Bu Python kodundaki hatayı bul ve düzelt:
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
-        ```python
+        prompt = f"""
+        Bu {config['name']} kodundaki hatayı bul ve düzelt:
+        
+        ```{self.language}
         {code_with_error}
         ```
         
@@ -233,10 +280,12 @@ class CodeAIAgent:
 
     def suggest_resources(self, topic, num_resources=3):
         """
-        Belirtilen konu için Python öğrenme kaynakları önerir - Google Search ile gerçek linkler
+        Belirtilen konu için öğrenme kaynakları önerir - Google Search ile gerçek linkler
         """
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+        
         prompt = f"""
-        {topic} konusunda Python öğrenmek için en iyi {num_resources} kaynak ara ve öner.
+        {config['name']} dili için {topic} konusunda öğrenmek için en iyi {num_resources} kaynak ara ve öner.
         
         Her kaynak için:
         - Kaynak adı
@@ -262,7 +311,7 @@ class CodeAIAgent:
         except Exception as e:
             # Fallback: Google Search başarısız olursa basit öneri
             fallback_prompt = f"""
-            {topic} için {num_resources} Python kaynağı öner.
+            {config['name']} dili için {topic} konusunda {num_resources} kaynak öner.
             
             Format:
             1. Kaynak adı - açıklama (1 cümle)
@@ -285,10 +334,12 @@ class CodeAIAgent:
         """
         Verilen algoritmanın zaman ve alan karmaşıklığını analiz eder
         """
-        prompt = f"""
-        Bu Python kodunun karmaşıklığını kısaca analiz et:
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
-        ```python
+        prompt = f"""
+        Bu {config['name']} kodunun karmaşıklığını kısaca analiz et:
+        
+        ```{self.language}
         {code}
         ```
         
@@ -316,13 +367,15 @@ class CodeAIAgent:
         """
         Kullanıcının kodunu geleneksel yöntemle değerlendirir (eski uyumlulık için)
         """
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+        
         prompt = f"""
-        Python kodunu kısaca değerlendir:
+        {config['name']} kodunu kısaca değerlendir:
         
         Soru: {question}
         
         Kod:
-        ```python
+        ```{self.language}
         {user_code}
         ```
         
