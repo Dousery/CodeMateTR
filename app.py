@@ -115,6 +115,21 @@ class TestSession(db.Model):
     start_time = db.Column(db.DateTime, default=datetime.utcnow)
     status = db.Column(db.String(20), default='active')  # active, completed, expired
 
+# Otomatik mülakat oturumları için database tablosu
+class AutoInterviewSession(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    interest = db.Column(db.String(80), nullable=False)
+    questions = db.Column(db.Text, nullable=True)  # JSON string - sorular listesi
+    answers = db.Column(db.Text, nullable=True)  # JSON string - cevaplar listesi
+    current_question_index = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='active')  # active, completed, paused
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=True)
+    conversation_context = db.Column(db.Text, nullable=True)  # Mülakat bağlamı
+    final_evaluation = db.Column(db.Text, nullable=True)  # Final değerlendirme
+
 # Database'den session'ları yükle
 def load_sessions_from_db():
     with app.app_context():
@@ -587,19 +602,6 @@ def interview_speech_evaluation():
                 import shutil
                 shutil.move(result['audio_file'], audio_path)
                 
-                # Geçmişe kaydet
-                detail = f"Sesli mülakat: {question[:60]}..."
-                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
-                db.session.add(history)
-                db.session.commit()
-                
-                return jsonify({
-                    'evaluation': result['feedback_text'],
-                    'audio_url': f'/static/audio/{audio_filename}',
-                    'has_audio': True,
-                    'has_cv_context': bool(user.cv_analysis)
-                })
-            else:
                 # Geçmişe kaydet
                 detail = f"Mülakat sorusu: {question[:60]}..."
                 history = UserHistory(username=user.username, activity_type='interview', detail=detail)
@@ -1418,6 +1420,307 @@ def clear_user_sessions():
                 del active_case_sessions[session_id]
     
     return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
+
+# ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
+
+@app.route('/auto_interview/start', methods=['POST'])
+def start_auto_interview():
+    """Otomatik mülakat başlatır"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    try:
+        # Kullanıcının aktif mülakat oturumu var mı kontrol et
+        existing_session = AutoInterviewSession.query.filter_by(
+            username=user.username, 
+            status='active'
+        ).first()
+        
+        if existing_session:
+            # Aktif session'ı tamamlandı olarak işaretle
+            existing_session.status = 'completed'
+            existing_session.end_time = datetime.utcnow()
+            db.session.commit()
+        
+        # Yeni oturum oluştur
+        session_id = f"auto_interview_{user.username}_{int(time.time())}"
+        new_session = AutoInterviewSession(
+            session_id=session_id,
+            username=user.username,
+            interest=user.interest,
+            questions=json.dumps([]),
+            answers=json.dumps([]),
+            current_question_index=0,
+            status='active'
+        )
+        
+        db.session.add(new_session)
+        db.session.commit()
+        
+        # İlk soruyu üret - kullanıcı adıyla
+        agent = InterviewAIAgent(user.interest)
+        result = agent.generate_dynamic_speech_question(
+            conversation_context=f"Bu mülakat {user.username} ile yapılıyor. Kullanıcının adı: {user.username}"
+        )
+        
+        # İlk progress evaluation üret
+        initial_progress = agent.evaluate_conversation_progress([], [])
+        new_session.conversation_context = initial_progress
+        
+        if result.get('audio_file'):
+            # Ses dosyasını static klasörüne taşı
+            audio_filename = f"auto_interview_{user.username}_{int(time.time())}.wav"
+            audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+            
+            import shutil
+            shutil.move(result['audio_file'], audio_path)
+            
+            # İlk soruyu session'a kaydet
+            questions = [result['question_text']]
+            new_session.questions = json.dumps(questions)
+            db.session.commit()
+            
+            return jsonify({
+                'session_id': session_id,
+                'question': result['question_text'],
+                'audio_url': f'/static/audio/{audio_filename}',
+                'has_audio': True,
+                'question_index': 0,
+                'total_questions': 1
+            })
+        else:
+            # İlk soruyu session'a kaydet
+            questions = [result['question_text']]
+            new_session.questions = json.dumps(questions)
+            db.session.commit()
+            
+            return jsonify({
+                'session_id': session_id,
+                'question': result['question_text'],
+                'audio_url': None,
+                'has_audio': False,
+                'error': result.get('error'),
+                'question_index': 0,
+                'total_questions': 1
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Otomatik mülakat başlatma hatası: {str(e)}'}), 500
+
+@app.route('/auto_interview/submit_answer', methods=['POST'])
+def submit_auto_interview_answer():
+    """Mülakat cevabını gönderir ve sonraki soruyu üretir (metin veya sesli)"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    session_id = None
+    user_answer = None
+    voice_name = 'Kore'
+    
+    # Form data (sesli cevap) veya JSON data (metin cevap) kontrol et
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        # Sesli cevap
+        session_id = request.form.get('session_id')
+        voice_name = request.form.get('voice_name', 'Kore')
+        
+        if 'audio' not in request.files:
+            return jsonify({'error': 'Ses dosyası gerekli.'}), 400
+        
+        audio_file = request.files['audio']
+        if audio_file.filename == '':
+            return jsonify({'error': 'Ses dosyası seçilmedi.'}), 400
+        
+        # Ses dosyasını geçici olarak kaydet
+        temp_audio_path = os.path.join(app.config['UPLOAD_FOLDER'], f"temp_audio_{int(time.time())}.webm")
+        os.makedirs(os.path.dirname(temp_audio_path), exist_ok=True)
+        audio_file.save(temp_audio_path)
+        
+        # Ses dosyasını transcript et
+        try:
+            agent = InterviewAIAgent("general")  # Geçici agent
+            user_answer = agent._transcribe_audio(temp_audio_path)
+            os.remove(temp_audio_path)  # Geçici dosyayı sil
+        except Exception as e:
+            os.remove(temp_audio_path)  # Geçici dosyayı sil
+            return jsonify({'error': f'Ses transcript hatası: {str(e)}'}), 500
+    else:
+        # Metin cevap
+        data = request.json
+        session_id = data.get('session_id')
+        user_answer = data.get('answer')
+        voice_name = data.get('voice_name', 'Kore')
+    
+    if not session_id or not user_answer:
+        return jsonify({'error': 'Session ID ve cevap gerekli.'}), 400
+    
+    try:
+        # Session'ı bul
+        interview_session = AutoInterviewSession.query.filter_by(
+            session_id=session_id,
+            username=session['username'],
+            status='active'
+        ).first()
+        
+        if not interview_session:
+            return jsonify({'error': 'Aktif mülakat oturumu bulunamadı.'}), 404
+        
+        # Cevabı kaydet
+        questions = json.loads(interview_session.questions or '[]')
+        answers = json.loads(interview_session.answers or '[]')
+        
+        answers.append(user_answer)
+        interview_session.answers = json.dumps(answers)
+        interview_session.current_question_index = len(answers)
+        
+        # Mülakat ilerlemesini değerlendir
+        agent = InterviewAIAgent(interview_session.interest)
+        progress_evaluation = agent.evaluate_conversation_progress(questions, answers)
+        interview_session.conversation_context = progress_evaluation
+        
+        # Sonraki soruyu üret - kullanıcı adıyla
+        user = User.query.filter_by(username=session['username']).first()
+        result = agent.generate_dynamic_speech_question(
+            previous_questions=questions,
+            user_answers=answers,
+            conversation_context=f"{progress_evaluation}\n\nBu mülakat {user.username} ile devam ediyor. Kullanıcının adı: {user.username}",
+            voice_name=voice_name
+        )
+        
+        if result.get('audio_file'):
+            # Ses dosyasını static klasörüne taşı
+            audio_filename = f"auto_interview_{interview_session.username}_{int(time.time())}.wav"
+            audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
+            os.makedirs(os.path.dirname(audio_path), exist_ok=True)
+            
+            import shutil
+            shutil.move(result['audio_file'], audio_path)
+            
+            # Yeni soruyu listeye ekle
+            questions.append(result['question_text'])
+            interview_session.questions = json.dumps(questions)
+            db.session.commit()
+            
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': f'/static/audio/{audio_filename}',
+                'has_audio': True,
+                'question_index': len(answers),
+                'total_questions': len(questions)
+            })
+        else:
+            # Yeni soruyu listeye ekle
+            questions.append(result['question_text'])
+            interview_session.questions = json.dumps(questions)
+            interview_session.conversation_context = progress_evaluation
+            db.session.commit()
+            
+            return jsonify({
+                'question': result['question_text'],
+                'audio_url': None,
+                'has_audio': False,
+                'error': result.get('error'),
+                'question_index': len(answers),
+                'total_questions': len(questions)
+            })
+            
+    except Exception as e:
+        return jsonify({'error': f'Cevap gönderme hatası: {str(e)}'}), 500
+
+@app.route('/auto_interview/complete', methods=['POST'])
+def complete_auto_interview():
+    """Mülakatı tamamlar ve final değerlendirme üretir"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    data = request.json
+    session_id = data.get('session_id')
+    
+    if not session_id:
+        return jsonify({'error': 'Session ID gerekli.'}), 400
+    
+    try:
+        # Session'ı bul
+        interview_session = AutoInterviewSession.query.filter_by(
+            session_id=session_id,
+            username=session['username'],
+            status='active'
+        ).first()
+        
+        if not interview_session:
+            return jsonify({'error': 'Aktif mülakat oturumu bulunamadı.'}), 404
+        
+        # Final değerlendirme üret
+        questions = json.loads(interview_session.questions or '[]')
+        answers = json.loads(interview_session.answers or '[]')
+        
+        agent = InterviewAIAgent(interview_session.interest)
+        final_evaluation = agent.generate_final_evaluation(
+            questions, 
+            answers, 
+            interview_session.conversation_context
+        )
+        
+        # Session'ı tamamla
+        interview_session.status = 'completed'
+        interview_session.end_time = datetime.now()
+        interview_session.final_evaluation = final_evaluation
+        
+        # Geçmişe kaydet
+        detail = f"Otomatik mülakat tamamlandı - {len(questions)} soru"
+        history = UserHistory(
+            username=interview_session.username, 
+            activity_type='auto_interview', 
+            detail=detail
+        )
+        
+        db.session.add(history)
+        db.session.commit()
+        
+        return jsonify({
+            'final_evaluation': final_evaluation,
+            'total_questions': len(questions),
+            'total_answers': len(answers),
+            'session_duration': (interview_session.end_time - interview_session.start_time).total_seconds()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Mülakat tamamlama hatası: {str(e)}'}), 500
+
+@app.route('/auto_interview/status', methods=['GET'])
+def get_auto_interview_status():
+    """Aktif mülakat oturumunun durumunu döndürür"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    try:
+        interview_session = AutoInterviewSession.query.filter_by(
+            username=session['username'],
+            status='active'
+        ).first()
+        
+        if not interview_session:
+            return jsonify({'has_active_session': False})
+        
+        questions = json.loads(interview_session.questions or '[]')
+        answers = json.loads(interview_session.answers or '[]')
+        
+        return jsonify({
+            'has_active_session': True,
+            'session_id': interview_session.session_id,
+            'interest': interview_session.interest,
+            'current_question_index': interview_session.current_question_index,
+            'total_questions': len(questions),
+            'total_answers': len(answers),
+            'start_time': interview_session.start_time.isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Durum kontrolü hatası: {str(e)}'}), 500
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle

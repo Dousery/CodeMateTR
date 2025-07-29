@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import CodeIcon from '@mui/icons-material/Code';
 import QuizIcon from '@mui/icons-material/Quiz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import WorkIcon from '@mui/icons-material/Work';
 import axios from 'axios';
 
@@ -27,10 +28,10 @@ const modules = [
     path: '/code',
   },
   {
-    title: 'Mülakat Simülasyonu',
-    desc: 'Mülakat sorularına hazırlan.',
-    icon: <PsychologyIcon fontSize="large" color="warning" />, 
-    path: '/interview',
+    title: 'Mülakat',
+    desc: 'Yapay zeka ile dinamik mülakat.',
+    icon: <RecordVoiceOverIcon fontSize="large" color="info" />, 
+    path: '/auto-interview',
   },
 ];
 

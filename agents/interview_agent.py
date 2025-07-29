@@ -1,322 +1,215 @@
 import google.generativeai as genai
 from google import genai as google_genai_new
 from google.genai import types
-import httpx
-import base64
-import io
-from pathlib import Path
 import wave
 import tempfile
 import os
+import base64
+from dotenv import load_dotenv
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class InterviewAIAgent:
     def __init__(self, interest):
         self.interest = interest
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
-        self.client = google_genai_new.Client()  # Yeni API için client
-
-    def analyze_cv(self, cv_data, mime_type='application/pdf'):
-        """
-        CV'yi analiz eder ve kişinin becerilerine göre mülakat soruları hazırlar
-        """
+        # Configure the new client with API key
         try:
-            prompt = """
-            Bu CV'yi analiz et ve aşağıdaki bilgileri çıkar:
-            1. Kişinin ana becerileri ve teknolojileri
-            2. Deneyim seviyesi
-            3. Güçlü ve zayıf olduğu alanlar
-            4. Bu kişiye sorulabilecek uygun teknik mülakat soruları (3-5 tane)
-            
-            Analizi Türkçe olarak yap ve net bir şekilde kategorize et.
-            """
-            
-            # Gemini ile dosya upload
-            response = self.model.generate_content([
-                {
-                    "mime_type": mime_type,
-                    "data": base64.b64encode(cv_data).decode()
-                },
-                prompt
-            ])
-            return response.text.strip()
+            self.client = google_genai_new.Client(api_key=GEMINI_API_KEY)
         except Exception as e:
-            return f"CV analizi sırasında hata oluştu: {str(e)}"
+            print(f"Google GenAI client initialization error: {e}")
+            # Fallback: Set environment variable
+            os.environ['GOOGLE_API_KEY'] = GEMINI_API_KEY
+            try:
+                self.client = google_genai_new.Client()
+            except Exception as e2:
+                print(f"Fallback client initialization error: {e2}")
+                self.client = None
 
-    def analyze_cv_from_url(self, cv_url):
+    def generate_dynamic_question(self, previous_questions=None, user_answers=None, conversation_context=None):
         """
-        URL'den CV'yi indirip analiz eder
+        Kullanıcının önceki cevaplarına göre dinamik soru üretir
         """
         try:
-            cv_data = httpx.get(cv_url).content
-            return self.analyze_cv(cv_data)
-        except Exception as e:
-            return f"CV indirme ve analizi sırasında hata oluştu: {str(e)}"
-
-    def generate_cv_based_question(self, cv_analysis):
-        """
-        CV analizine göre özelleştirilmiş soru üretir
-        """
-        prompt = f"""
-        Aşağıdaki CV analizi sonucuna göre uygun bir teknik mülakat sorusu sor:
-        
-        CV Analizi: {cv_analysis}
-        
-        Soruyu kişinin deneyim seviyesine uygun ve gerçekçi yap. Sadece soruyu ver, açıklama ekleme.
-        """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
-
-    def generate_personalized_questions(self, cv_analysis, difficulty='orta'):
-        """
-        CV analizine göre kişiselleştirilmiş sorular üretir
-        """
-        prompt = f"""
-        Aşağıdaki CV analizi sonucuna göre {difficulty} seviyede 5 teknik mülakat sorusu hazırla:
-        
-        CV Analizi: {cv_analysis}
-        
-        Soruları kişinin deneyimlerine göre özelleştir ve numaralı liste halinde sun.
-        """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
-
-    def evaluate_cv_answer(self, question, user_answer, cv_context):
-        """
-        CV bağlamında cevabı değerlendirir
-        """
-        prompt = f"""
-        CV Bağlamı: {cv_context}
-        Mülakat Sorusu: {question}
-        Kullanıcı Cevabı: {user_answer}
-        
-        Bu cevabı kişinin CV'sindeki deneyim seviyesi göz önünde bulundurarak değerlendir:
-        - Cevabın doğruluğu ve yeterliliği
-        - Kişinin deneyim seviyesine uygunluğu
-        - Geliştirmesi gereken alanlar
-        - Öneriler ve kaynaklar
-        """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
-
-    def generate_question(self):
-        prompt = f"""
-        {self.interest} alanında bir teknik mülakat başlat. Sadece ilk soruyu sor ve başka açıklama ekleme.
-        """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
-
-    def evaluate_answer(self, question, user_answer):
-        prompt = f"""
-        Aşağıdaki teknik mülakat sorusu ve kullanıcı cevabını değerlendir:
-        Soru: {question}
-        Cevap: {user_answer}
-        - Cevabın doğruluğu ve eksikleri hakkında kısa bir değerlendirme yap.
-        - Geliştirme için öneriler ver.
-        - Son olarak, eksik veya yanlış varsa 2-3 kaynak öner (başlık ve link).
-        """
-        response = self.model.generate_content(prompt)
-        return response.text.strip()
-
-    def generate_speech_question(self, voice_name='Kore'):
-        """
-        Sesli mülakat sorusu üretir ve ses dosyası olarak döndürür
-        """
-        try:
+            context_prompt = ""
+            if previous_questions and user_answers:
+                context_prompt = f"""
+                Önceki sorular ve cevaplar:
+                """
+                for i, (q, a) in enumerate(zip(previous_questions, user_answers)):
+                    context_prompt += f"\nSoru {i+1}: {q}\nCevap: {a}\n"
+                context_prompt += "\nBu cevaplara göre uygun bir sonraki soru sor."
+            
+            if conversation_context:
+                context_prompt += f"\n\nMülakat bağlamı: {conversation_context}"
+            
             prompt = f"""
-            {self.interest} alanında bir teknik mülakat sorusu sor. 
-            Soru profesyonel ve samimi bir tonda sorulmalı.
-            Mülakat yapan kişi gibi konuş ve soruyu net bir şekilde sor.
+            {self.interest} alanında genel bir mülakat yapıyorsun. Teknik kod soruları sorma, 
+            kişinin deneyimi, motivasyonu, hedefleri, problem çözme yaklaşımı, 
+            takım çalışması, liderlik, öğrenme isteği gibi konularda sorular sor.
+            
+            {context_prompt}
+            
+            Soruyu doğal ve samimi bir şekilde sor, mülakat yapan kişi gibi konuş.
+            Eğer conversation_context'te "Kullanıcının adı: [ad]" formatında bir bilgi varsa, 
+            o adı kullanarak kişiselleştirilmiş sorular sor. Örneğin: "[Ad], bu konuda ne düşünüyorsun?" 
+            veya "[Ad], bu durumda nasıl davranırdın?" gibi.
+            Sadece soruyu ver, başka açıklama ekleme.
             """
             
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
-                        )
-                    ),
-                )
-            )
-            
-            # Ses verisini al
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            
-            # Geçici dosya oluştur
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            # Metin versiyonunu da al
-            text_response = self.model.generate_content(prompt)
-            
-            return {
-                'audio_file': temp_file.name,
-                'question_text': text_response.text.strip(),
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            # Hata durumunda sadece metin döndür
-            prompt = f"{self.interest} alanında bir teknik mülakat sorusu sor."
             response = self.model.generate_content(prompt)
-            return {
-                'audio_file': None,
-                'question_text': response.text.strip(),
-                'audio_data': None,
-                'error': str(e)
-            }
+            return response.text.strip()
+            
+        except Exception as e:
+            # Fallback soru
+            return f"{self.interest} alanında çalışırken en büyük zorlukla nasıl karşılaştınız?"
 
-    def generate_cv_based_speech_question(self, cv_analysis, voice_name='Kore'):
+    def generate_dynamic_speech_question(self, previous_questions=None, user_answers=None, conversation_context=None, voice_name='Kore'):
         """
-        CV analizine göre sesli soru üretir
+        Kullanıcının önceki cevaplarına göre dinamik sesli soru üretir
         """
         try:
-            prompt = f"""
-            Aşağıdaki CV analizi sonucuna göre uygun bir teknik mülakat sorusu sor:
+            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
             
-            CV Analizi: {cv_analysis}
-            
-            Soruyu kişinin deneyim seviyesine uygun ve gerçekçi yap. 
-            Mülakat yapan kişi gibi profesyonel ve samimi bir tonda konuş.
-            """
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
+            # Sesli özellik aktifse ses üret
+            if self.client:
+                try:
+                    response = self.client.models.generate_content(
+                        model="gemini-2.5-flash-preview-tts",
+                        contents=question_text,
+                        config=types.GenerateContentConfig(
+                            response_modalities=["AUDIO"],
+                            speech_config=types.SpeechConfig(
+                                voice_config=types.VoiceConfig(
+                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
+                                        voice_name=voice_name,
+                                    )
+                                )
+                            ),
                         )
-                    ),
-                )
-            )
-            
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            # Metin versiyonu
-            text_response = self.model.generate_content(prompt)
-            
-            return {
-                'audio_file': temp_file.name,
-                'question_text': text_response.text.strip(),
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            return self.generate_cv_based_question(cv_analysis)
-
-    def generate_speech_feedback(self, question, user_answer, cv_context=None, voice_name='Enceladus'):
-        """
-        Kullanıcı cevabına sesli geri bildirim üretir
-        """
-        try:
-            if cv_context:
-                prompt = f"""
-                CV Bağlamı: {cv_context}
-                Mülakat Sorusu: {question}
-                Kullanıcı Cevabı: {user_answer}
-                
-                Bu cevabı kişinin CV'sindeki deneyim seviyesi göz önünde bulundurarak değerlendir.
-                Mülakat yapan kişi gibi yapıcı geri bildirim ver.
-                Olumlu yönleri belirt, eksikleri kibarca söyle ve gelişim önerileri sun.
-                """
-            else:
-                prompt = f"""
-                Mülakat Sorusu: {question}
-                Kullanıcı Cevabı: {user_answer}
-                
-                Bu cevabı değerlendir ve yapıcı geri bildirim ver.
-                Mülakat yapan kişi gibi profesyonel ve destekleyici bir tonda konuş.
-                """
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
-                        )
-                    ),
-                )
-            )
-            
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            # Metin versiyonu
-            if cv_context:
-                text_response = self.evaluate_cv_answer(question, user_answer, cv_context)
-            else:
-                text_response = self.evaluate_answer(question, user_answer)
-            
-            return {
-                'audio_file': temp_file.name,
-                'feedback_text': text_response,
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            if cv_context:
-                text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
-            else:
-                text_feedback = self.evaluate_answer(question, user_answer)
-                
-            return {
-                'audio_file': None,
-                'feedback_text': text_feedback,
-                'audio_data': None,
-                'error': str(e)
-            }
-
-    def evaluate_speech_answer(self, question, audio_file_path, additional_text="", cv_context=None, voice_name="Enceladus"):
-        """
-        Ses dosyasını transcript edip değerlendirir ve sesli geri bildirim üretir
-        """
-        try:
-            # Önce ses dosyasını transcript et
-            transcribed_text = self._transcribe_audio(audio_file_path)
-            
-            # Ek metin varsa birleştir
-            if additional_text:
-                user_answer = f"{transcribed_text}\n\nEk açıklama: {additional_text}"
-            else:
-                user_answer = transcribed_text
-            
-            # Sesli geri bildirim üret
-            result = self.generate_speech_feedback(question, user_answer, cv_context, voice_name)
-            result['transcribed_text'] = transcribed_text
-            
-            return result
-            
-        except Exception as e:
-            # Transcript edilemezse sadece ek metni kullan
-            if additional_text:
-                result = self.generate_speech_feedback(question, additional_text, cv_context, voice_name)
-                result['transcribed_text'] = f"Ses transcript edilemedi: {str(e)}"
-                return result
+                    )
+                    
+                    audio_data = response.candidates[0].content.parts[0].inline_data.data
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                    self._save_wave_file(temp_file.name, audio_data)
+                    
+                    return {
+                        'audio_file': temp_file.name,
+                        'question_text': question_text,
+                        'audio_data': audio_data
+                    }
+                except Exception as audio_error:
+                    print(f"Audio generation error: {audio_error}")
+                    return {
+                        'audio_file': None,
+                        'question_text': question_text,
+                        'audio_data': None,
+                        'error': f'Ses üretilemedi: {str(audio_error)}'
+                    }
             else:
                 return {
                     'audio_file': None,
-                    'feedback_text': f"Ses dosyası işlenemedi: {str(e)}",
+                    'question_text': question_text,
                     'audio_data': None,
-                    'transcribed_text': f"Transcript hatası: {str(e)}",
-                    'error': str(e)
+                    'error': 'Sesli özellik kullanılamıyor'
                 }
+            
+        except Exception as e:
+            # Hata durumunda sadece metin döndür
+            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
+            return {
+                'audio_file': None,
+                'question_text': question_text,
+                'audio_data': None,
+                'error': str(e)
+            }
+
+    def evaluate_conversation_progress(self, questions, answers):
+        """
+        Mülakat ilerlemesini değerlendirir ve sonraki adım önerisi verir
+        """
+        try:
+            # Eğer henüz cevap yoksa, mülakatın başladığını belirt
+            if not answers:
+                return f"{self.interest} alanında mülakat başladı. İlk soruya cevap verildikten sonra detaylı değerlendirme yapılacak."
+            
+            prompt = f"""
+            {self.interest} alanında yapılan mülakatın ilerlemesini değerlendir:
+            
+            Sorular ve cevaplar:
+            """
+            for i, (q, a) in enumerate(zip(questions, answers)):
+                prompt += f"\nSoru {i+1}: {q}\nCevap: {a}\n"
+            
+            prompt += f"""
+            
+            Bu mülakatın durumunu değerlendir:
+            1. Hangi alanlar daha detaylı sorulmalı?
+            2. Kullanıcının güçlü yanları neler?
+            3. Hangi konularda daha fazla bilgi alınmalı?
+            4. Mülakatın genel tonu nasıl?
+            5. Sonraki soru için öneriler
+            
+            Kısa ve öz bir değerlendirme yap. Maksimum 3-4 cümle.
+            """
+            
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+            
+        except Exception as e:
+            return f"Mülakat değerlendirmesi yapılamadı: {str(e)}"
+
+    def generate_final_evaluation(self, questions, answers, conversation_summary=None):
+        """
+        Mülakat sonunda kapsamlı değerlendirme üretir
+        """
+        try:
+            prompt = f"""
+            {self.interest} alanında yapılan mülakatın genel değerlendirmesini yap:
+            
+            Sorular ve cevaplar:
+            """
+            for i, (q, a) in enumerate(zip(questions, answers)):
+                prompt += f"\nSoru {i+1}: {q}\nCevap: {a}\n"
+            
+            if conversation_summary:
+                prompt += f"\nMülakat özeti: {conversation_summary}"
+            
+            prompt += f"""
+            
+            Bu mülakatın kapsamlı değerlendirmesini yap:
+            
+            **Güçlü Yönler:**
+            - Kullanıcının en iyi performans gösterdiği alanlar
+            - Olumlu özellikler ve beceriler
+            
+            **Geliştirilmesi Gereken Alanlar:**
+            - Eksiklikler ve zayıf noktalar
+            - İyileştirme önerileri
+            
+            **Genel İzlenim:**
+            - Mülakatın genel tonu ve atmosferi
+            - Kullanıcının motivasyonu ve ilgisi
+            
+            **Öneriler:**
+            - Kariyer gelişimi için öneriler
+            - Öğrenme kaynakları ve yönlendirmeler
+            
+            **Puanlama (1-10):**
+            - Genel performans: X/10
+            - İletişim becerileri: X/10
+            - Teknik bilgi: X/10
+            - Problem çözme: X/10
+            
+            Yapıcı, destekleyici ve detaylı bir değerlendirme yap.
+            """
+            
+            response = self.model.generate_content(prompt)
+            return response.text.strip()
+            
+        except Exception as e:
+            return f"Genel değerlendirme yapılamadı: {str(e)}"
 
     def _transcribe_audio(self, audio_file_path):
         """
@@ -356,12 +249,4 @@ class InterviewAIAgent:
             wf.setnchannels(channels)
             wf.setsampwidth(sample_width)
             wf.setframerate(rate)
-            wf.writeframes(pcm_data)
-
-    def suggest_resources(self, topic, num_resources=3):
-        prompt = f"""
-        {topic} konusunda kendini geliştirmek isteyen bir geliştiriciye {num_resources} adet kaliteli kaynak (YouTube videosu, Medium makalesi, blog, vs) öner. Sadece başlık ve link ver.
-        """
-        response = self.model.generate_content(prompt)
-        resources = [line.strip() for line in response.text.split('\n') if line.strip()]
-        return resources[:num_resources] 
+            wf.writeframes(pcm_data) 

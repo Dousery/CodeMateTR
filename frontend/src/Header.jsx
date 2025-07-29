@@ -3,7 +3,7 @@ import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stac
 import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
 import CodeIcon from '@mui/icons-material/Code';
-import PsychologyIcon from '@mui/icons-material/Psychology';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,7 @@ const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
   { icon: <WorkIcon />, label: 'Case Study', route: '/case' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
-  { icon: <PsychologyIcon />, label: 'Mülakat', route: '/interview' },
+  { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
   { icon: <HistoryEduIcon />, label: 'Geçmiş', route: '/history' },
 ];
 
