@@ -3,19 +3,35 @@ from google.genai import types
 import os
 import json
 import traceback
+from dotenv import load_dotenv
 
+load_dotenv()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class CodeAIAgent:
     def __init__(self, interest):
         self.interest = interest
-        # Gemini 2.5 Flash modelini code execution ile yapılandır
-        self.client = genai.Client()
+        # Configure the client with API key
+        try:
+            self.client = genai.Client(api_key=GEMINI_API_KEY)
+        except Exception as e:
+            print(f"Google GenAI client initialization error: {e}")
+            # Fallback: Set environment variable
+            os.environ['GOOGLE_API_KEY'] = GEMINI_API_KEY
+            try:
+                self.client = genai.Client()
+            except Exception as e2:
+                print(f"Fallback client initialization error: {e2}")
+                self.client = None
         self.model = "gemini-2.0-flash-exp"
         
     def generate_coding_question(self, difficulty="orta"):
         """
         Belirtilen zorluk seviyesinde Python kodlama sorusu üretir
         """
+        if not self.client:
+            return "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin."
+            
         difficulty_levels = {
             "kolay": "başlangıç seviyesi, temel Python syntax",
             "orta": "orta seviye, fonksiyonlar, listeler, döngüler",
@@ -43,12 +59,21 @@ class CodeAIAgent:
             return response.text.strip()
             
         except Exception as e:
-            return f"Hata oluştu: {str(e)}"
+            return f"Kodlama sorusu üretilemedi: {str(e)}"
 
     def evaluate_code_with_execution(self, user_code, question):
         """
         Kullanıcının kodunu çalıştırarak değerlendirir
         """
+        if not self.client:
+            return {
+                "evaluation": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
+                "execution_output": "",
+                "code_suggestions": "",
+                "has_errors": True,
+                "corrected_code": ""
+            }
+            
         prompt = f"""
         Python kodunu çalıştır ve kısa değerlendir:
         

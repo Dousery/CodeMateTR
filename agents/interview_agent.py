@@ -32,70 +32,6 @@ class InterviewAIAgent:
         Kullanıcının önceki cevaplarına göre dinamik soru üretir
         """
         try:
-<<<<<<< HEAD
-            # Önce metin soruyu üret
-            text_prompt = f"""
-            {self.interest} alanında bir teknik mülakat sorusu sor. 
-            Sadece soruyu ver, başka açıklama ekleme.
-            """
-            
-            text_response = self.model.generate_content(text_prompt)
-            question_text = text_response.text.strip()
-            
-            # Sonra bu soruyu sesli hale getir
-            speech_prompt = f"""
-            Şu mülakat sorusunu profesyonel ve samimi bir tonda oku:
-            
-            "{question_text}"
-            """
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=speech_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
-                        )
-                    ),
-                )
-            )
-            
-            # Ses verisini al
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            
-            # Geçici dosya oluştur
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            return {
-                'audio_file': temp_file.name,
-                'question_text': question_text,
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            # Hata durumunda sadece metin döndür
-            try:
-                text_prompt = f"{self.interest} alanında bir teknik mülakat sorusu sor. Sadece soruyu ver."
-                response = self.model.generate_content(text_prompt)
-                return {
-                    'audio_file': None,
-                    'question_text': response.text.strip(),
-                    'audio_data': None,
-                    'error': str(e)
-                }
-            except Exception as e2:
-                return {
-                    'audio_file': None,
-                    'question_text': f"{self.interest} alanında basit bir teknik soru sorun.",
-                    'audio_data': None,
-                    'error': f"Soru üretme hatası: {str(e2)}"
-                }
-=======
             context_prompt = ""
             if previous_questions and user_answers:
                 context_prompt = f"""
@@ -116,9 +52,9 @@ class InterviewAIAgent:
             {context_prompt}
             
             Soruyu doğal ve samimi bir şekilde sor, mülakat yapan kişi gibi konuş.
-            Eğer conversation_context'te "Kullanıcının adı: [ad]" formatında bir bilgi varsa, 
+            Eğer conversation_context'te kullanıcı adı belirtilmişse (örneğin "Bu mülakat [ad] adlı kullanıcı ile yapılıyor"), 
             o adı kullanarak kişiselleştirilmiş sorular sor. Örneğin: "[Ad], bu konuda ne düşünüyorsun?" 
-            veya "[Ad], bu durumda nasıl davranırdın?" gibi.
+            veya "[Ad], bu durumda nasıl davranırdın?" gibi. Kullanıcı adını conversation_context'ten çıkar ve doğrudan kullan.
             Sadece soruyu ver, başka açıklama ekleme.
             """
             
@@ -128,201 +64,35 @@ class InterviewAIAgent:
         except Exception as e:
             # Fallback soru
             return f"{self.interest} alanında çalışırken en büyük zorlukla nasıl karşılaştınız?"
->>>>>>> 9cc64b1b04c4894cc503464b51710f866587754e
 
     def generate_dynamic_speech_question(self, previous_questions=None, user_answers=None, conversation_context=None, voice_name='Kore'):
         """
         Kullanıcının önceki cevaplarına göre dinamik sesli soru üretir
         """
         try:
-<<<<<<< HEAD
-            # Önce metin soruyu üret
-            text_prompt = f"""
-            Aşağıdaki CV analizi sonucuna göre uygun bir teknik mülakat sorusu sor:
+            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
+            print(f"Generated question text: {question_text}")
             
-            CV Analizi: {cv_analysis}
-            
-            Soruyu kişinin deneyim seviyesine uygun ve gerçekçi yap. 
-            Sadece soruyu ver, başka açıklama ekleme.
-            """
-            
-            text_response = self.model.generate_content(text_prompt)
-            question_text = text_response.text.strip()
-            
-            # Sonra bu soruyu sesli hale getir
-            speech_prompt = f"""
-            Şu mülakat sorusunu profesyonel ve samimi bir tonda oku:
-            
-            "{question_text}"
-            """
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=speech_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
-                        )
-                    ),
-                )
-            )
-            
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            return {
-                'audio_file': temp_file.name,
-                'question_text': question_text,
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            # Hata durumunda metin soru döndür
-            return self.generate_cv_based_question(cv_analysis)
-
-    def generate_speech_feedback(self, question, user_answer, cv_context=None, voice_name='Enceladus'):
-        """
-        Kullanıcı cevabına sesli geri bildirim üretir
-        """
-        try:
-            # Önce metin geri bildirimi üret
-            if cv_context:
-                text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
-            else:
-                text_feedback = self.evaluate_answer(question, user_answer)
-            
-            # Sonra bu geri bildirimi sesli hale getir
-            speech_prompt = f"""
-            Şu mülakat geri bildirimini profesyonel ve destekleyici bir tonda oku:
-            
-            "{text_feedback}"
-            """
-            
-            response = self.client.models.generate_content(
-                model="gemini-2.5-flash-preview-tts",
-                contents=speech_prompt,
-                config=types.GenerateContentConfig(
-                    response_modalities=["AUDIO"],
-                    speech_config=types.SpeechConfig(
-                        voice_config=types.VoiceConfig(
-                            prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                voice_name=voice_name,
-                            )
-                        )
-                    ),
-                )
-            )
-            
-            audio_data = response.candidates[0].content.parts[0].inline_data.data
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
-            
-            return {
-                'audio_file': temp_file.name,
-                'feedback_text': text_feedback,
-                'audio_data': audio_data
-            }
-            
-        except Exception as e:
-            # Hata durumunda sadece metin geri bildirim döndür
-            if cv_context:
-                text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
-            else:
-                text_feedback = self.evaluate_answer(question, user_answer)
-                
+            # TTS kotası aşıldığı için geçici olarak devre dışı
+            print("TTS quota exceeded - returning text only")
             return {
                 'audio_file': None,
-                'feedback_text': text_feedback,
+                'question_text': question_text,
                 'audio_data': None,
-                'error': str(e)
+                'error': 'Sesli özellik geçici olarak devre dışı - API kotası aşıldı'
             }
-
-    def evaluate_speech_answer(self, question, audio_file_path, additional_text="", cv_context=None, voice_name="Enceladus"):
-        """
-        Ses dosyasını transcript edip değerlendirir ve sesli geri bildirim üretir
-        """
-        try:
-            # Önce ses dosyasını transcript et
-            transcribed_text = self._transcribe_audio(audio_file_path)
-            
-            # Ek metin varsa birleştir
-            if additional_text:
-                user_answer = f"{transcribed_text}\n\nEk açıklama: {additional_text}"
-            else:
-                user_answer = transcribed_text
-            
-            # Sesli geri bildirim üret
-            result = self.generate_speech_feedback(question, user_answer, cv_context, voice_name)
-            result['transcribed_text'] = transcribed_text
-            
-            return result
             
         except Exception as e:
-            # Transcript edilemezse sadece ek metni kullan
-            if additional_text:
-                result = self.generate_speech_feedback(question, additional_text, cv_context, voice_name)
-                result['transcribed_text'] = f"Ses transcript edilemedi: {str(e)}"
-                return result
-=======
-            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
-            
-            # Sesli özellik aktifse ses üret
-            if self.client:
-                try:
-                    response = self.client.models.generate_content(
-                        model="gemini-2.5-flash-preview-tts",
-                        contents=question_text,
-                        config=types.GenerateContentConfig(
-                            response_modalities=["AUDIO"],
-                            speech_config=types.SpeechConfig(
-                                voice_config=types.VoiceConfig(
-                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                        voice_name=voice_name,
-                                    )
-                                )
-                            ),
-                        )
-                    )
-                    
-                    audio_data = response.candidates[0].content.parts[0].inline_data.data
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                    self._save_wave_file(temp_file.name, audio_data)
-                    
-                    return {
-                        'audio_file': temp_file.name,
-                        'question_text': question_text,
-                        'audio_data': audio_data
-                    }
-                except Exception as audio_error:
-                    print(f"Audio generation error: {audio_error}")
-                    return {
-                        'audio_file': None,
-                        'question_text': question_text,
-                        'audio_data': None,
-                        'error': f'Ses üretilemedi: {str(audio_error)}'
-                    }
->>>>>>> 9cc64b1b04c4894cc503464b51710f866587754e
-            else:
-                return {
-                    'audio_file': None,
-                    'question_text': question_text,
-                    'audio_data': None,
-                    'error': 'Sesli özellik kullanılamıyor'
-                }
-            
-        except Exception as e:
+            print(f"General error in generate_dynamic_speech_question: {e}")
+            import traceback
+            traceback.print_exc()
             # Hata durumunda sadece metin döndür
             question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
             return {
                 'audio_file': None,
                 'question_text': question_text,
                 'audio_data': None,
-                'error': str(e)
+                'error': f'Genel hata: {str(e)}'
             }
 
     def evaluate_conversation_progress(self, questions, answers):
@@ -333,6 +103,9 @@ class InterviewAIAgent:
             # Eğer henüz cevap yoksa, mülakatın başladığını belirt
             if not answers:
                 return f"{self.interest} alanında mülakat başladı. İlk soruya cevap verildikten sonra detaylı değerlendirme yapılacak."
+            
+            if not self.client:
+                return f"{self.interest} alanında mülakat devam ediyor. API bağlantısı olmadığı için detaylı değerlendirme yapılamıyor."
             
             prompt = f"""
             {self.interest} alanında yapılan mülakatın ilerlemesini değerlendir:
@@ -416,58 +189,30 @@ class InterviewAIAgent:
         Ses dosyasını metne dönüştürür (Gemini ile)
         """
         try:
-            print(f"Transcribing audio file: {audio_file_path}")
-            
             # Ses dosyasını oku
             with open(audio_file_path, 'rb') as audio_file:
                 audio_data = audio_file.read()
             
-            # Dosya boyutu kontrolü
-            if len(audio_data) == 0:
-                return "Ses dosyası boş veya okunamadı."
+            # Gemini ile transcript et
+            prompt = """
+            Bu ses dosyasındaki konuşmayı metne dönüştür. 
+            Sadece konuşulan metni ver, başka açıklama ekleme.
+            Türkçe konuşma var ise Türkçe olarak transcript et.
+            """
             
-            file_size_mb = len(audio_data) / (1024 * 1024)
-            print(f"Audio file size for transcription: {file_size_mb:.2f} MB")
+            response = self.model.generate_content([
+                {
+                    "mime_type": "audio/webm",  # Frontend'den gelen format
+                    "data": base64.b64encode(audio_data).decode()
+                },
+                prompt
+            ])
             
-            if file_size_mb > 20:  # 20MB limit for transcription
-                return "Ses dosyası transcript için çok büyük. Daha kısa kayıt yapın."
+            return response.text.strip()
             
-            # Gemini ile transcript et - daha kısa ve odaklı prompt
-            prompt = "Bu ses dosyasındaki konuşmayı metne dönüştür. Sadece konuşulan metni ver."
-            
-            # Farklı MIME type'ları dene - hızlı failover
-            mime_types = ["audio/webm", "audio/wav", "audio/mpeg"]
-            
-            for i, mime_type in enumerate(mime_types):
-                try:
-                    print(f"Trying transcription with MIME type: {mime_type} (attempt {i+1})")
-                    
-                    response = self.model.generate_content([
-                        {
-                            "mime_type": mime_type,
-                            "data": base64.b64encode(audio_data).decode()
-                        },
-                        prompt
-                    ])
-                    
-                    result = response.text.strip()
-                    if result and not result.lower().startswith('hata') and len(result) > 3:
-                        print(f"Transcription successful with {mime_type}")
-                        return result
-                except Exception as e:
-                    print(f"MIME type {mime_type} failed: {e}")
-                    if i == len(mime_types) - 1:  # Son deneme
-                        break
-                    continue
-            
-            # Hiçbir MIME type başarılı olmadıysa
-            return "Ses transcript edilemedi. Lütfen daha net konuşun veya metin ile cevap verin."
-            
-        except FileNotFoundError:
-            return "Ses dosyası bulunamadı."
         except Exception as e:
-            print(f"Transcription error: {e}")
-            return f"Ses transcript hatası: {str(e)}. Manuel cevap yazabilirsiniz."
+            # Gemini ile transcript edilemezse, basit placeholder
+            return f"Ses transcript edildi ancak metin çıkarılamadı. Hata: {str(e)}"
 
     def _save_wave_file(self, filename, pcm_data, channels=1, rate=24000, sample_width=2):
         """
