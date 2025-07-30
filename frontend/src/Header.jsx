@@ -4,6 +4,7 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
 import CodeIcon from '@mui/icons-material/Code';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import ForumIcon from '@mui/icons-material/Forum';
 import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +15,7 @@ const menuItems = [
   { icon: <WorkIcon />, label: 'Case Study', route: '/case' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
+  { icon: <ForumIcon />, label: 'Forum', route: '/forum' },
   { icon: <HistoryEduIcon />, label: 'Geçmiş', route: '/history' },
 ];
 
