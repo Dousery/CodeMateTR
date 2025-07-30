@@ -265,9 +265,6 @@ def get_file_mimetype(filename):
 # Uygulama context'i oluşturulduktan sonra test session'larını temizle
 def init_app():
     with app.app_context():
-<<<<<<< HEAD
-        db.create_all()
-=======
         # Veritabanı tablolarını oluştur (eğer yoksa)
         try:
             db.create_all()
@@ -275,8 +272,6 @@ def init_app():
         except Exception as e:
             print(f"❌ Veritabanı oluşturma hatası: {e}")
         
-        load_sessions_from_db()
->>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
         # Eski test session'larını temizle
         expired_sessions = TestSession.query.filter_by(status='active').all()
         for test_session in expired_sessions:
@@ -1182,8 +1177,6 @@ def code_room_suggest_resources():
     except Exception as e:
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
-<<<<<<< HEAD
-=======
 @app.route('/code_room/evaluate_with_execution', methods=['POST'])
 def code_room_evaluate_with_execution():
     """Kodu çalıştırarak değerlendirir ve puan verir"""
@@ -1243,8 +1236,6 @@ def case_study_room_evaluate():
     db.session.add(history)
     db.session.commit()
     return jsonify({'evaluation': evaluation})
-
->>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
 def interview_simulation_evaluate():
@@ -1297,8 +1288,6 @@ def change_password():
     db.session.commit()
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
 
-<<<<<<< HEAD
-=======
 @app.route('/debug/session/<session_id>', methods=['GET'])
 def debug_session(session_id):
     if session_id not in active_case_sessions:
@@ -1440,7 +1429,6 @@ def clear_user_sessions():
     
     return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
->>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
 @app.route('/auto_interview/start', methods=['POST'])
