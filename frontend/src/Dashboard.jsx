@@ -6,6 +6,7 @@ import QuizIcon from '@mui/icons-material/Quiz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import WorkIcon from '@mui/icons-material/Work';
+import ForumIcon from '@mui/icons-material/Forum';
 import axios from 'axios';
 
 const modules = [
@@ -33,6 +34,12 @@ const modules = [
     icon: <RecordVoiceOverIcon fontSize="large" color="info" />, 
     path: '/auto-interview',
   },
+  {
+    title: 'Forum',
+    desc: 'İlgi alanındaki kullanıcılarla tartış.',
+    icon: <ForumIcon fontSize="large" color="warning" />, 
+    path: '/forum',
+  },
 ];
 
 const alanlar = [
@@ -48,7 +55,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
-  const [clearingSessions, setClearingSessions] = useState(false);
+
 
   useEffect(() => {
     // Eğer ilgi alanı yoksa önce backend'den çek
@@ -80,17 +87,9 @@ export default function Dashboard() {
     }
   };
 
-  const handleClearSessions = async () => {
-    setClearingSessions(true);
-    try {
-      await axios.post('http://localhost:5000/debug/clear_user_sessions', {}, { withCredentials: true });
-      alert('Session\'lar temizlendi!');
-    } catch (err) {
-      alert('Session temizleme hatası: ' + (err.response?.data?.error || err.message));
-    } finally {
-      setClearingSessions(false);
-    }
-  };
+
+
+
 
   return (
     <Box sx={{ minHeight: '100vh', width: '100vw', py: 18 }}>
@@ -228,6 +227,8 @@ export default function Dashboard() {
       <Typography textAlign="center" mb={8} color="rgba(255,255,255,0.8)">
         Aşağıdaki modüllerden birini seçerek kendini geliştir!
       </Typography>
+      
+
       {!alan ? null : (
         <Grid container spacing={4} justifyContent="center" sx={{ mt: 2 }}>
           {modules.map((mod, i) => (

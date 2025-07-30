@@ -52,6 +52,12 @@ class InterviewAIAgent:
             {context_prompt}
             
             Soruyu doğal ve samimi bir şekilde sor, mülakat yapan kişi gibi konuş.
+<<<<<<< HEAD
+=======
+            Eğer conversation_context'te kullanıcı adı belirtilmişse (örneğin "Bu mülakat [ad] adlı kullanıcı ile yapılıyor"), 
+            o adı kullanarak kişiselleştirilmiş sorular sor. Örneğin: "[Ad], bu konuda ne düşünüyorsun?" 
+            veya "[Ad], bu durumda nasıl davranırdın?" gibi. Kullanıcı adını conversation_context'ten çıkar ve doğrudan kullan.
+>>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
             Sadece soruyu ver, başka açıklama ekleme.
             """
             
@@ -65,6 +71,7 @@ class InterviewAIAgent:
     def generate_cv_based_question(self, cv_analysis):
         """CV analizi temelinde kişiselleştirilmiş soru üretir"""
         try:
+<<<<<<< HEAD
             prompt = f"""
             Aşağıdaki CV analizi temelinde {self.interest} alanında bir mülakat sorusu hazırla:
             
@@ -75,6 +82,65 @@ class InterviewAIAgent:
             Teknik detaylara girmeden, deneyim, motivasyon, hedefler konularında sor.
             Sadece soruyu ver, başka açıklama ekleme.
             """
+=======
+            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
+            print(f"Generated question text: {question_text}")
+            
+            # TTS kotası aşıldığı için geçici olarak devre dışı
+            print("TTS quota exceeded - returning text only")
+            return {
+                'audio_file': None,
+                'question_text': question_text,
+                'audio_data': None,
+                'error': 'Sesli özellik geçici olarak devre dışı - API kotası aşıldı'
+            }
+            
+        except Exception as e:
+            print(f"General error in generate_dynamic_speech_question: {e}")
+            import traceback
+            traceback.print_exc()
+            # Hata durumunda sadece metin döndür
+            question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
+            return {
+                'audio_file': None,
+                'question_text': question_text,
+                'audio_data': None,
+                'error': f'Genel hata: {str(e)}'
+            }
+
+    def evaluate_conversation_progress(self, questions, answers):
+        """
+        Mülakat ilerlemesini değerlendirir ve sonraki adım önerisi verir
+        """
+        try:
+            # Eğer henüz cevap yoksa, mülakatın başladığını belirt
+            if not answers:
+                return f"{self.interest} alanında mülakat başladı. İlk soruya cevap verildikten sonra detaylı değerlendirme yapılacak."
+            
+            if not self.client:
+                return f"{self.interest} alanında mülakat devam ediyor. API bağlantısı olmadığı için detaylı değerlendirme yapılamıyor."
+            
+            prompt = f"""
+            {self.interest} alanında yapılan mülakatın ilerlemesini değerlendir:
+            
+            Sorular ve cevaplar:
+            """
+            for i, (q, a) in enumerate(zip(questions, answers)):
+                prompt += f"\nSoru {i+1}: {q}\nCevap: {a}\n"
+            
+            prompt += f"""
+            
+            Bu mülakatın durumunu değerlendir:
+            1. Hangi alanlar daha detaylı sorulmalı?
+            2. Kullanıcının güçlü yanları neler?
+            3. Hangi konularda daha fazla bilgi alınmalı?
+            4. Mülakatın genel tonu nasıl?
+            5. Sonraki soru için öneriler
+            
+            Kısa ve öz bir değerlendirme yap. Maksimum 3-4 cümle.
+            """
+            
+>>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -103,6 +169,7 @@ class InterviewAIAgent:
     def evaluate_cv_answer(self, question, user_answer, cv_analysis):
         """CV bağlamında kullanıcının cevabını değerlendirir"""
         try:
+<<<<<<< HEAD
             prompt = f"""
             CV Analizi: {cv_analysis}
             Mülakat sorusu: {question}
@@ -122,6 +189,32 @@ class InterviewAIAgent:
             return response.text.strip()
         except Exception as e:
             return self.evaluate_answer(question, user_answer)
+=======
+            # Ses dosyasını oku
+            with open(audio_file_path, 'rb') as audio_file:
+                audio_data = audio_file.read()
+            
+            # Gemini ile transcript et
+            prompt = """
+            Bu ses dosyasındaki konuşmayı metne dönüştür. 
+            Sadece konuşulan metni ver, başka açıklama ekleme.
+            Türkçe konuşma var ise Türkçe olarak transcript et.
+            """
+            
+            response = self.model.generate_content([
+                {
+                    "mime_type": "audio/webm",  # Frontend'den gelen format
+                    "data": base64.b64encode(audio_data).decode()
+                },
+                prompt
+            ])
+            
+            return response.text.strip()
+            
+        except Exception as e:
+            # Gemini ile transcript edilemezse, basit placeholder
+            return f"Ses transcript edildi ancak metin çıkarılamadı. Hata: {str(e)}"
+>>>>>>> 4c40ea8a4c28723b723e772ce4b8f2869bcdd3d9
 
     def generate_personalized_questions(self, cv_analysis, difficulty='orta'):
         """CV analizine göre kişiselleştirilmiş sorular üretir"""

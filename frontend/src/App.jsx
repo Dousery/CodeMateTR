@@ -8,13 +8,12 @@ import Test from './Test';
 import JobSearch from './JobSearch';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
+import Forum from './Forum';
 import History from './History';
 import Header from './Header';
 import Profile from './Profile';
-import Box from '@mui/material/Box';
-import { ThemeProvider } from '@mui/material/styles';
-import { createTheme } from '@mui/material/styles';
-import CssBaseline from '@mui/material/CssBaseline';
+import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
+import '@mui/material/styles';
 
 // Context ile login durumunu paylaş
 const AuthContext = createContext();
@@ -107,6 +106,7 @@ function App() {
               <Route path="/job-search" element={<ProtectedRoute><JobSearch /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
+              <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
             </Routes>

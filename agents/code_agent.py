@@ -1,96 +1,214 @@
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 import os
 import json
 import traceback
+import re
+from dotenv import load_dotenv
 
+load_dotenv()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class CodeAIAgent:
-    def __init__(self, interest):
+    def __init__(self, interest, language='python'):
         self.interest = interest
-        # Gemini 2.5 Flash modelini code execution ile yapılandır
-        self.client = genai.Client()
-        self.model = "gemini-2.0-flash-exp"
+        self.language = language
+        # Configure Gemini API
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        genai.configure(api_key=GEMINI_API_KEY)
+        self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
+        
+        # Dil konfigürasyonları
+        self.language_configs = {
+            'python': {
+                'name': 'Python',
+                'extension': '.py',
+                'comment': '#',
+                'keywords': ['def', 'class', 'if', 'else', 'elif', 'for', 'while', 'try', 'except', 'finally', 'with', 'import', 'from', 'as', 'return', 'yield', 'break', 'continue', 'pass', 'True', 'False', 'None'],
+                'syntax': 'Python syntax',
+                'examples': ['def solution():\n    return "Hello World"\n\nprint(solution())']
+            },
+            'javascript': {
+                'name': 'JavaScript',
+                'extension': '.js',
+                'comment': '//',
+                'keywords': ['function', 'class', 'if', 'else', 'for', 'while', 'try', 'catch', 'finally', 'switch', 'case', 'default', 'return', 'break', 'continue', 'var', 'let', 'const', 'import', 'export', 'async', 'await'],
+                'syntax': 'JavaScript syntax',
+                'examples': ['function solution() {\n    return "Hello World";\n}\n\nconsole.log(solution());']
+            },
+            'java': {
+                'name': 'Java',
+                'extension': '.java',
+                'comment': '//',
+                'keywords': ['public', 'private', 'protected', 'class', 'interface', 'extends', 'implements', 'static', 'final', 'abstract', 'if', 'else', 'for', 'while', 'try', 'catch', 'finally', 'switch', 'case', 'default', 'return', 'break', 'continue', 'new', 'import', 'package'],
+                'syntax': 'Java syntax',
+                'examples': ['public class Solution {\n    public static void main(String[] args) {\n        System.out.println("Hello World");\n    }\n}']
+            },
+            'cpp': {
+                'name': 'C++',
+                'extension': '.cpp',
+                'comment': '//',
+                'keywords': ['int', 'float', 'double', 'char', 'bool', 'string', 'vector', 'class', 'struct', 'public', 'private', 'protected', 'if', 'else', 'for', 'while', 'try', 'catch', 'switch', 'case', 'default', 'return', 'break', 'continue', 'new', 'delete', 'include', 'using', 'namespace'],
+                'syntax': 'C++ syntax',
+                'examples': ['#include <iostream>\nusing namespace std;\n\nint main() {\n    cout << "Hello World" << endl;\n    return 0;\n}']
+            }
+        }
         
     def generate_coding_question(self, difficulty="orta"):
         """
-        Belirtilen zorluk seviyesinde Python kodlama sorusu üretir
+        Belirtilen zorluk seviyesinde kodlama sorusu üretir
         """
+        if not self.model:
+            return "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin."
+            
         difficulty_levels = {
-            "kolay": "başlangıç seviyesi, temel Python syntax",
-            "orta": "orta seviye, fonksiyonlar, listeler, döngüler",
-            "zor": "ileri seviye, algoritmalar, veri yapıları, optimizasyon"
+            "kolay": "başlangıç seviyesi, temel syntax",
+            "orta": "orta seviye, fonksiyonlar, döngüler, veri yapıları",
+            "zor": "ileri seviye, algoritmalar, optimizasyon, tasarım desenleri"
         }
         
         level_desc = difficulty_levels.get(difficulty, "orta seviye")
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
         prompt = f"""
-        {self.interest} alanında {level_desc} bir kısa Python kodlama sorusu üret.
+        {self.interest} alanında {config['name']} dili için {level_desc} bir kısa kodlama sorusu üret.
         
         Format:
         - Problem (2-3 cümle)
         - Örnek: input -> output
         
+        {config['name']} dilinde yazılacak şekilde sor.
         Sadece soruyu ver, çözüm yok.
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
-            
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
-            return f"Hata oluştu: {str(e)}"
+            return f"Kodlama sorusu üretilemedi: {str(e)}"
+
+    def run_code(self, user_code):
+        """
+        Kullanıcının kodunu sadece çalıştırır, değerlendirmez
+        """
+        if not self.model:
+            return {
+                "execution_output": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
+                "has_errors": True,
+                "execution_time": 0,
+                "memory_usage": "N/A"
+            }
+        
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+            
+        prompt = f"""
+        Bu {config['name']} kodunu çalıştır ve sadece çıktısını göster:
+        
+        ```{self.language}
+        {user_code}
+        ```
+        
+        Sadece:
+        1. Kod çıktısı/sonucu
+        2. Varsa hata mesajı
+        3. Kod çalıştı mı? (Evet/Hayır)
+        
+        Değerlendirme, puan, öneri YOK. Sadece çalıştır.
+        """
+        
+        try:
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Hata kontrolü için basit analiz
+            has_errors = any(keyword in response_text.lower() for keyword in 
+                           ['error', 'hata', 'exception', 'traceback', 'failed', 'başarısız'])
+            
+            result = {
+                "execution_output": response_text,
+                "has_errors": has_errors,
+                "execution_time": "N/A",  # Gerçek execution time için ayrı implementation gerek
+                "memory_usage": "N/A"
+            }
+            
+            return result
+            
+        except Exception as e:
+            return {
+                "execution_output": f"Çalıştırma hatası: {str(e)}",
+                "has_errors": True,
+                "execution_time": 0,
+                "memory_usage": "N/A"
+            }
 
     def evaluate_code_with_execution(self, user_code, question):
         """
-        Kullanıcının kodunu çalıştırarak değerlendirir
+        Kullanıcının kodunu çalıştırarak değerlendirir - PUANLAMA İÇİN
         """
+        if not self.model:
+            return {
+                "evaluation": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
+                "execution_output": "",
+                "code_suggestions": "",
+                "has_errors": True,
+                "corrected_code": "",
+                "score": 0,
+                "feedback": ""
+            }
+        
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+            
         prompt = f"""
-        Python kodunu çalıştır ve kısa değerlendir:
+        {config['name']} kodunu değerlendir ve puan ver:
         
         Soru: {question}
         
         Kod:
-        ```python
+        ```{self.language}
         {user_code}
         ```
         
-        Kısa çıktı ver:
-        1. Kodu çalıştır
-        2. Doğru/yanlış (1 cümle)
-        3. Ana sorun varsa belirt (1 cümle)
-        4. Kısa öneri (1 cümle)
+        Değerlendirme formatı:
+        1. Çıktı/Sonuç: [Kod çıktısı]
+        2. Doğruluk: [Doğru mu yanlış mı - 1 cümle]
+        3. Puan: [0-100 arası]
+        4. Ana sorun: [Varsa - 1 cümle]
+        5. Öneri: [Kısa iyileştirme önerisi - 1 cümle]
+        
+        PUANLAMA YAPARAK DEĞERLENDİR.
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
             
             result = {
-                "evaluation": "",
+                "evaluation": response_text,
                 "execution_output": "",
                 "code_suggestions": "",
                 "has_errors": False,
-                "corrected_code": ""
+                "corrected_code": "",
+                "score": 0,
+                "feedback": response_text
             }
             
-            # Tüm parçaları birleştir
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    result["evaluation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    result["code_suggestions"] += f"Kod:\n{part.executable_code.code}\n"
-                elif part.code_execution_result is not None:
-                    result["execution_output"] += f"Çıktı:\n{part.code_execution_result.output}\n"
+            # Puan çıkarmaya çalış
+            score_match = re.search(r'puan[:\s]*(\d+)', response_text.lower())
+            if score_match:
+                result["score"] = int(score_match.group(1))
+            else:
+                # Puan bulunamazsa, doğruluk durumuna göre tahmin et
+                if any(word in response_text.lower() for word in ['doğru', 'correct', 'başarılı', 'successful']):
+                    result["score"] = 85
+                elif any(word in response_text.lower() for word in ['kısmen', 'partial', 'yarım']):
+                    result["score"] = 60
+                else:
+                    result["score"] = 30
+            
+            # Hata kontrolü
+            result["has_errors"] = any(keyword in response_text.lower() for keyword in 
+                                     ['error', 'hata', 'exception', 'yanlış', 'wrong'])
             
             return result
             
@@ -100,34 +218,42 @@ class CodeAIAgent:
                 "execution_output": "",
                 "code_suggestions": "",
                 "has_errors": True,
-                "corrected_code": ""
+                "corrected_code": "",
+                "score": 0,
+                "feedback": f"Değerlendirme hatası: {str(e)}"
             }
 
     def generate_code_solution(self, question):
         """
-        Verilen soru için örnek çözüm üretir ve test eder
+        Verilen soru için örnek çözüm üretir
         """
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+        
         prompt = f"""
-        Bu Python sorusu için çalışan kod yaz ve test et:
+        {config['name']} dilinde bu soruyu çöz:
         
         Soru: {question}
         
-        Sadece:
-        1. Kısa açıklama (2 cümle)
-        2. Python kodu yaz ve çalıştır
-        3. Test sonucu göster
+        Lütfen aşağıdaki formatı kullan:
         
-        Uzun açıklama yapma, direkt kod ver.
+        **Açıklama:**
+        Sorunun nasıl çözüleceğini kısaca açıkla (2-3 cümle)
+        
+        **Kod:**
+        ```{self.language}
+        # Çözüm kodunu buraya yaz
+        ```
+        
+        **Test:**
+        Kodun nasıl çalıştığını göster ve test sonuçlarını açıkla.
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            # Yeni Gemini API kullan
+            response = self.model.generate_content(prompt)
+            
+            # Yanıtı parse et
+            response_text = response.text
             
             result = {
                 "explanation": "",
@@ -136,33 +262,81 @@ class CodeAIAgent:
                 "complexity_analysis": ""
             }
             
-            # Yanıtı parçalara ayır
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    result["explanation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    result["code"] += part.executable_code.code + "\n"
-                elif part.code_execution_result is not None:
-                    result["test_results"] += part.code_execution_result.output + "\n"
+            # Text'i parse et
+            lines = response_text.split('\n')
+            current_section = "explanation"
+            code_block = False
+            
+            for line in lines:
+                line = line.strip()
+                
+                # Section başlıklarını tespit et
+                if "**Açıklama:**" in line or "Açıklama:" in line:
+                    current_section = "explanation"
+                    continue
+                elif "**Kod:**" in line or "Kod:" in line:
+                    current_section = "code"
+                    continue
+                elif "**Test:**" in line or "Test:" in line:
+                    current_section = "test_results"
+                    continue
+                
+                # Kod bloğu başlangıcı
+                if line.startswith("```") and current_section == "code":
+                    code_block = not code_block
+                    continue
+                
+                # İçeriği ilgili bölüme ekle
+                if current_section == "explanation" and line:
+                    result["explanation"] += line + "\n"
+                elif current_section == "code" and code_block and line:
+                    result["code"] += line + "\n"
+                elif current_section == "code" and not code_block and line and not line.startswith("```"):
+                    result["code"] += line + "\n"
+                elif current_section == "test_results" and line:
+                    result["test_results"] += line + "\n"
+            
+            # Eğer parsing başarısız olduysa, tüm metni explanation'a ekle
+            if not result["explanation"] and not result["code"]:
+                result["explanation"] = response_text
+                
+                # Kod bloğunu manuel olarak bul
+                code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+                if code_matches:
+                    result["code"] = code_matches[0].strip()
+            
+            # Boş alanları temizle
+            result["explanation"] = result["explanation"].strip()
+            result["code"] = result["code"].strip()
+            result["test_results"] = result["test_results"].strip()
             
             return result
             
         except Exception as e:
+            print(f"Code solution generation error: {e}")
             return {
-                "explanation": f"Çözüm hatası: {str(e)}",
-                "code": "",
-                "test_results": "",
+                "explanation": f"Çözüm oluşturma hatası: {str(e)}",
+                "code": "# Kod oluşturulamadı",
+                "test_results": "Test sonucu mevcut değil",
                 "complexity_analysis": ""
             }
+
+    def generate_solution(self, question):
+        """
+        Frontend'den çağrılacak generate_solution metodu
+        """
+        return self.generate_code_solution(question)
 
     def debug_code(self, code_with_error):
         """
         Hatalı kodu debug eder ve düzeltir
         """
-        prompt = f"""
-        Bu Python kodundaki hatayı bul ve düzelt:
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
-        ```python
+        prompt = f"""
+        Bu {config['name']} kodundaki hatayı bul ve düzelt:
+        
+        ```{self.language}
         {code_with_error}
         ```
         
@@ -173,13 +347,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(code_execution=types.ToolCodeExecution())]
-                ),
-            )
+            response = self.model.generate_content(prompt)
             
             debug_result = {
                 "error_explanation": "",
@@ -188,13 +356,14 @@ class CodeAIAgent:
                 "prevention_tips": ""
             }
             
-            for part in response.candidates[0].content.parts:
-                if part.text is not None:
-                    debug_result["error_explanation"] += part.text + "\n"
-                elif part.executable_code is not None:
-                    debug_result["corrected_code"] += part.executable_code.code + "\n"
-                elif part.code_execution_result is not None:
-                    debug_result["execution_result"] += part.code_execution_result.output + "\n"
+            # Parse response text
+            response_text = response.text
+            debug_result["error_explanation"] = response_text
+            
+            # Try to extract corrected code
+            code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+            if code_matches:
+                debug_result["corrected_code"] = code_matches[0].strip()
             
             return debug_result
             
@@ -208,62 +377,315 @@ class CodeAIAgent:
 
     def suggest_resources(self, topic, num_resources=3):
         """
-        Belirtilen konu için Python öğrenme kaynakları önerir - Google Search ile gerçek linkler
+        Belirtilen konu için öğrenme kaynakları önerir - Gerçek URL'ler ile
         """
-        prompt = f"""
-        {topic} konusunda Python öğrenmek için en iyi {num_resources} kaynak ara ve öner.
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
-        Her kaynak için:
-        - Kaynak adı
-        - Kısa açıklama (1 cümle)
-        - Neden faydalı (1 cümle)
-        - Zorluk seviyesi (Başlangıç/Orta/İleri)
+        # Öncelikle gerçek URL'leri al
+        real_resources = self._get_topic_specific_urls(topic, config['name'])
         
-        Güncel ve kaliteli kaynakları bul.
-        """
+        if real_resources:
+            # Gerçek kaynakları formatla
+            formatted_resources = self._format_resources_with_urls(real_resources, topic)
+            return formatted_resources
         
+        # Gerçek kaynaklar bulunamazsa AI ile oluştur
         try:
-            # Google Search tool ile gerçek kaynakları ara
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[types.Tool(google_search=types.GoogleSearch())]
-                ),
-            )
+            prompt = f"""
+            {config['name']} dili için {topic} konusunda öğrenmek için en iyi {num_resources} kaynak öner.
             
+            Her kaynak için şu formatı kullan:
+            **Kaynak Adı:** [Kaynak başlığı]
+            - **URL:** [Gerçek erişilebilir URL]
+            - **Açıklama:** [Kısa açıklama - 1 cümle]
+            - **Neden Faydalı:** [Faydası - 1 cümle]
+            - **Zorluk Seviyesi:** [Başlangıç/Orta/İleri]
+            
+            Gerçek, erişilebilir URL'ler ver. Güncel ve kaliteli kaynakları öner.
+            """
+            
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
-            # Fallback: Google Search başarısız olursa basit öneri
-            fallback_prompt = f"""
-            {topic} için {num_resources} Python kaynağı öner.
-            
-            Format:
-            1. Kaynak adı - açıklama (1 cümle)
-            2. Kaynak adı - açıklama (1 cümle)
-            3. Kaynak adı - açıklama (1 cümle)
-            
-            Kısa ve net ol.
-            """
-            
-            try:
-                fallback_response = self.client.models.generate_content(
-                    model=self.model,
-                    contents=fallback_prompt
-                )
-                return fallback_response.text.strip()
-            except:
-                return f"Kaynak hatası: {str(e)}"
+            # Fallback: Önceden tanımlanmış kaynaklar
+            return self._get_fallback_resources_with_urls(topic, config['name'], num_resources)
+    
+    def _get_topic_specific_urls(self, topic, language):
+        """Konuya özel gerçek URL'leri döndürür"""
+        topic_lower = topic.lower()
+        
+        # Python için URL mapping
+        python_resources = {
+            'list': [
+                {
+                    'title': 'Python Lists - Official Documentation',
+                    'url': 'https://docs.python.org/3/tutorial/introduction.html#lists',
+                    'description': 'Python resmi dokümantasyonu - listeler bölümü',
+                    'benefit': 'En güvenilir ve güncel Python liste bilgileri',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'Python Lists - W3Schools',
+                    'url': 'https://www.w3schools.com/python/python_lists.asp',
+                    'description': 'Adım adım Python liste öğretimi',
+                    'benefit': 'İnteraktif örnekler ve tryit editörü ile pratik',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'Real Python - Python Lists and Tuples',
+                    'url': 'https://realpython.com/python-lists-tuples/',
+                    'description': 'Detaylı liste ve tuple açıklaması',
+                    'benefit': 'Derinlemesine analiz ve gelişmiş örnekler',
+                    'level': 'Orta'
+                }
+            ],
+            'loop': [
+                {
+                    'title': 'Python For Loops - Official Tutorial',
+                    'url': 'https://docs.python.org/3/tutorial/controlflow.html#for-statements',
+                    'description': 'Python resmi for döngüsü öğreticisi',
+                    'benefit': 'Resmi dokümantasyondan güvenilir bilgi',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'Python Loops - W3Schools',
+                    'url': 'https://www.w3schools.com/python/python_for_loops.asp',
+                    'description': 'Python döngüleri kapsamlı rehberi',
+                    'benefit': 'Uygulamalı örnekler ve çevrimiçi editör',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'Real Python - Python for Loops',
+                    'url': 'https://realpython.com/python-for-loop/',
+                    'description': 'For döngülerinin derinlemesine incelenmesi',
+                    'benefit': 'İleri seviye teknikler ve best practices',
+                    'level': 'Orta'
+                }
+            ],
+            'function': [
+                {
+                    'title': 'Python Functions - Official Documentation',
+                    'url': 'https://docs.python.org/3/tutorial/controlflow.html#defining-functions',
+                    'description': 'Python fonksiyon tanımlama resmi rehberi',
+                    'benefit': 'En güncel ve doğru fonksiyon bilgileri',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'Python Functions - Real Python',
+                    'url': 'https://realpython.com/defining-your-own-python-function/',
+                    'description': 'Fonksiyon tanımlama ve kullanımı detaylı rehberi',
+                    'benefit': 'Pratik örnekler ve gerçek dünya uygulamaları',
+                    'level': 'Orta'
+                },
+                {
+                    'title': 'Python Functions - Programiz',
+                    'url': 'https://www.programiz.com/python-programming/function',
+                    'description': 'Python fonksiyonları adım adım öğretimi',
+                    'benefit': 'Görsel örnekler ve kolay anlaşılır açıklamalar',
+                    'level': 'Başlangıç'
+                }
+            ],
+            'data structure': [
+                {
+                    'title': 'Python Data Structures - Official Documentation',
+                    'url': 'https://docs.python.org/3/tutorial/datastructures.html',
+                    'description': 'Python veri yapıları resmi dokümantasyonu',
+                    'benefit': 'Tüm veri yapıları için tek kaynak',
+                    'level': 'Orta'
+                },
+                {
+                    'title': 'Python Data Structures - GeeksforGeeks',
+                    'url': 'https://www.geeksforgeeks.org/python-data-structures/',
+                    'description': 'Python veri yapıları kapsamlı rehberi',
+                    'benefit': 'Algoritmalar ve komplekslik analizleri',
+                    'level': 'Orta'
+                },
+                {
+                    'title': 'Data Structures and Algorithms in Python',
+                    'url': 'https://realpython.com/python-data-structures/',
+                    'description': 'Veri yapıları ve algoritmaları Python\'da',
+                    'benefit': 'Performans odaklı yaklaşım ve optimizasyonlar',
+                    'level': 'İleri'
+                }
+            ],
+            'algorithm': [
+                {
+                    'title': 'Python Algorithms - GeeksforGeeks',
+                    'url': 'https://www.geeksforgeeks.org/python-programming-language/',
+                    'description': 'Python algoritmaları ve veri yapıları',
+                    'benefit': 'Geniş algoritma koleksiyonu ve açıklamaları',
+                    'level': 'Orta'
+                },
+                {
+                    'title': 'Algorithms in Python - Real Python',
+                    'url': 'https://realpython.com/python-thinking-recursively/',
+                    'description': 'Python\'da algoritma düşüncesi geliştirme',
+                    'benefit': 'Problem çözme yaklaşımları ve recursive thinking',
+                    'level': 'İleri'
+                },
+                {
+                    'title': 'LeetCode Python Solutions',
+                    'url': 'https://leetcode.com/problemset/all/',
+                    'description': 'Python ile algoritma problemleri çözme platformu',
+                    'benefit': 'Uygulamalı algoritma pratiği ve interview hazırlığı',
+                    'level': 'İleri'
+                }
+            ]
+        }
+        
+        # JavaScript için URL mapping
+        javascript_resources = {
+            'array': [
+                {
+                    'title': 'JavaScript Arrays - MDN Web Docs',
+                    'url': 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array',
+                    'description': 'JavaScript dizileri resmi dokümantasyonu',
+                    'benefit': 'En güncel ve kapsamlı array metodları',
+                    'level': 'Tüm Seviyeler'
+                },
+                {
+                    'title': 'JavaScript Arrays - W3Schools',
+                    'url': 'https://www.w3schools.com/js/js_arrays.asp',
+                    'description': 'JavaScript array öğretimi',
+                    'benefit': 'İnteraktif örnekler ve tryit editörü',
+                    'level': 'Başlangıç'
+                },
+                {
+                    'title': 'JavaScript Array Methods - JavaScript.info',
+                    'url': 'https://javascript.info/array-methods',
+                    'description': 'Array metodları detaylı açıklaması',
+                    'benefit': 'Modern JavaScript yaklaşımları',
+                    'level': 'Orta'
+                }
+            ],
+            'function': [
+                {
+                    'title': 'JavaScript Functions - MDN',
+                    'url': 'https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Functions',
+                    'description': 'JavaScript fonksiyonları resmi rehberi',
+                    'benefit': 'Kapsamlı fonksiyon kavramları ve ES6+ özellikleri',
+                    'level': 'Tüm Seviyeler'
+                },
+                {
+                    'title': 'JavaScript Functions - JavaScript.info',
+                    'url': 'https://javascript.info/function-basics',
+                    'description': 'Fonksiyon temelleri modern yaklaşım',
+                    'benefit': 'Modern JavaScript standartları',
+                    'level': 'Başlangıç'
+                }
+            ]
+        }
+        
+        # Dile göre kaynak seçimi
+        if language.lower() == 'python':
+            resources_map = python_resources
+        elif language.lower() == 'javascript':
+            resources_map = javascript_resources
+        else:
+            return None
+        
+        # Topic'e uygun kaynakları bul
+        for key, resources in resources_map.items():
+            if key in topic_lower or any(word in key for word in topic_lower.split()):
+                return resources[:3]  # İlk 3 kaynağı döndür
+        
+        # Genel kaynakları döndür
+        if language.lower() == 'python':
+            return python_resources.get('list', [])[:3]
+        elif language.lower() == 'javascript':
+            return javascript_resources.get('array', [])[:3]
+        
+        return None
+    
+    def _format_resources_with_urls(self, resources, topic):
+        """Kaynakları URL'li format ile döndürür"""
+        formatted = f"📚 **{topic.title()} Öğrenme Kaynakları** 📚\n\n"
+        formatted += "Gerçek URL'lerle erişilebilir kaynak önerileri:\n\n"
+        
+        for i, resource in enumerate(resources, 1):
+            formatted += f"**{i}. {resource['title']}**\n"
+            formatted += f"🔗 **URL:** {resource['url']}\n"
+            formatted += f"📝 **Açıklama:** {resource['description']}\n"
+            formatted += f"✅ **Neden Faydalı:** {resource['benefit']}\n"
+            formatted += f"📊 **Zorluk Seviyesi:** {resource['level']}\n\n"
+        
+        formatted += "💡 **İpucu:** Bu kaynakları sırayla takip ederek konuyu derinlemesine öğrenebilirsiniz!\n"
+        return formatted
+    
+    def _get_fallback_resources_with_urls(self, topic, language, num_resources):
+        """Fallback kaynakları gerçek URL'ler ile"""
+        if language.lower() == 'python':
+            fallback = f"""📚 **{topic.title()} Python Öğrenme Kaynakları** 📚
+
+**1. Python Resmi Dokümantasyonu**
+🔗 **URL:** https://docs.python.org/3/
+📝 **Açıklama:** Python'ın resmi dokümantasyonu ve öğreticileri
+✅ **Neden Faydalı:** En güncel ve doğru bilgi kaynağı
+📊 **Zorluk Seviyesi:** Tüm Seviyeler
+
+**2. Real Python**
+🔗 **URL:** https://realpython.com/
+📝 **Açıklama:** Python için kapsamlı makaleler ve öğreticiler
+✅ **Neden Faydalı:** Pratik örnekler ve gerçek dünya uygulamaları
+📊 **Zorluk Seviyesi:** Orta-İleri
+
+**3. W3Schools Python Tutorial**
+🔗 **URL:** https://www.w3schools.com/python/
+📝 **Açıklama:** Adım adım Python öğretimi
+✅ **Neden Faydalı:** İnteraktif örnekler ve kolay takip
+📊 **Zorluk Seviyesi:** Başlangıç
+
+💡 **Bonus:** Python Practice - https://www.hackerrank.com/domains/python"""
+        
+        elif language.lower() == 'javascript':
+            fallback = f"""📚 **{topic.title()} JavaScript Öğrenme Kaynakları** 📚
+
+**1. MDN Web Docs**
+🔗 **URL:** https://developer.mozilla.org/en-US/docs/Web/JavaScript
+📝 **Açıklama:** JavaScript resmi dokümantasyonu
+✅ **Neden Faydalı:** En kapsamlı ve güncel JavaScript kaynağı
+📊 **Zorluk Seviyesi:** Tüm Seviyeler
+
+**2. JavaScript.info**
+🔗 **URL:** https://javascript.info/
+📝 **Açıklama:** Modern JavaScript öğretimi
+✅ **Neden Faydalı:** ES6+ özellikleri ve best practices
+📊 **Zorluk Seviyesi:** Başlangıç-Orta
+
+**3. W3Schools JavaScript**
+🔗 **URL:** https://www.w3schools.com/js/
+📝 **Açıklama:** JavaScript temel öğretimi
+✅ **Neden Faydalı:** Uygulamalı örnekler ve tryit editörü
+📊 **Zorluk Seviyesi:** Başlangıç"""
+        
+        else:
+            fallback = f"""📚 **{topic.title()} Öğrenme Kaynakları** 📚
+
+**1. Stack Overflow**
+🔗 **URL:** https://stackoverflow.com/questions/tagged/{language.lower()}
+📝 **Açıklama:** {language} ile ilgili soru-cevap platformu
+✅ **Neden Faydalı:** Gerçek problemler ve çözümleri
+📊 **Zorluk Seviyesi:** Tüm Seviyeler
+
+**2. GitHub**
+🔗 **URL:** https://github.com/search?q={topic}+{language}
+📝 **Açıklama:** {topic} konusunda açık kaynak projeler
+✅ **Neden Faydalı:** Gerçek kod örnekleri ve best practices
+📊 **Zorluk Seviyesi:** Orta-İleri"""
+        
+        return fallback
 
     def analyze_algorithm_complexity(self, code):
         """
         Verilen algoritmanın zaman ve alan karmaşıklığını analiz eder
         """
-        prompt = f"""
-        Bu Python kodunun karmaşıklığını kısaca analiz et:
+        config = self.language_configs.get(self.language, self.language_configs['python'])
         
-        ```python
+        prompt = f"""
+        Bu {config['name']} kodunun karmaşıklığını kısaca analiz et:
+        
+        ```{self.language}
         {code}
         ```
         
@@ -277,10 +699,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
+            response = self.model.generate_content(prompt)
             
             return response.text.strip()
             
@@ -291,31 +710,31 @@ class CodeAIAgent:
         """
         Kullanıcının kodunu geleneksel yöntemle değerlendirir (eski uyumlulık için)
         """
+        config = self.language_configs.get(self.language, self.language_configs['python'])
+        
         prompt = f"""
-        Python kodunu kısaca değerlendir:
+        {config['name']} kodunu detaylı değerlendir ve puan ver:
         
         Soru: {question}
         
         Kod:
-        ```python
+        ```{self.language}
         {user_code}
         ```
         
-        Kısaca:
-        1. Doğru/yanlış (1 cümle)
-        2. Ana sorun varsa (1 cümle)
-        3. Kısa öneri (1 cümle)
+        Detaylı değerlendirme:
+        1. Doğruluk: [Çözüm doğru mu? - 2 cümle]
+        2. Kod kalitesi: [Temizlik, okunabilirlik - 2 cümle]
+        3. Verimlilik: [Algoritma verimi - 1 cümle]
+        4. Puan: [0-100 arası]
+        5. İyileştirme önerileri: [3-4 madde]
         
-        Uzun açıklama yapma.
+        DETAYLI PUANLAMA VE ÖNERİLER VER.
         """
         
         try:
-            response = self.client.models.generate_content(
-                model=self.model,
-                contents=prompt
-            )
-            
+            response = self.model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
-            return f"Değerlendirme hatası: {str(e)}" 
+            return f"Detaylı değerlendirme hatası: {str(e)}" 
