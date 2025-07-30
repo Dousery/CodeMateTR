@@ -13,7 +13,33 @@ import History from './History';
 import Header from './Header';
 import Profile from './Profile';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
-import '@mui/material/styles';
+
+const theme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: { main: '#4f46e5' },
+    background: {
+      default: '#0a0e27',
+      paper: 'rgba(255,255,255,0.05)',
+    },
+    text: {
+      primary: '#fff',
+      secondary: 'rgba(255,255,255,0.8)',
+    },
+  },
+  shape: { borderRadius: 12 },
+  typography: { fontFamily: 'Inter, Roboto, Arial, sans-serif' },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: {
+          backgroundColor: '#0a0e27',
+          background: 'linear-gradient(135deg, #0a0e27 0%, #1a1b3d 25%, #2d1b69 50%, #4a148c 75%, #6a1b9a 100%)',
+        },
+      },
+    },
+  },
+});
 
 // Context ile login durumunu paylaş
 const AuthContext = createContext();
@@ -27,33 +53,6 @@ function ProtectedRoute({ children }) {
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(localStorage.getItem('username')));
   const [mode, setMode] = useState('light');
-
-  const theme = createTheme({
-    palette: {
-      mode: 'dark',
-      primary: { main: '#4f46e5' },
-      background: {
-        default: '#0a0e27',
-        paper: 'rgba(255,255,255,0.05)',
-      },
-      text: {
-        primary: '#fff',
-        secondary: 'rgba(255,255,255,0.8)',
-      },
-    },
-    shape: { borderRadius: 12 },
-    typography: { fontFamily: 'Inter, Roboto, Arial, sans-serif' },
-    components: {
-      MuiCssBaseline: {
-        styleOverrides: {
-          body: {
-            backgroundColor: '#0a0e27',
-            background: 'linear-gradient(135deg, #0a0e27 0%, #1a1b3d 25%, #2d1b69 50%, #4a148c 75%, #6a1b9a 100%)',
-          },
-        },
-      },
-    },
-  });
 
   const toggleTheme = () => {
     setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
