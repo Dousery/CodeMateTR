@@ -11,7 +11,7 @@ import { useAuth } from './App';
 
 const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
-  { icon: <WorkIcon />, label: 'Case Study', route: '/case' },
+  { icon: <WorkIcon />, label: 'İş Bulma', route: '/job-search' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
   { icon: <HistoryEduIcon />, label: 'Geçmiş', route: '/history' },

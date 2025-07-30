@@ -5,7 +5,7 @@ import Register from './Register';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Test from './Test';
-import Case from './Case';
+import JobSearch from './JobSearch';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
 import History from './History';
@@ -104,7 +104,7 @@ function App() {
               <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/test" element={<ProtectedRoute><Test /></ProtectedRoute>} />
-              <Route path="/case" element={<ProtectedRoute><Case /></ProtectedRoute>} />
+              <Route path="/job-search" element={<ProtectedRoute><JobSearch /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
               <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />

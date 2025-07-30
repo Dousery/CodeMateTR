@@ -25,7 +25,7 @@ export default function History() {
   const getModuleColor = (module) => {
     const colors = {
       'Test': '#1976d2',
-      'Case Study': '#dc004e',
+      'İş Bulma': '#dc004e',
       'Code': '#2e7d32',
       'Interview': '#ed6c02'
     };

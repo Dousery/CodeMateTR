@@ -16,10 +16,10 @@ const modules = [
     path: '/test',
   },
   {
-    title: 'Case Study',
-    desc: 'Gerçek senaryolarla pratik yap.',
+    title: 'İş Bulma',
+    desc: 'CV ile uygun iş ilanlarını bul.',
     icon: <WorkIcon fontSize="large" color="secondary" />, 
-    path: '/case',
+    path: '/job-search',
   },
   {
     title: 'Kodlama Odası',

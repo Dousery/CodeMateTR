@@ -9,6 +9,7 @@ from agents.test_agent import TestAIAgent
 from agents.interview_agent import InterviewAIAgent
 from agents.case_study_agent import CaseStudyAIAgent
 from agents.code_agent import CodeAIAgent
+from agents.job_matching_agent import JobMatchingAIAgent
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import time
@@ -62,7 +63,7 @@ class User(db.Model):
 class UserHistory(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False)
-    activity_type = db.Column(db.String(32), nullable=False)  # test, code, case, interview
+    activity_type = db.Column(db.String(32), nullable=False)  # test, code, job_search, interview
     detail = db.Column(db.Text, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -85,23 +86,6 @@ with app.app_context():
 
 # Geçici bellek içi veri saklama
 users = {}  # username: {password_hash, interest}
-
-# Case Study eşleştirme sistemi
-case_study_queue = {}  # interest: [usernames]
-active_case_sessions = {}  # session_id: {users: [], case: {}, start_time: datetime, duration: 30, messages: [], audio_messages: []}
-
-# Session persistence için database tablosu
-class CaseSession(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(100), unique=True, nullable=False)
-    users = db.Column(db.Text, nullable=False)  # JSON string
-    case_data = db.Column(db.Text, nullable=False)  # JSON string
-    status = db.Column(db.String(20), default='active')  # active, completed
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
-    end_time = db.Column(db.DateTime, nullable=True)
-    messages = db.Column(db.Text, nullable=True)  # JSON string
-    audio_messages = db.Column(db.Text, nullable=True)  # JSON string
-    evaluations = db.Column(db.Text, nullable=True)  # JSON string
 
 # Test session'ları için database tablosu
 class TestSession(db.Model):
@@ -130,29 +114,55 @@ class AutoInterviewSession(db.Model):
     conversation_context = db.Column(db.Text, nullable=True)  # Mülakat bağlamı
     final_evaluation = db.Column(db.Text, nullable=True)  # Final değerlendirme
 
-# Database'den session'ları yükle
-def load_sessions_from_db():
-    with app.app_context():
-        try:
-            sessions = CaseSession.query.filter_by(status='active').all()
-            for session_db in sessions:
-                session_data = {
-                    'users': json.loads(session_db.users),
-                    'case': json.loads(session_db.case_data),
-                    'start_time': session_db.start_time,
-                    'duration': 30,
-                    'messages': json.loads(session_db.messages) if session_db.messages else [],
-                    'audio_messages': json.loads(session_db.audio_messages) if session_db.audio_messages else [],
-                    'status': session_db.status
-                }
-                active_case_sessions[session_db.session_id] = session_data
-            print(f"Database'den {len(sessions)} aktif session yüklendi.")
-        except Exception as e:
-            print(f"Session yükleme hatası: {e}")
-
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+def extract_text_from_file(file_path):
+    """CV dosyasından metin çıkarır"""
+    try:
+        if file_path.lower().endswith('.pdf'):
+            # PDF okuma
+            try:
+                import PyPDF2
+                with open(file_path, 'rb') as file:
+                    reader = PyPDF2.PdfReader(file)
+                    text = ""
+                    for page in reader.pages:
+                        text += page.extract_text() + "\n"
+                    return text
+            except ImportError:
+                try:
+                    import pdfplumber
+                    with pdfplumber.open(file_path) as pdf:
+                        text = ""
+                        for page in pdf.pages:
+                            text += page.extract_text() + "\n"
+                        return text
+                except ImportError:
+                    return "PDF okuma kütüphanesi bulunamadı"
+        
+        elif file_path.lower().endswith('.docx'):
+            # DOCX okuma
+            try:
+                from docx import Document
+                doc = Document(file_path)
+                text = ""
+                for paragraph in doc.paragraphs:
+                    text += paragraph.text + "\n"
+                return text
+            except ImportError:
+                return "DOCX okuma kütüphanesi bulunamadı"
+        
+        elif file_path.lower().endswith('.doc'):
+            # DOC dosyaları için - basit metin döndür
+            return "DOC dosyası algılandı - içerik okunamadı (DOCX formatını tercih edin)"
+        
+        else:
+            return "Desteklenmeyen dosya formatı"
+            
+    except Exception as e:
+        return f"Dosya okuma hatası: {str(e)}"
 
 def get_file_mimetype(filename):
     ext = filename.rsplit('.', 1)[1].lower()
@@ -162,11 +172,10 @@ def get_file_mimetype(filename):
         return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     return 'application/octet-stream'
 
-# Uygulama context'i oluşturulduktan sonra session'ları yükle
+# Uygulama context'i oluşturulduktan sonra test session'larını temizle
 def init_app():
     with app.app_context():
         db.create_all()
-        load_sessions_from_db()
         # Eski test session'larını temizle
         expired_sessions = TestSession.query.filter_by(status='active').all()
         for test_session in expired_sessions:
@@ -213,47 +222,14 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
     
-    # Kullanıcı login olduğunda eski session'larını temizle
-    # Kullanıcıyı tüm kuyruklardan çıkar
-    for interest in case_study_queue:
-        if username in case_study_queue[interest]:
-            case_study_queue[interest].remove(username)
     
-    # Kullanıcıyı tüm aktif session'lardan çıkar
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users']:
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
+    # Kullanıcı login olduğunda eski session'larını temizle (artık sadece test session'ları)
     
     session['username'] = username
     return jsonify({'message': 'Giriş başarılı.'})
 
 @app.route('/logout', methods=['POST'])
 def logout():
-    if 'username' in session:
-        username = session['username']
-        
-        # Kullanıcıyı tüm case study kuyruklarından çıkar
-        for interest in case_study_queue:
-            if username in case_study_queue[interest]:
-                case_study_queue[interest].remove(username)
-        
-        # Kullanıcının aktif session'larını tamamla
-        for session_id, session_data in list(active_case_sessions.items()):
-            if username in session_data['users'] and session_data['status'] == 'active':
-                # Session'ı completed olarak işaretle
-                session_data['status'] = 'completed'
-                session_data['end_time'] = datetime.now()
-                
-                # Kullanıcıyı session'dan çıkar
-                session_data['users'].remove(username)
-                
-                # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-                if not session_data['users']:
-                    del active_case_sessions[session_id]
-    
     session.pop('username', None)
     return jsonify({'message': 'Çıkış başarılı.'})
 
@@ -661,359 +637,109 @@ def interview_simulation():
         'question': question
     })
 
-@app.route('/case_study_room', methods=['POST'])
-def case_study_room():
+# ==================== İŞ BULMA SİSTEMİ ====================
+
+@app.route('/job_search', methods=['POST'])
+def job_search():
+    """CV yükle ve iş ilanlarını getir"""
     if 'username' not in session:
         return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
-    username = session['username']
-    interest = user.interest
+    # CV dosyası kontrolü
+    if 'cv' not in request.files:
+        return jsonify({'error': 'CV dosyası yüklemelisiniz.'}), 400
     
-    # Kullanıcının aktif session'da olup olmadığını kontrol et
-    for session_id, session_data in active_case_sessions.items():
-        if username in session_data['users'] and session_data['status'] == 'active':
-            return jsonify({'error': 'Zaten aktif bir case study session\'ınız var.'}), 400
+    cv_file = request.files['cv']
+    if cv_file.filename == '':
+        return jsonify({'error': 'CV dosyası seçilmedi.'}), 400
     
-    # Kullanıcıyı kuyruğa ekle
-    if interest not in case_study_queue:
-        case_study_queue[interest] = []
+    if not allowed_file(cv_file.filename):
+        return jsonify({'error': 'Sadece PDF, DOC ve DOCX dosyaları kabul edilir.'}), 400
     
-    # Kullanıcı zaten kuyrukta mı kontrol et
-    if username in case_study_queue[interest]:
-        return jsonify({'status': 'waiting', 'message': 'Eşleşme bekleniyor...'})
-    
-    case_study_queue[interest].append(username)
-    
-    # Eşleşme kontrolü
-    if len(case_study_queue[interest]) >= 2:
-        # İki kullanıcıyı eşleştir
-        user1, user2 = case_study_queue[interest][:2]
-        case_study_queue[interest] = case_study_queue[interest][2:]  # Kuyruktan çıkar
+    try:
+        # CV'yi kaydet
+        filename = secure_filename(f"cv_{user.username}_{int(time.time())}.{cv_file.filename.rsplit('.', 1)[1].lower()}")
+        cv_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        cv_file.save(cv_path)
         
-        # Case study oluştur
-        try:
-            agent = CaseStudyAIAgent(interest)
-            case = agent.generate_case()
-            
-            # Session oluştur
-            session_id = f"case_{int(time.time())}"
-            active_case_sessions[session_id] = {
-                'users': [user1, user2],
-                'case': case,
-                'start_time': datetime.now(),
-                'duration': 30,  # 30 dakika
-                'solutions': {},
-                'messages': [],
-                'audio_messages': [],
-                'status': 'active'
-            }
-            
-            return jsonify({
-                'status': 'matched',
-                'session_id': session_id,
-                'case': case,
-                'partner': user2 if username == user1 else user1,
-                'start_time': datetime.now().isoformat(),
-                'duration': 30
-            })
-            
-        except Exception as e:
-            # Hata durumunda kullanıcıları kuyruğa geri ekle
-            case_study_queue[interest].extend([user1, user2])
-            return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
-    
-    return jsonify({'status': 'waiting', 'message': 'Eşleşme bekleniyor...'})
-
-@app.route('/case_study_room/check_match', methods=['GET'])
-def check_case_match():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    interest = user.interest
-    
-    # Aktif session'da mı kontrol et
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users'] and session_data['status'] == 'active':
-            return jsonify({
-                'status': 'matched',
-                'session_id': session_id,
-                'case': session_data['case'],
-                'partner': next(u for u in session_data['users'] if u != username),
-                'start_time': session_data['start_time'].isoformat(),
-                'duration': session_data['duration']
-            })
-        elif username in session_data['users'] and session_data['status'] == 'completed':
-            # Completed session'da kullanıcı varsa, onu temizle
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
-    
-    # Kuyrukta mı kontrol et
-    if interest in case_study_queue and username in case_study_queue[interest]:
-        return jsonify({'status': 'waiting', 'message': 'Eşleşme bekleniyor...'})
-    
-    return jsonify({'status': 'not_found'})
-
-@app.route('/case_study_room/submit_solution', methods=['POST'])
-def submit_case_solution():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    data = request.json
-    session_id = data.get('session_id')
-    solution = data.get('solution')
-    
-    if not session_id or not solution:
-        return jsonify({'error': 'Session ID ve çözüm gerekli.'}), 400
-    
-    if session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    # Çözümü kaydet
-    if 'solutions' not in session_data:
-        session_data['solutions'] = {}
-    session_data['solutions'][username] = solution
-    
-    return jsonify({'message': 'Çözüm kaydedildi.'})
-
-@app.route('/case_study_room/send_message', methods=['POST'])
-def send_message():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    data = request.json
-    session_id = data.get('session_id')
-    message = data.get('message')
-    
-    if not session_id or not message:
-        return jsonify({'error': 'Session ID ve mesaj gerekli.'}), 400
-    
-    if session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    # Mesajı kaydet
-    message_data = {
-        'username': username,
-        'message': message,
-        'timestamp': datetime.now().isoformat(),
-        'type': 'text'
-    }
-    session_data['messages'].append(message_data)
-    
-    return jsonify({'message': 'Mesaj gönderildi.'})
-
-
-
-@app.route('/case_study_room/send_audio', methods=['POST'])
-def send_audio():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    session_id = request.form.get('session_id')
-    audio_text = request.form.get('audio_text')
-    
-    if not session_id or not audio_text:
-        return jsonify({'error': 'Session ID ve ses metni gerekli.'}), 400
-    
-    if session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    # Ses dosyasını kaydet
-    audio_url = None
-    if 'audio_file' in request.files:
-        audio_file = request.files['audio_file']
-        if audio_file.filename:
-            # Ses dosyaları için klasör oluştur
-            audio_dir = os.path.join(app.root_path, 'static', 'audio')
-            os.makedirs(audio_dir, exist_ok=True)
-            
-            # Dosya adını güvenli hale getir
-            filename = secure_filename(f"{session_id}_{username}_{int(time.time())}.webm")
-            filepath = os.path.join(audio_dir, filename)
-            
-            # Dosyayı kaydet
-            audio_file.save(filepath)
-            audio_url = f"/static/audio/{filename}"
-    
-    # Ses mesajını kaydet
-    audio_message_data = {
-        'username': username,
-        'audio_text': audio_text,
-        'audio_url': audio_url,
-        'timestamp': datetime.now().isoformat(),
-        'type': 'audio'
-    }
-    session_data['audio_messages'].append(audio_message_data)
-    
-    return jsonify({'message': 'Ses mesajı gönderildi.'})
-
-@app.route('/case_study_room/get_messages', methods=['GET'])
-def get_messages():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    data = request.args
-    session_id = data.get('session_id')
-    
-    if not session_id or session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    # Tüm mesajları birleştir ve sırala
-    all_messages = session_data['messages'] + session_data['audio_messages']
-    all_messages.sort(key=lambda x: x['timestamp'])
-    
-    return jsonify({'messages': all_messages})
-
-@app.route('/case_study_room/complete_session', methods=['POST'])
-def complete_session():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    data = request.json
-    session_id = data.get('session_id')
-    
-    if not session_id:
-        # Yeni bir session oluştur
-        session_id = f"case_{int(time.time())}"
-        active_case_sessions[session_id] = {
-            'users': [session['username']],
-            'case': {}, # Case bilgisi henüz alınmadı
-            'start_time': datetime.now(),
-            'duration': 30,
-            'solutions': {},
-            'messages': [],
-            'audio_messages': [],
-            'status': 'active'
-        }
-        # Yeni session'ı veritabanına kaydet
-        new_session_db = CaseSession(
-            session_id=session_id,
-            users=json.dumps([session['username']]),
-            case_data=json.dumps({}),
-            status='active'
-        )
-        db.session.add(new_session_db)
+        # CV'den metin çıkar
+        cv_text = extract_text_from_file(cv_path)
+        
+        # Job matching agent'ı başlat
+        agent = JobMatchingAIAgent(user.interest)
+        
+        # CV'yi analiz et
+        cv_analysis = agent.analyze_cv(cv_text)
+        
+        # CV analizini user'a kaydet
+        user.cv_analysis = json.dumps(cv_analysis)
         db.session.commit()
-    elif session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    # Oturumu hemen tamamla (tek kullanıcı basınca)
-    session_data['status'] = 'completed'
-    session_data['end_time'] = datetime.now()
-
-    agent = CaseStudyAIAgent(session_data['case'].get('interest', 'general'))
-    evaluations = {}
-
-    # Tüm mesajları birleştir
-    all_messages = session_data['messages'] + session_data['audio_messages']
-    all_messages.sort(key=lambda x: x['timestamp'])
-    conversation_text = ""
-    for msg in all_messages:
-        if msg['type'] == 'audio':
-            conversation_text += f"{msg['username']}: {msg['audio_text']}\n"
-        else:
-            conversation_text += f"{msg['username']}: {msg['message']}\n"
-
-    # Her kullanıcı için ayrı ayrı değerlendirme yap
-    for user in session_data['users']:
-        try:
-            # Birleşik performans değerlendirmesi (hem çözüm hem mesajlaşma)
-            unified_evaluation = agent.evaluate_unified_performance(session_data['case'], conversation_text, user)
+        
+        # İş arama sitelerini getir (gerçek iş ilanları yerine)
+        job_search_data = agent.generate_mock_job_listings(user.interest, 10)
+        
+        # Eğer gerçek iş ilanları yoksa, iş arama sitelerini öner
+        if not job_search_data.get('jobs'):
+            search_recommendations = job_search_data.get('search_recommendations', [])
             
-            evaluations[user] = {
-                'unified_evaluation': unified_evaluation
-            }
+            # Geçmişe kaydet
+            detail = f"CV analizi tamamlandı, iş arama siteleri önerildi"
+            history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
+            db.session.add(history)
+            db.session.commit()
             
-        except Exception as e:
-            evaluations[user] = {
-                'unified_evaluation': {'error': str(e)}
-            }
-
-    # Geçmişe kaydet
-    for user in session_data['users']:
-        detail = f"Case study tamamlandı: {len(all_messages)} mesaj. Partner: {next(u for u in session_data['users'] if u != user)}"
-        history = UserHistory(username=user, activity_type='case_conversation', detail=detail)
+            return jsonify({
+                'status': 'success',
+                'cv_analysis': cv_analysis,
+                'search_recommendations': search_recommendations,
+                'matched_jobs': [],
+                'total_jobs_analyzed': 0,
+                'message': job_search_data.get('message', 'İş arama sitelerine yönlendiriliyorsunuz.')
+            })
+        
+        # Eski kod (eğer mock iş ilanları varsa)
+        matching_results = agent.match_jobs_with_cv(cv_analysis, job_search_data.get('jobs', []))
+        
+        # En iyi 5 iş ilanını seç
+        matches = matching_results.get('matches', [])
+        
+        # Skorlara göre sırala
+        matches.sort(key=lambda x: x.get('score', 0), reverse=True)
+        
+        # En iyi 5 iş ilanını al
+        top_matches = matches[:5]
+        
+        # İş ilanı detaylarını ekle
+        result_jobs = []
+        for match in top_matches:
+            job_index = match.get('job_index', 0)
+            if job_index < len(job_search_data.get('jobs', [])):
+                job = job_search_data['jobs'][job_index]
+                job['match_score'] = match.get('score', 0)
+                job['match_reasons'] = match.get('match_reasons', [])
+                job['missing_skills'] = match.get('missing_skills', [])
+                result_jobs.append(job)
+        
+        # Geçmişe kaydet
+        detail = f"İş eşleştirmesi yapıldı: {len(result_jobs)} uygun iş bulundu"
+        history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
         db.session.add(history)
-
-    session_data['evaluations'] = evaluations
-    db.session.commit()
-    
-    # Session tamamlandıktan sonra kullanıcıları kuyruktan temizle
-    # Interest'i case data'dan al
-    case_interest = session_data['case'].get('interest', 'general')
-    for user in session_data['users']:
-        if case_interest in case_study_queue and user in case_study_queue[case_interest]:
-            case_study_queue[case_interest].remove(user)
-    
-    return jsonify({'message': 'Oturum tamamlandı.'})
-
-@app.route('/case_study_room/get_result', methods=['GET'])
-def get_case_result():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    data = request.args
-    session_id = data.get('session_id')
-    
-    if not session_id or session_id not in active_case_sessions:
-        return jsonify({'error': 'Geçersiz session.'}), 400
-    
-    session_data = active_case_sessions[session_id]
-    username = session['username']
-    
-    if username not in session_data['users']:
-        return jsonify({'error': 'Bu session\'a erişim izniniz yok.'}), 403
-    
-    if session_data['status'] != 'completed':
-        return jsonify({'status': 'not_completed'})
-    
-    return jsonify({
-        'status': 'completed',
-        'evaluation': session_data['evaluations'].get(username, {}),
-        'partner_evaluation': session_data['evaluations'].get(
-            next(u for u in session_data['users'] if u != username), {}
-        ),
-        'case': session_data['case'],
-        'partner': next(u for u in session_data['users'] if u != username),
-        'messages': session_data['messages'],
-        'audio_messages': session_data['audio_messages']
-    })
+        db.session.commit()
+        
+        return jsonify({
+            'status': 'success',
+            'cv_analysis': cv_analysis,
+            'matched_jobs': result_jobs,
+            'total_jobs_analyzed': len(job_search_data.get('jobs', [])),
+            'message': f'{len(result_jobs)} uygun iş ilanı bulundu!'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'İş eşleştirme hatası: {str(e)}'}), 500
 
 @app.route('/code_room', methods=['POST'])
 def code_room():
@@ -1392,31 +1118,6 @@ def suggest_code_resources():
     except Exception as e:
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
-# Case Study çözümü kaydı
-@app.route('/case_study_room/evaluate', methods=['POST'])
-def case_study_room_evaluate():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    data = request.json
-    case = data.get('case')
-    user_solution = data.get('user_solution')
-    if not case or not user_solution:
-        return jsonify({'error': 'Case ve çözüm gerekli.'}), 400
-    agent = CaseStudyAIAgent(user.interest)
-    try:
-        evaluation = agent.evaluate_case_solution(case, user_solution)
-    except Exception as e:
-        return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
-    # Geçmişe kaydet
-    detail = f"Case: {case[:60]}..."
-    history = UserHistory(username=user.username, activity_type='case', detail=detail)
-    db.session.add(history)
-    db.session.commit()
-    return jsonify({'evaluation': evaluation})
-
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
 def interview_simulation_evaluate():
@@ -1469,141 +1170,6 @@ def change_password():
     user.set_password(new_password)
     db.session.commit()
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
-
-@app.route('/debug/session/<session_id>', methods=['GET'])
-def debug_session(session_id):
-    if session_id not in active_case_sessions:
-        return jsonify({'error': 'Session bulunamadı'})
-    
-    session_data = active_case_sessions[session_id]
-    return jsonify({
-        'session_id': session_id,
-        'users': session_data['users'],
-        'status': session_data['status'],
-        'messages_count': len(session_data['messages']),
-        'audio_messages_count': len(session_data['audio_messages']),
-        'has_evaluations': 'evaluations' in session_data,
-        'evaluations': session_data.get('evaluations', {}),
-        'case': session_data['case']
-    })
-
-@app.route('/debug/queue', methods=['GET'])
-def debug_queue():
-    return jsonify({
-        'case_study_queue': case_study_queue,
-        'active_sessions': {k: {'users': v['users'], 'status': v['status']} for k, v in active_case_sessions.items()}
-    })
-
-@app.route('/debug/force_match', methods=['POST'])
-def force_match():
-    data = request.json
-    interest = data.get('interest', 'Data Science')
-
-    if interest in case_study_queue and len(case_study_queue[interest]) >= 2:
-        user1, user2 = case_study_queue[interest][:2]
-        case_study_queue[interest] = case_study_queue[interest][2:]
-
-        # Basit case study oluştur (API olmadan)
-        case = {
-            "title": f"{interest} Case Study",
-            "description": f"Bu bir {interest} alanında test case study'sidir. Lütfen bu senaryoyu çözün.",
-            "requirements": ["Çözümü tamamlayın"],
-            "constraints": ["30 dakika süre"],
-            "evaluation_criteria": ["Çözüm kalitesi", "Analiz derinliği"],
-            "interest": interest
-        }
-
-        session_id = f"case_{int(time.time())}"
-        active_case_sessions[session_id] = {
-            'users': [user1, user2],
-            'case': case,
-            'start_time': datetime.now(),
-            'duration': 30,
-            'solutions': {},
-            'messages': [],
-            'audio_messages': [],
-            'status': 'active'
-        }
-
-        return jsonify({
-            'status': 'success',
-            'message': f'{user1} ve {user2} eşleştirildi',
-            'session_id': session_id
-        })
-
-    return jsonify({'status': 'error', 'message': 'Eşleştirilecek kullanıcı yok'})
-
-@app.route('/debug/clear_sessions', methods=['POST'])
-def clear_sessions():
-    global active_case_sessions, case_study_queue
-    active_case_sessions.clear()
-    case_study_queue.clear()
-    return jsonify({'status': 'success', 'message': 'Tüm sessionlar temizlendi'})
-
-@app.route('/case_study_room/leave_queue', methods=['POST'])
-def leave_queue():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    interest = user.interest
-    
-    # Kullanıcıyı kuyruktan çıkar
-    if interest in case_study_queue and username in case_study_queue[interest]:
-        case_study_queue[interest].remove(username)
-    
-    # Kullanıcıyı aktif session'lardan çıkar
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users']:
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
-    
-    return jsonify({'message': 'Tüm session\'lardan çıkarıldınız.'})
-
-@app.route('/debug/test_case_generation', methods=['POST'])
-def test_case_generation():
-    data = request.json
-    interest = data.get('interest', 'Data Science')
-    
-    try:
-        agent = CaseStudyAIAgent(interest)
-        case = agent.generate_case()
-        return jsonify({
-            'status': 'success',
-            'case': case,
-            'message': 'Case generation başarılı'
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'message': 'Case generation hatası'
-        })
-
-@app.route('/debug/clear_user_sessions', methods=['POST'])
-def clear_user_sessions():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    username = session['username']
-    
-    # Kullanıcıyı tüm kuyruklardan çıkar
-    for interest in case_study_queue:
-        if username in case_study_queue[interest]:
-            case_study_queue[interest].remove(username)
-    
-    # Kullanıcıyı tüm session'lardan çıkar
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users']:
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
-    
-    return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
