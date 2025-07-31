@@ -20,11 +20,7 @@ import {
   List,
   ListItem,
   ListItemIcon,
-  ListItemText,
-  FormControlLabel,
-  RadioGroup,
-  Radio,
-  FormLabel
+  ListItemText
 } from '@mui/material';
 import { 
   CloudUpload as UploadIcon,
@@ -49,8 +45,6 @@ export default function JobSearch() {
   const [error, setError] = useState('');
   const [step, setStep] = useState('upload'); // upload, results
   const [totalJobsAnalyzed, setTotalJobsAnalyzed] = useState(0);
-  const [searchMethod, setSearchMethod] = useState('interest'); // interest, cv
-  const [searchTermUsed, setSearchTermUsed] = useState('');
 
   const handleCvUpload = (event) => {
     const file = event.target.files[0];
@@ -84,7 +78,6 @@ export default function JobSearch() {
     try {
       const formData = new FormData();
       formData.append('cv', cvFile);
-      formData.append('search_method', searchMethod); // Arama yöntemi ekle
 
       const response = await axios.post('http://localhost:5000/job_search', formData, {
         headers: {
@@ -98,7 +91,6 @@ export default function JobSearch() {
         setMatchedJobs(response.data.matched_jobs || []);
         setSearchRecommendations(response.data.search_recommendations || []);
         setTotalJobsAnalyzed(response.data.total_jobs_analyzed);
-        setSearchTermUsed(response.data.search_term_used || '');
         setStep('results');
       } else {
         setError(response.data.error || 'İş eşleştirmesi başarısız oldu.');
@@ -119,8 +111,6 @@ export default function JobSearch() {
     setError('');
     setStep('upload');
     setTotalJobsAnalyzed(0);
-    setSearchTermUsed('');
-    setSearchMethod('interest');
   };
 
   const getScoreColor = (score) => {
@@ -194,37 +184,6 @@ export default function JobSearch() {
             )}
           </Box>
 
-          {/* Arama Yöntemi Seçimi */}
-          <Box sx={{ mb: 3 }}>
-            <FormControl component="fieldset">
-              <FormLabel component="legend" sx={{ color: 'white', mb: 1 }}>
-                İş Arama Yöntemi Seçin
-              </FormLabel>
-              <RadioGroup
-                value={searchMethod}
-                onChange={(e) => setSearchMethod(e.target.value)}
-                row
-              >
-                <FormControlLabel
-                  value="interest"
-                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
-                  label={<Typography sx={{ color: 'white' }}>İlgi Alanına Göre</Typography>}
-                />
-                <FormControlLabel
-                  value="cv"
-                  control={<Radio sx={{ color: 'white', '&.Mui-checked': { color: '#4caf50' } }} />}
-                  label={<Typography sx={{ color: 'white' }}>CV İçeriğine Göre</Typography>}
-                />
-              </RadioGroup>
-              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mt: 1 }}>
-                {searchMethod === 'interest' 
-                  ? 'Profilinizde belirttiğiniz ilgi alanına göre iş arar' 
-                  : 'CV\'nizde bulunan beceri ve deneyimlere göre iş arar'
-                }
-              </Typography>
-            </FormControl>
-          </Box>
-
           <Button 
             variant="contained" 
             color="primary" 
@@ -274,23 +233,9 @@ export default function JobSearch() {
                   <Typography variant="h4" fontWeight={700} color="white" mb={1}>
                     İş Eşleştirme Sonuçları
                   </Typography>
-                  <Typography color="rgba(255,255,255,0.8)" mb={1}>
+                  <Typography color="rgba(255,255,255,0.8)">
                     {totalJobsAnalyzed} iş ilanı analiz edildi, {matchedJobs.length} uygun iş bulundu
                   </Typography>
-                  {searchTermUsed && (
-                    <Typography variant="body2" color="rgba(255,255,255,0.6)" mb={1}>
-                      Arama terimi: "{searchTermUsed}"
-                    </Typography>
-                  )}
-                  <Chip 
-                    label={searchMethod === 'interest' ? 'İlgi Alanı Bazlı Arama' : 'CV Bazlı Arama'} 
-                    size="small" 
-                    sx={{ 
-                      background: searchMethod === 'interest' ? 'rgba(76, 175, 80, 0.2)' : 'rgba(33, 150, 243, 0.2)',
-                      color: 'white',
-                      border: `1px solid ${searchMethod === 'interest' ? 'rgba(76, 175, 80, 0.5)' : 'rgba(33, 150, 243, 0.5)'}`
-                    }} 
-                  />
                 </Box>
                 <Button 
                   variant="outlined" 
@@ -485,41 +430,28 @@ export default function JobSearch() {
                       }}
                     >
                       <CardContent sx={{ p: 3 }}>
-                        {/* Job Header */}
+                        {/* Score Badge */}
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
                           <Typography variant="h6" fontWeight="bold" color="white" sx={{ flex: 1 }}>
                             {job.title}
                           </Typography>
-                          {job.match_score && (
-                            <Box 
-                              sx={{ 
-                                bgcolor: getScoreColor(job.match_score),
-                                color: 'white',
-                                px: 2,
-                                py: 0.5,
-                                borderRadius: 10,
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: 0.5
-                              }}
-                            >
-                              <StarIcon sx={{ fontSize: 16 }} />
-                              <Typography variant="body2" fontWeight="bold">
-                                {job.match_score}%
-                              </Typography>
-                            </Box>
-                          )}
-                          {job.source && (
-                            <Chip 
-                              label={job.source} 
-                              size="small" 
-                              sx={{ 
-                                bgcolor: 'rgba(76, 175, 80, 0.2)', 
-                                color: 'white',
-                                border: '1px solid rgba(76, 175, 80, 0.5)'
-                              }} 
-                            />
-                          )}
+                          <Box 
+                            sx={{ 
+                              bgcolor: getScoreColor(job.match_score),
+                              color: 'white',
+                              px: 2,
+                              py: 0.5,
+                              borderRadius: 10,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 0.5
+                            }}
+                          >
+                            <StarIcon sx={{ fontSize: 16 }} />
+                            <Typography variant="body2" fontWeight="bold">
+                              {job.match_score}%
+                            </Typography>
+                          </Box>
                         </Box>
 
                         {/* Job Details */}
@@ -533,7 +465,7 @@ export default function JobSearch() {
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                             <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18 }} />
                             <Typography color="rgba(255,255,255,0.8)" variant="body2">
-                              {job.location || 'Belirtilmemiş'}
+                              {job.location}
                             </Typography>
                           </Box>
                         </Stack>
@@ -546,47 +478,39 @@ export default function JobSearch() {
                           }
                         </Typography>
 
-                        {/* Employment Details - Sadece varsa göster */}
-                        {(job.experience_level || job.employment_type) && (
-                          <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                            {job.experience_level && (
-                              <Chip 
-                                label={job.experience_level} 
-                                size="small" 
-                                sx={{ bgcolor: 'rgba(79, 70, 229, 0.3)', color: 'white' }}
-                              />
-                            )}
-                            {job.employment_type && (
-                              <Chip 
-                                label={job.employment_type} 
-                                size="small" 
-                                sx={{ bgcolor: 'rgba(124, 58, 237, 0.3)', color: 'white' }}
-                              />
-                            )}
-                          </Box>
-                        )}
+                        {/* Employment Details */}
+                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                          <Chip 
+                            label={job.experience_level} 
+                            size="small" 
+                            sx={{ bgcolor: 'rgba(79, 70, 229, 0.3)', color: 'white' }}
+                          />
+                          <Chip 
+                            label={job.employment_type} 
+                            size="small" 
+                            sx={{ bgcolor: 'rgba(124, 58, 237, 0.3)', color: 'white' }}
+                          />
+                        </Box>
 
-                        {/* Match Score Progress - Sadece varsa göster */}
-                        {job.match_score && (
-                          <Box sx={{ mb: 2 }}>
-                            <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
-                              Uygunluk: {getScoreLabel(job.match_score)}
-                            </Typography>
-                            <LinearProgress 
-                              variant="determinate" 
-                              value={job.match_score} 
-                              sx={{
-                                height: 8,
-                                borderRadius: 4,
-                                bgcolor: 'rgba(255,255,255,0.2)',
-                                '& .MuiLinearProgress-bar': {
-                                  bgcolor: getScoreColor(job.match_score),
-                                  borderRadius: 4
-                                }
-                              }}
-                            />
-                          </Box>
-                        )}
+                        {/* Match Score Progress */}
+                        <Box sx={{ mb: 2 }}>
+                          <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                            Uygunluk: {getScoreLabel(job.match_score)}
+                          </Typography>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={job.match_score} 
+                            sx={{
+                              height: 8,
+                              borderRadius: 4,
+                              bgcolor: 'rgba(255,255,255,0.2)',
+                              '& .MuiLinearProgress-bar': {
+                                bgcolor: getScoreColor(job.match_score),
+                                borderRadius: 4
+                              }
+                            }}
+                          />
+                        </Box>
 
                         {/* Match Reasons */}
                         {job.match_reasons && job.match_reasons.length > 0 && (
@@ -639,76 +563,54 @@ export default function JobSearch() {
                         )}
                       </CardContent>
                       
-                      {/* Apply Button - Gerçek iş ilanı veya arama yönlendirmesi */}
+                      {/* Apply Button - Gerçek iş arama yönlendirmesi */}
                       <CardActions sx={{ p: 2, pt: 0 }}>
-                        {job.url ? (
-                          // Gerçek iş ilanı linki varsa
-                          <Button
-                            variant="contained"
-                            fullWidth
-                            startIcon={<OpenInNewIcon />}
-                            onClick={() => window.open(job.url, '_blank')}
-                            sx={{
-                              background: 'linear-gradient(135deg, #4caf50 0%, #45a049 100%)',
-                              color: 'white',
-                              fontWeight: 600,
-                              py: 1.5,
-                              '&:hover': {
-                                background: 'linear-gradient(135deg, #45a049 0%, #3d8b40 100%)',
-                              }
-                            }}
-                          >
-                            İlanı Görüntüle ({job.source})
-                          </Button>
-                        ) : (
-                          // Fallback: Arama linkleri
-                          <>
-                            <Button
-                              variant="contained"
-                              fullWidth
-                              startIcon={<OpenInNewIcon />}
-                              onClick={() => {
-                                const searchQuery = `${job.title} ${job.company}`;
-                                const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(searchQuery)}&location=Turkey`;
-                                window.open(linkedinUrl, '_blank');
-                              }}
-                              sx={{
-                                background: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
-                                color: 'white',
-                                fontWeight: 600,
-                                py: 1.5,
-                                '&:hover': {
-                                  background: 'linear-gradient(135deg, #005885 0%, #004268 100%)',
-                                }
-                              }}
-                            >
-                              LinkedIn'de Ara
-                            </Button>
-                            <Button
-                              variant="outlined"
-                              fullWidth
-                              startIcon={<OpenInNewIcon />}
-                              onClick={() => {
-                                const searchQuery = job.title;
-                                const kariyerUrl = `https://www.kariyer.net/is-ilanlari?q=${encodeURIComponent(searchQuery)}`;
-                                window.open(kariyerUrl, '_blank');
-                              }}
-                              sx={{
-                                borderColor: 'rgba(255,255,255,0.3)',
-                                color: 'white',
-                                fontWeight: 600,
-                                py: 1.5,
-                                mt: 1,
-                                '&:hover': {
-                                  borderColor: 'rgba(255,255,255,0.5)',
-                                  background: 'rgba(255,255,255,0.1)',
-                                }
-                              }}
-                            >
-                              Kariyer.net'te Ara
-                            </Button>
-                          </>
-                        )}
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          startIcon={<OpenInNewIcon />}
+                          onClick={() => {
+                            // Şirket adı ve pozisyon ile LinkedIn'de arama
+                            const searchQuery = `${job.title} ${job.company}`;
+                            const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(searchQuery)}&location=Turkey`;
+                            window.open(linkedinUrl, '_blank');
+                          }}
+                          sx={{
+                            background: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)', // LinkedIn mavi
+                            color: 'white',
+                            fontWeight: 600,
+                            py: 1.5,
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #005885 0%, #004268 100%)',
+                            }
+                          }}
+                        >
+                          LinkedIn'de Ara
+                        </Button>
+                        <Button
+                          variant="outlined"
+                          fullWidth
+                          startIcon={<OpenInNewIcon />}
+                          onClick={() => {
+                            // Kariyer.net'te arama
+                            const searchQuery = job.title;
+                            const kariyerUrl = `https://www.kariyer.net/is-ilanlari?q=${encodeURIComponent(searchQuery)}`;
+                            window.open(kariyerUrl, '_blank');
+                          }}
+                          sx={{
+                            borderColor: 'rgba(255,255,255,0.3)',
+                            color: 'white',
+                            fontWeight: 600,
+                            py: 1.5,
+                            mt: 1,
+                            '&:hover': {
+                              borderColor: 'rgba(255,255,255,0.5)',
+                              background: 'rgba(255,255,255,0.1)',
+                            }
+                          }}
+                        >
+                          Kariyer.net'te Ara
+                        </Button>
                       </CardActions>
                     </Card>
                   </Grid>

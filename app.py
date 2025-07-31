@@ -737,10 +737,6 @@ def job_search():
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
-    # Arama tipi kontrolü - kullanıcı tercihi
-    search_method = request.form.get('search_method', 'interest')  # default: interest
-    use_interest = search_method == 'interest'
-    
     # CV dosyası kontrolü
     if 'cv' not in request.files:
         return jsonify({'error': 'CV dosyası yüklemelisiniz.'}), 400
@@ -782,24 +778,15 @@ def job_search():
         user.cv_analysis = json.dumps(cv_analysis)
         db.session.commit()
         
-        # İş arama terimi belirle
-        search_term = user.interest if use_interest else "CV Analysis Based"
-        
         # İş arama sitelerini getir (gerçek iş ilanları yerine)
-        job_search_data = agent.generate_mock_job_listings(
-            search_term, 
-            count=10, 
-            cv_analysis=cv_analysis, 
-            use_interest=use_interest
-        )
+        job_search_data = agent.generate_mock_job_listings(user.interest, 10)
         
         # Eğer gerçek iş ilanları yoksa, iş arama sitelerini öner
         if not job_search_data.get('jobs'):
             search_recommendations = job_search_data.get('search_recommendations', [])
             
             # Geçmişe kaydet
-            search_method_text = "İlgi alanı bazlı" if use_interest else "CV bazlı"
-            detail = f"CV analizi tamamlandı ({file_extension.upper()} - {'PDF doğrudan' if file_extension == 'pdf' else 'metin'}), {search_method_text} iş arama siteleri önerildi"
+            detail = f"CV analizi tamamlandı ({file_extension.upper()} - {'PDF doğrudan' if file_extension == 'pdf' else 'metin'}), iş arama siteleri önerildi"
             history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
             db.session.add(history)
             db.session.commit()
@@ -808,8 +795,6 @@ def job_search():
                 'status': 'success',
                 'cv_analysis': cv_analysis,
                 'search_recommendations': search_recommendations,
-                'search_method': job_search_data.get('search_method', 'interest'),
-                'search_term_used': job_search_data.get('search_term', search_term),
                 'matched_jobs': [],
                 'total_jobs_analyzed': 0,
                 'message': job_search_data.get('message', 'İş arama sitelerine yönlendiriliyorsunuz.')
@@ -1208,6 +1193,7 @@ def code_room_suggest_resources():
     except Exception as e:
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
+<<<<<<< HEAD
 @app.route('/code_room/evaluate_with_execution', methods=['POST'])
 def code_room_evaluate_with_execution():
     """Kodu çalıştırarak değerlendirir ve puan verir"""
@@ -1267,6 +1253,8 @@ def case_study_room_evaluate():
     db.session.add(history)
     db.session.commit()
     return jsonify({'evaluation': evaluation})
+=======
+>>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
 def interview_simulation_evaluate():
@@ -1319,6 +1307,7 @@ def change_password():
     db.session.commit()
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
 
+<<<<<<< HEAD
 @app.route('/debug/session/<session_id>', methods=['GET'])
 def debug_session(session_id):
     if session_id not in active_case_sessions:
@@ -1460,6 +1449,8 @@ def clear_user_sessions():
     
     return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
+=======
+>>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
 @app.route('/auto_interview/start', methods=['POST'])
