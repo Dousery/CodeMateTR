@@ -41,6 +41,7 @@ export default function JobSearch() {
   const [cvAnalysis, setCvAnalysis] = useState(null);
   const [matchedJobs, setMatchedJobs] = useState([]);
   const [searchRecommendations, setSearchRecommendations] = useState([]);
+  const [positionsFound, setPositionsFound] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [step, setStep] = useState('upload'); // upload, results
@@ -86,11 +87,9 @@ export default function JobSearch() {
         withCredentials: true
       });
 
-      if (response.data.status === 'success') {
+      if (response.data.success) {
         setCvAnalysis(response.data.cv_analysis);
-        setMatchedJobs(response.data.matched_jobs || []);
-        setSearchRecommendations(response.data.search_recommendations || []);
-        setTotalJobsAnalyzed(response.data.total_jobs_analyzed);
+        setMatchedJobs(response.data.jobs || []);
         setStep('results');
       } else {
         setError(response.data.error || 'İş eşleştirmesi başarısız oldu.');
@@ -108,6 +107,7 @@ export default function JobSearch() {
     setCvAnalysis(null);
     setMatchedJobs([]);
     setSearchRecommendations([]);
+    setPositionsFound([]);
     setError('');
     setStep('upload');
     setTotalJobsAnalyzed(0);
@@ -395,188 +395,200 @@ export default function JobSearch() {
             </Grid>
           )}
 
-          {/* Job Listings */}
+          {/* Job Listings - Forum Style */}
           {matchedJobs.length > 0 && (
             <Grid item xs={12}>
-              <Grid 
+              <Paper 
                 component={motion.div} 
                 initial={{ opacity: 0, y: 20 }} 
                 animate={{ opacity: 1, y: 0 }} 
                 transition={{ duration: 0.5, delay: 0.3 }} 
-                container 
-                spacing={3}
+                elevation={8} 
+                className="glass-card" 
+                sx={{ p: 3, borderRadius: 4 }}
               >
-                {matchedJobs.map((job, index) => (
-                  <Grid item xs={12} md={6} key={index}>
+                <Typography variant="h6" fontWeight={600} color="white" mb={3}>
+                  🎯 Size Uygun İş İlanları ({matchedJobs.length})
+                </Typography>
+                
+                <Stack spacing={2}>
+                  {matchedJobs.map((job, index) => (
                     <Card 
+                      key={index}
                       component={motion.div}
-                      initial={{ opacity: 0, y: 30, scale: 0.9 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
                       transition={{ 
-                        duration: 0.6, 
+                        duration: 0.5, 
                         delay: 0.4 + (index * 0.1),
                         type: "spring",
                         stiffness: 100
                       }}
-                      elevation={8}
+                      elevation={4}
                       className="glass-card"
                       sx={{
-                        borderRadius: 3,
-                        transition: 'transform 0.2s, box-shadow 0.2s',
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s ease',
                         '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: '0 8px 25px rgba(0,0,0,0.15)'
+                          transform: 'translateX(8px)',
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.15)'
                         }
                       }}
+                      onClick={() => window.open(job.url, '_blank')}
                     >
                       <CardContent sx={{ p: 3 }}>
-                        {/* Score Badge */}
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-                          <Typography variant="h6" fontWeight="bold" color="white" sx={{ flex: 1 }}>
-                            {job.title}
-                          </Typography>
-                          <Box 
-                            sx={{ 
-                              bgcolor: getScoreColor(job.match_score),
-                              color: 'white',
-                              px: 2,
-                              py: 0.5,
-                              borderRadius: 10,
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 0.5
-                            }}
-                          >
-                            <StarIcon sx={{ fontSize: 16 }} />
-                            <Typography variant="body2" fontWeight="bold">
-                              {job.match_score}%
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          {/* Sol taraf - İş bilgileri */}
+                          <Box sx={{ flex: 1, mr: 2 }}>
+                            <Typography variant="h6" fontWeight="bold" color="white" mb={1}>
+                              {job.title}
                             </Typography>
-                          </Box>
-                        </Box>
+                            
+                            <Stack spacing={1} sx={{ mb: 2 }}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <BusinessIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
+                                <Typography color="rgba(255,255,255,0.8)" variant="body2">
+                                  {job.company}
+                                </Typography>
+                              </Box>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 16 }} />
+                                <Typography color="rgba(255,255,255,0.8)" variant="body2">
+                                  {job.location}
+                                </Typography>
+                              </Box>
+                            </Stack>
 
-                        {/* Job Details */}
-                        <Stack spacing={1} sx={{ mb: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <BusinessIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18 }} />
-                            <Typography color="rgba(255,255,255,0.8)" variant="body2">
-                              {job.company}
-                            </Typography>
-                          </Box>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <LocationIcon sx={{ color: 'rgba(255,255,255,0.7)', fontSize: 18 }} />
-                            <Typography color="rgba(255,255,255,0.8)" variant="body2">
-                              {job.location}
-                            </Typography>
-                          </Box>
-                        </Stack>
-
-                        {/* Job Description */}
-                        <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ mb: 2 }}>
-                          {job.description.length > 150 
-                            ? `${job.description.substring(0, 150)}...` 
-                            : job.description
-                          }
-                        </Typography>
-
-                        {/* Employment Details */}
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                          <Chip 
-                            label={job.experience_level} 
-                            size="small" 
-                            sx={{ bgcolor: 'rgba(79, 70, 229, 0.3)', color: 'white' }}
-                          />
-                          <Chip 
-                            label={job.employment_type} 
-                            size="small" 
-                            sx={{ bgcolor: 'rgba(124, 58, 237, 0.3)', color: 'white' }}
-                          />
-                        </Box>
-
-                        {/* Match Score Progress */}
-                        <Box sx={{ mb: 2 }}>
-                          <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
-                            Uygunluk: {getScoreLabel(job.match_score)}
-                          </Typography>
-                          <LinearProgress 
-                            variant="determinate" 
-                            value={job.match_score} 
-                            sx={{
-                              height: 8,
-                              borderRadius: 4,
-                              bgcolor: 'rgba(255,255,255,0.2)',
-                              '& .MuiLinearProgress-bar': {
-                                bgcolor: getScoreColor(job.match_score),
-                                borderRadius: 4
+                            {/* İş açıklaması */}
+                            <Typography variant="body2" color="rgba(255,255,255,0.7)" sx={{ mb: 2 }}>
+                              {job.description.length > 120 
+                                ? `${job.description.substring(0, 120)}...` 
+                                : job.description
                               }
-                            }}
-                          />
+                            </Typography>
+
+                            {/* Etiketler */}
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                              <Chip 
+                                label={job.experience_level} 
+                                size="small" 
+                                sx={{ bgcolor: 'rgba(79, 70, 229, 0.3)', color: 'white' }}
+                              />
+                              <Chip 
+                                label={job.employment_type} 
+                                size="small" 
+                                sx={{ bgcolor: 'rgba(124, 58, 237, 0.3)', color: 'white' }}
+                              />
+                              <Chip 
+                                label="LinkedIn" 
+                                size="small" 
+                                sx={{ bgcolor: 'rgba(0, 119, 181, 0.3)', color: 'white' }}
+                              />
+                            </Box>
+                          </Box>
+
+                          {/* Sağ taraf - Uygunluk skoru */}
+                          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', minWidth: 80 }}>
+                            <Box 
+                              sx={{ 
+                                bgcolor: getScoreColor(job.match_score),
+                                color: 'white',
+                                px: 2,
+                                py: 1,
+                                borderRadius: 2,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'center',
+                                mb: 1
+                              }}
+                            >
+                              <StarIcon sx={{ fontSize: 20, mb: 0.5 }} />
+                              <Typography variant="h6" fontWeight="bold">
+                                {job.match_score}%
+                              </Typography>
+                              <Typography variant="caption" sx={{ opacity: 0.9 }}>
+                                {getScoreLabel(job.match_score)}
+                              </Typography>
+                            </Box>
+                            
+                            {/* Uygunluk çubuğu */}
+                            <LinearProgress 
+                              variant="determinate" 
+                              value={job.match_score} 
+                              sx={{
+                                width: 60,
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: 'rgba(255,255,255,0.2)',
+                                '& .MuiLinearProgress-bar': {
+                                  bgcolor: getScoreColor(job.match_score),
+                                  borderRadius: 3
+                                }
+                              }}
+                            />
+                          </Box>
                         </Box>
 
-                        {/* Match Reasons */}
+                        {/* Uygunluk nedenleri */}
                         {job.match_reasons && job.match_reasons.length > 0 && (
-                          <Box sx={{ mb: 2 }}>
+                          <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                             <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
-                              <strong>Neden Uygun:</strong>
+                              <strong>✅ Neden Uygun:</strong>
                             </Typography>
-                            <List dense>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                               {job.match_reasons.slice(0, 3).map((reason, idx) => (
-                                <ListItem key={idx} sx={{ py: 0, px: 0 }}>
-                                  <ListItemIcon sx={{ minWidth: 20 }}>
-                                    <CheckIcon sx={{ color: '#4caf50', fontSize: 16 }} />
-                                  </ListItemIcon>
-                                  <ListItemText 
-                                    primary={reason} 
-                                    primaryTypographyProps={{
-                                      variant: 'body2',
-                                      color: 'rgba(255,255,255,0.7)'
-                                    }}
-                                  />
-                                </ListItem>
+                                <Chip 
+                                  key={idx}
+                                  label={reason} 
+                                  size="small" 
+                                  sx={{ 
+                                    bgcolor: 'rgba(76, 175, 80, 0.2)', 
+                                    color: '#4caf50',
+                                    fontSize: '0.75rem'
+                                  }}
+                                />
                               ))}
-                            </List>
+                            </Box>
                           </Box>
                         )}
 
-                        {/* Missing Skills */}
+                        {/* Eksik beceriler */}
                         {job.missing_skills && job.missing_skills.length > 0 && (
-                          <Box>
+                          <Box sx={{ mt: 1 }}>
                             <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
-                              <strong>Geliştirilecek Alanlar:</strong>
+                              <strong>⚠️ Geliştirilecek:</strong>
                             </Typography>
-                            <List dense>
+                            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                               {job.missing_skills.slice(0, 2).map((skill, idx) => (
-                                <ListItem key={idx} sx={{ py: 0, px: 0 }}>
-                                  <ListItemIcon sx={{ minWidth: 20 }}>
-                                    <CancelIcon sx={{ color: '#ff9800', fontSize: 16 }} />
-                                  </ListItemIcon>
-                                  <ListItemText 
-                                    primary={skill} 
-                                    primaryTypographyProps={{
-                                      variant: 'body2',
-                                      color: 'rgba(255,255,255,0.7)'
-                                    }}
-                                  />
-                                </ListItem>
+                                <Chip 
+                                  key={idx}
+                                  label={skill} 
+                                  size="small" 
+                                  sx={{ 
+                                    bgcolor: 'rgba(255, 152, 0, 0.2)', 
+                                    color: '#ff9800',
+                                    fontSize: '0.75rem'
+                                  }}
+                                />
                               ))}
-                            </List>
+                            </Box>
                           </Box>
                         )}
                       </CardContent>
                       
-                      {/* Apply Button - Gerçek iş arama yönlendirmesi */}
+                      {/* Başvuru butonu */}
                       <CardActions sx={{ p: 2, pt: 0 }}>
                         <Button
                           variant="contained"
                           fullWidth
                           startIcon={<OpenInNewIcon />}
-                          onClick={() => {
-                            // Şirket adı ve pozisyon ile LinkedIn'de arama
-                            const searchQuery = `${job.title} ${job.company}`;
-                            const linkedinUrl = `https://www.linkedin.com/jobs/search/?keywords=${encodeURIComponent(searchQuery)}&location=Turkey`;
-                            window.open(linkedinUrl, '_blank');
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(job.url, '_blank');
                           }}
                           sx={{
-                            background: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)', // LinkedIn mavi
+                            background: 'linear-gradient(135deg, #0077b5 0%, #005885 100%)',
                             color: 'white',
                             fontWeight: 600,
                             py: 1.5,
@@ -585,37 +597,13 @@ export default function JobSearch() {
                             }
                           }}
                         >
-                          LinkedIn'de Ara
-                        </Button>
-                        <Button
-                          variant="outlined"
-                          fullWidth
-                          startIcon={<OpenInNewIcon />}
-                          onClick={() => {
-                            // Kariyer.net'te arama
-                            const searchQuery = job.title;
-                            const kariyerUrl = `https://www.kariyer.net/is-ilanlari?q=${encodeURIComponent(searchQuery)}`;
-                            window.open(kariyerUrl, '_blank');
-                          }}
-                          sx={{
-                            borderColor: 'rgba(255,255,255,0.3)',
-                            color: 'white',
-                            fontWeight: 600,
-                            py: 1.5,
-                            mt: 1,
-                            '&:hover': {
-                              borderColor: 'rgba(255,255,255,0.5)',
-                              background: 'rgba(255,255,255,0.1)',
-                            }
-                          }}
-                        >
-                          Kariyer.net'te Ara
+                          LinkedIn'de Başvur
                         </Button>
                       </CardActions>
                     </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                  ))}
+                </Stack>
+              </Paper>
             </Grid>
           )}
 

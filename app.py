@@ -16,7 +16,9 @@ from agents.test_agent import TestAIAgent
 from agents.interview_agent import InterviewAIAgent
 from agents.case_study_agent import CaseStudyAIAgent
 from agents.code_agent import CodeAIAgent
-from agents.job_matching_agent import JobMatchingAIAgent
+from agents.cv_job_matcher import CVJobMatcher
+from agents.advanced_cv_job_agent import AdvancedCVJobAgent
+from agents.job_scraper_agent import JobScraperAgent
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import json
@@ -258,6 +260,19 @@ def extract_text_from_file(file_path):
             
     except Exception as e:
         return f"Dosya okuma hatası: {str(e)}"
+
+def extract_text_from_pdf_bytes(pdf_bytes):
+    """PDF bytes'ından metin çıkarır"""
+    try:
+        import io
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+        text = ""
+        for page in pdf_reader.pages:
+            text += page.extract_text() + "\n"
+        return text
+    except Exception as e:
+        print(f"PDF bytes okuma hatası: {e}")
+        return "PDF okunamadı"
 
 def get_file_mimetype(filename):
     ext = filename.rsplit('.', 1)[1].lower()
@@ -734,8 +749,6 @@ def job_search():
         return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     
     user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     # CV dosyası kontrolü
     if 'cv' not in request.files:
@@ -749,8 +762,8 @@ def job_search():
         return jsonify({'error': 'Sadece PDF, DOC ve DOCX dosyaları kabul edilir.'}), 400
     
     try:
-        # Job matching agent'ı başlat
-        agent = JobMatchingAIAgent(user.interest)
+        # CV Job Matcher agent'ı başlat
+        agent = CVJobMatcher()
         
         # PDF dosyası mı kontrol et
         file_extension = cv_file.filename.rsplit('.', 1)[1].lower()
@@ -758,8 +771,9 @@ def job_search():
         if file_extension == 'pdf':
             # PDF dosyasını doğrudan bytes olarak oku ve analiz et
             cv_data = cv_file.read()
-            cv_analysis = agent.analyze_cv_from_pdf_bytes(cv_data)
-            print(f"PDF doğrudan analiz edildi: {cv_analysis.get('summary', 'Başarılı')}")
+            cv_text = extract_text_from_pdf_bytes(cv_data)
+            cv_analysis = agent.analyze_cv_and_find_jobs(cv_text)
+            print(f"PDF doğrudan analiz edildi")
         else:
             # Diğer dosya türleri için eski yöntemi kullan (DOCX, DOC)
             # CV'yi kaydet
@@ -769,59 +783,42 @@ def job_search():
             
             # CV'den metin çıkar
             cv_text = extract_text_from_file(cv_path)
-            
-            # CV'yi analiz et
-            cv_analysis = agent.analyze_cv(cv_text)
-            print(f"DOCX/DOC metin analizi yapıldı: {cv_analysis.get('summary', 'Başarılı')}")
+            cv_analysis = agent.analyze_cv_and_find_jobs(cv_text)
+            print(f"DOCX/DOC analizi yapıldı")
         
         # CV analizini user'a kaydet
         user.cv_analysis = json.dumps(cv_analysis)
         db.session.commit()
         
-        # İş arama sitelerini getir (gerçek iş ilanları yerine)
-        job_search_data = agent.generate_mock_job_listings(user.interest, 10)
+        # CV analizine göre iş ilanları oluştur
+        job_search_data = agent.generate_job_listings(cv_analysis.get('job_areas', []))
         
-        # Eğer gerçek iş ilanları yoksa, iş arama sitelerini öner
-        if not job_search_data.get('jobs'):
-            search_recommendations = job_search_data.get('search_recommendations', [])
-            
-            # Geçmişe kaydet
-            detail = f"CV analizi tamamlandı ({file_extension.upper()} - {'PDF doğrudan' if file_extension == 'pdf' else 'metin'}), iş arama siteleri önerildi"
-            history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
-            db.session.add(history)
-            db.session.commit()
-            
-            return jsonify({
-                'status': 'success',
-                'cv_analysis': cv_analysis,
-                'search_recommendations': search_recommendations,
-                'matched_jobs': [],
-                'total_jobs_analyzed': 0,
-                'message': job_search_data.get('message', 'İş arama sitelerine yönlendiriliyorsunuz.')
+        if not job_search_data:
+            return jsonify({'error': 'İş ilanları oluşturulamadı'}), 500
+        
+        # İş ilanlarını CV ile eşleştir
+        matching_results = []
+        for job in job_search_data:
+            match_score = agent.calculate_similarity_score(cv_analysis, job.get('description', ''), job.get('title', ''))
+            matching_results.append({
+                'job': job,
+                'score': match_score.get('similarity_score', 50),
+                'match_reasons': match_score.get('match_reasons', []),
+                'missing_skills': match_score.get('missing_skills', [])
             })
         
-        # Eski kod (eğer mock iş ilanları varsa)
-        matching_results = agent.match_jobs_with_cv(cv_analysis, job_search_data.get('jobs', []))
-        
         # En iyi 5 iş ilanını seç
-        matches = matching_results.get('matches', [])
-        
-        # Skorlara göre sırala
-        matches.sort(key=lambda x: x.get('score', 0), reverse=True)
-        
-        # En iyi 5 iş ilanını al
-        top_matches = matches[:5]
+        matching_results.sort(key=lambda x: x.get('score', 0), reverse=True)
+        top_matches = matching_results[:5]
         
         # İş ilanı detaylarını ekle
         result_jobs = []
         for match in top_matches:
-            job_index = match.get('job_index', 0)
-            if job_index < len(job_search_data.get('jobs', [])):
-                job = job_search_data['jobs'][job_index]
-                job['match_score'] = match.get('score', 0)
-                job['match_reasons'] = match.get('match_reasons', [])
-                job['missing_skills'] = match.get('missing_skills', [])
-                result_jobs.append(job)
+            job = match.get('job', {})
+            job['match_score'] = match.get('score', 0)
+            job['match_reasons'] = match.get('match_reasons', [])
+            job['missing_skills'] = match.get('missing_skills', [])
+            result_jobs.append(job)
         
         # Geçmişe kaydet
         detail = f"İş eşleştirmesi yapıldı: {len(result_jobs)} uygun iş bulundu"
@@ -830,15 +827,80 @@ def job_search():
         db.session.commit()
         
         return jsonify({
-            'status': 'success',
+            'success': True,
             'cv_analysis': cv_analysis,
-            'matched_jobs': result_jobs,
-            'total_jobs_analyzed': len(job_search_data.get('jobs', [])),
-            'message': f'{len(result_jobs)} uygun iş ilanı bulundu!'
+            'jobs': result_jobs,
+            'positions_found': cv_analysis.get('job_areas', []),
+            'message': f'CV\'nize uygun {len(result_jobs)} iş ilanı bulundu.'
         })
         
     except Exception as e:
-        return jsonify({'error': f'İş eşleştirme hatası: {str(e)}'}), 500
+        print(f"Job search error: {e}")
+        return jsonify({'error': 'İş arama işlemi başarısız'}), 500
+
+@app.route('/advanced_cv_job_search', methods=['POST'])
+def advanced_cv_job_search():
+    """Gelişmiş CV analizi ve iş arama - CrewAI ve LangChain kullanarak"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    
+    # CV dosyası kontrolü
+    if 'cv' not in request.files:
+        return jsonify({'error': 'CV dosyası yüklemelisiniz.'}), 400
+    
+    cv_file = request.files['cv']
+    if cv_file.filename == '':
+        return jsonify({'error': 'CV dosyası seçilmedi.'}), 400
+    
+    if not allowed_file(cv_file.filename):
+        return jsonify({'error': 'Sadece PDF, DOC ve DOCX dosyaları kabul edilir.'}), 400
+    
+    try:
+        # CV'den metin çıkar
+        file_extension = cv_file.filename.rsplit('.', 1)[1].lower()
+        
+        if file_extension == 'pdf':
+            # PDF dosyasını doğrudan bytes olarak oku
+            cv_data = cv_file.read()
+            cv_text = extract_text_from_pdf_bytes(cv_data)
+        else:
+            # Diğer dosya türleri için kaydet ve oku
+            filename = secure_filename(f"cv_{user.username}_{int(time.time())}.{file_extension}")
+            cv_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            cv_file.save(cv_path)
+            cv_text = extract_text_from_file(cv_path)
+        
+        # Gelişmiş CV analizi agent'ını başlat
+        advanced_agent = AdvancedCVJobAgent()
+        
+        # CV'yi analiz et ve işleri bul
+        result = advanced_agent.analyze_cv_and_find_jobs(cv_text)
+        
+        # CV analizini user'a kaydet
+        user.cv_analysis = json.dumps(result['cv_analysis'])
+        db.session.commit()
+        
+        # Geçmişe kaydet
+        detail = f"Gelişmiş CV analizi: {len(result['top_matches'])} uygun iş bulundu"
+        history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
+        db.session.add(history)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'cv_analysis': result['cv_analysis'],
+            'job_areas': result['job_areas'],
+            'top_matches': result['top_matches'],
+            'total_jobs_found': result['total_jobs_found'],
+            'analysis_date': result['analysis_date'],
+            'message': f'CV\'nize uygun {len(result["top_matches"])} iş ilanı bulundu.'
+        })
+        
+    except Exception as e:
+        print(f"Advanced CV job search error: {e}")
+        return jsonify({'error': 'Gelişmiş CV analizi işlemi başarısız'}), 500
 
 @app.route('/code_room', methods=['POST'])
 def code_room():
@@ -1193,7 +1255,6 @@ def code_room_suggest_resources():
     except Exception as e:
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
-<<<<<<< HEAD
 @app.route('/code_room/evaluate_with_execution', methods=['POST'])
 def code_room_evaluate_with_execution():
     """Kodu çalıştırarak değerlendirir ve puan verir"""
@@ -1253,8 +1314,6 @@ def case_study_room_evaluate():
     db.session.add(history)
     db.session.commit()
     return jsonify({'evaluation': evaluation})
-=======
->>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
 def interview_simulation_evaluate():
@@ -1307,7 +1366,6 @@ def change_password():
     db.session.commit()
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
 
-<<<<<<< HEAD
 @app.route('/debug/session/<session_id>', methods=['GET'])
 def debug_session(session_id):
     if session_id not in active_case_sessions:
@@ -1448,9 +1506,6 @@ def clear_user_sessions():
                 del active_case_sessions[session_id]
     
     return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
-
-=======
->>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
 @app.route('/auto_interview/start', methods=['POST'])
