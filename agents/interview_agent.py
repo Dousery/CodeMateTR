@@ -52,12 +52,9 @@ class InterviewAIAgent:
             {context_prompt}
             
             Soruyu doğal ve samimi bir şekilde sor, mülakat yapan kişi gibi konuş.
-<<<<<<< HEAD
             Eğer conversation_context'te kullanıcı adı belirtilmişse (örneğin "Bu mülakat [ad] adlı kullanıcı ile yapılıyor"), 
             o adı kullanarak kişiselleştirilmiş sorular sor. Örneğin: "[Ad], bu konuda ne düşünüyorsun?" 
             veya "[Ad], bu durumda nasıl davranırdın?" gibi. Kullanıcı adını conversation_context'ten çıkar ve doğrudan kullan.
-=======
->>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
             Sadece soruyu ver, başka açıklama ekleme.
             """
             
@@ -81,7 +78,6 @@ class InterviewAIAgent:
             Teknik detaylara girmeden, deneyim, motivasyon, hedefler konularında sor.
             Sadece soruyu ver, başka açıklama ekleme.
             """
-<<<<<<< HEAD
             response = self.model.generate_content(prompt)
             return response.text.strip()
         except Exception as e:
@@ -95,9 +91,6 @@ class InterviewAIAgent:
             # Eğer henüz cevap yoksa, mülakatın başladığını belirt
             if not answers:
                 return f"{self.interest} alanında mülakat başladı. İlk soruya cevap verildikten sonra detaylı değerlendirme yapılacak."
-            
-            if not self.client:
-                return f"{self.interest} alanında mülakat devam ediyor. API bağlantısı olmadığı için detaylı değerlendirme yapılamıyor."
             
             prompt = f"""
             {self.interest} alanında yapılan mülakatın ilerlemesini değerlendir:
@@ -119,12 +112,11 @@ class InterviewAIAgent:
             Kısa ve öz bir değerlendirme yap. Maksimum 3-4 cümle.
             """
             
-=======
->>>>>>> 1d3fffa0c7b15f58865a39bc0a06a2a39e3b075d
             response = self.model.generate_content(prompt)
             return response.text.strip()
+            
         except Exception as e:
-            return self.generate_question()
+            return f"{self.interest} alanında mülakat devam ediyor. Değerlendirme yapılamıyor."
 
     def evaluate_answer(self, question, user_answer):
         """Kullanıcının cevabını değerlendirir"""

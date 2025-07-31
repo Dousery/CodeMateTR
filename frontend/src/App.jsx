@@ -6,6 +6,7 @@ import Login from './Login';
 import Dashboard from './Dashboard';
 import Test from './Test';
 import JobSearch from './JobSearch';
+import AdvancedJobSearch from './AdvancedJobSearch';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
 import Forum from './Forum';
@@ -103,6 +104,7 @@ function App() {
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/test" element={<ProtectedRoute><Test /></ProtectedRoute>} />
               <Route path="/job-search" element={<ProtectedRoute><JobSearch /></ProtectedRoute>} />
+              <Route path="/advanced-job-search" element={<ProtectedRoute><AdvancedJobSearch /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />

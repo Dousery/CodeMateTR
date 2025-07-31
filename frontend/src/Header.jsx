@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button } from '@mui/material';
 import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import CodeIcon from '@mui/icons-material/Code';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ForumIcon from '@mui/icons-material/Forum';
@@ -13,6 +14,7 @@ import { useAuth } from './App';
 const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
   { icon: <WorkIcon />, label: 'İş Bulma', route: '/job-search' },
+  { icon: <PsychologyIcon />, label: 'Gelişmiş CV Analizi', route: '/advanced-job-search' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
   { icon: <ForumIcon />, label: 'Forum', route: '/forum' },

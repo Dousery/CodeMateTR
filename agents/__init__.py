@@ -1,1 +1,1 @@
-print("Hello World")
+# Agents package initialization
