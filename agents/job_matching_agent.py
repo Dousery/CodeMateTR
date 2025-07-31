@@ -1,4 +1,6 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+import httpx
 import json
 import os
 import re
@@ -6,15 +8,99 @@ from dotenv import load_dotenv
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-genai.configure(api_key=GEMINI_API_KEY)
+
+# Yeni Google Gemini API yapısı
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 class JobMatchingAIAgent:
     def __init__(self, interest):
         self.interest = interest
-        self.model = genai.GenerativeModel('gemini-2.5-flash')
+        self.client = client
+
+    def analyze_cv_from_pdf_bytes(self, pdf_data):
+        """PDF bytes'ından doğrudan CV analizi yapar - Yeni Google Gemini API"""
+        try:
+            prompt = f"""
+            Aşağıdaki PDF CV'yi çok dikkatli analiz et ve gerçek bilgileri çıkar:
+            
+            ÖNEMLİ TALİMATLAR:
+            1. Deneyim süresini çok dikkatli hesapla. İş başlangıç ve bitiş tarihlerini kontrol et.
+            2. Eğer sadece birkaç aylık deneyim varsa (0.1-0.5 yıl), bunu doğru yansıt.
+            3. Yeni mezun, stajyer veya öğrenci olabilir - bu durumu belirt.
+            4. Gerçekte olmayan becerileri ekleme.
+            5. Eğitim bilgilerini doğru analiz et (mezuniyet yılı, bölüm).
+            6. Proje deneyimi ile iş deneyimini karıştırma.
+            
+            Aşağıdaki JSON formatında analiz et:
+            {{
+                "skills": ["sadece CV'de geçen gerçek beceriler"],
+                "experience_years": 0.1,
+                "experience_level": "Entry/Junior/Mid/Senior",
+                "job_titles": ["sadece CV'de geçen gerçek pozisyonlar"],
+                "education": ["gerçek eğitim bilgisi - üniversite, bölüm, yıl"],
+                "technologies": ["sadece CV'de bahsedilen teknolojiler"],
+                "industry_experience": ["gerçek sektör deneyimi"],
+                "summary": "Gerçek durumu yansıtan kısa özet",
+                "career_stage": "Yeni mezun/Öğrenci/Junior/Experienced"
+            }}
+            
+            Sadece JSON formatında döndür, gerçek bilgileri yaz.
+            """
+            
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[
+                    types.Part.from_bytes(
+                        data=pdf_data,
+                        mime_type='application/pdf',
+                    ),
+                    prompt
+                ]
+            )
+            
+            text = response.text.strip()
+            
+            # JSON parse etmeye çalış
+            if text.startswith('```json'):
+                text = text.replace('```json', '').replace('```', '').strip()
+            elif text.startswith('```'):
+                text = text.replace('```', '').strip()
+            
+            try:
+                return json.loads(text)
+            except json.JSONDecodeError as e:
+                print(f"JSON parse hatası: {e}")
+                print(f"Raw response: {text}")
+                # Fallback: Basit analiz yap
+                return {
+                    "skills": ["Genel beceriler"],
+                    "experience_years": 1.0,
+                    "experience_level": "Junior",
+                    "job_titles": ["Belirsiz"],
+                    "education": ["Üniversite mezunu"],
+                    "technologies": ["Çeşitli teknolojiler"],
+                    "industry_experience": [self.interest],
+                    "summary": "CV analizi yapıldı",
+                    "career_stage": "Junior"
+                }
+                
+        except Exception as e:
+            print(f"PDF CV analiz hatası: {e}")
+            # Fallback return
+            return {
+                "skills": ["Genel beceriler"],
+                "experience_years": 1.0,
+                "experience_level": "Junior",
+                "job_titles": ["Belirsiz"],
+                "education": ["Üniversite mezunu"],
+                "technologies": ["Çeşitli teknolojiler"],
+                "industry_experience": [self.interest],
+                "summary": "CV analizi yapılamadı",
+                "career_stage": "Junior"
+            }
 
     def analyze_cv(self, cv_text):
-        """CV'yi analiz eder ve anahtar kelimeleri çıkarır"""
+        """CV'yi analiz eder ve anahtar kelimeleri çıkarır (eski metin tabanlı metod)"""
         try:
             prompt = f"""
             Aşağıdaki CV'yi çok dikkatli analiz et ve gerçek bilgileri çıkar:
@@ -45,7 +131,10 @@ class JobMatchingAIAgent:
             
             Sadece JSON formatında döndür, gerçek bilgileri yaz.
             """
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt]
+            )
             text = response.text.strip()
             
             # JSON kısmını ayıkla
@@ -108,7 +197,10 @@ class JobMatchingAIAgent:
             
             Sadece JSON formatında döndür.
             """
-            response = self.model.generate_content(prompt)
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt]
+            )
             text = response.text.strip()
             
             # JSON kısmını ayıkla
