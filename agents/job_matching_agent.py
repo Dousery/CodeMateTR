@@ -4,6 +4,9 @@ import httpx
 import json
 import os
 import re
+import asyncio
+from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -213,35 +216,172 @@ class JobMatchingAIAgent:
             print(f"İş eşleştirme hatası: {e}")
             return {"matches": []}
 
-    def generate_mock_job_listings(self, interest, count=10):
-        """Gerçek iş ilanları olmadığı için kullanıcıyı direkt iş arama sitelerine yönlendirir"""
+    async def scrape_job_listings(self, query_term, count=10):
+        """İş ilanlarını scrape eder"""
+        jobs = []
+        
         try:
-            # Gerçek iş arama siteleri
+            # Kariyer.net'ten scraping
+            kariyer_jobs = await self.scrape_kariyer_net(query_term, count//2)
+            jobs.extend(kariyer_jobs)
+            
+            # Indeed'den scraping
+            indeed_jobs = await self.scrape_indeed_tr(query_term, count//2)
+            jobs.extend(indeed_jobs)
+            
+            return jobs[:count]
+            
+        except Exception as e:
+            print(f"Job scraping hatası: {e}")
+            return []
+
+    async def scrape_kariyer_net(self, query, limit=5):
+        """Kariyer.net'ten iş ilanlarını scrape eder"""
+        jobs = []
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                url = f"https://www.kariyer.net/is-ilanlari?q={quote_plus(query)}"
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                
+                response = await client.get(url, headers=headers)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # İş ilanı kartlarını bul
+                job_cards = soup.find_all('div', class_='list-items', limit=limit)
+                
+                for card in job_cards:
+                    try:
+                        title_elem = card.find('a', class_='job-title')
+                        company_elem = card.find('a', class_='company-name')
+                        location_elem = card.find('span', class_='location')
+                        desc_elem = card.find('p', class_='job-description')
+                        
+                        if title_elem and company_elem:
+                            job = {
+                                'title': title_elem.get_text(strip=True),
+                                'company': company_elem.get_text(strip=True),
+                                'location': location_elem.get_text(strip=True) if location_elem else 'Belirtilmemiş',
+                                'description': desc_elem.get_text(strip=True) if desc_elem else 'Açıklama yok',
+                                'url': f"https://www.kariyer.net{title_elem.get('href', '')}" if title_elem.get('href') else '',
+                                'source': 'Kariyer.net'
+                            }
+                            jobs.append(job)
+                    except Exception as e:
+                        print(f"Kariyer.net iş kartı parse hatası: {e}")
+                        continue
+                        
+        except Exception as e:
+            print(f"Kariyer.net scraping hatası: {e}")
+            
+        return jobs
+
+    async def scrape_indeed_tr(self, query, limit=5):
+        """Indeed TR'den iş ilanlarını scrape eder"""
+        jobs = []
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                url = f"https://tr.indeed.com/jobs?q={quote_plus(query)}&l=Turkey"
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                }
+                
+                response = await client.get(url, headers=headers)
+                soup = BeautifulSoup(response.text, 'html.parser')
+                
+                # İş ilanı kartlarını bul (Indeed'in yapısına göre)
+                job_cards = soup.find_all('div', class_='job_seen_beacon', limit=limit)
+                
+                for card in job_cards:
+                    try:
+                        title_elem = card.find('h2', class_='jobTitle')
+                        company_elem = card.find('span', class_='companyName')
+                        location_elem = card.find('div', class_='companyLocation')
+                        desc_elem = card.find('div', class_='summary')
+                        
+                        if title_elem and company_elem:
+                            title_link = title_elem.find('a')
+                            job = {
+                                'title': title_link.get_text(strip=True) if title_link else title_elem.get_text(strip=True),
+                                'company': company_elem.get_text(strip=True),
+                                'location': location_elem.get_text(strip=True) if location_elem else 'Belirtilmemiş',
+                                'description': desc_elem.get_text(strip=True) if desc_elem else 'Açıklama yok',
+                                'url': f"https://tr.indeed.com{title_link.get('href', '')}" if title_link and title_link.get('href') else '',
+                                'source': 'Indeed TR'
+                            }
+                            jobs.append(job)
+                    except Exception as e:
+                        print(f"Indeed iş kartı parse hatası: {e}")
+                        continue
+                        
+        except Exception as e:
+            print(f"Indeed scraping hatası: {e}")
+            
+        return jobs
+
+    def generate_mock_job_listings(self, search_term, count=10, cv_analysis=None, use_interest=True):
+        """Gerçek iş ilanlarını scrape eder veya yönlendirme yapar"""
+        try:
+            # Arama terimini belirle
+            if use_interest:
+                # Interest'e göre arama
+                query_term = search_term
+                message_prefix = f"{search_term} alanında"
+            else:
+                # CV analizine göre arama terimi oluştur
+                if cv_analysis:
+                    # CV'den çıkarılan beceriler ve pozisyonlara göre arama terimi oluştur
+                    skills = cv_analysis.get('skills', [])
+                    job_titles = cv_analysis.get('job_titles', [])
+                    technologies = cv_analysis.get('technologies', [])
+                    
+                    # En uygun arama terimini oluştur
+                    search_components = []
+                    if job_titles:
+                        search_components.extend(job_titles[:2])  # İlk 2 pozisyon
+                    if technologies:
+                        search_components.extend(technologies[:3])  # İlk 3 teknoloji
+                    if skills and not search_components:
+                        search_components.extend(skills[:2])  # Eğer başka şey yoksa beceriler
+                    
+                    query_term = ' '.join(search_components[:3]) if search_components else search_term
+                    message_prefix = "CV analizinize göre"
+                else:
+                    query_term = search_term
+                    message_prefix = f"{search_term} alanında"
+
+            # Scraping işlemini senkron olarak çalıştır
+            try:
+                scraped_jobs = asyncio.run(self.scrape_job_listings(query_term, count))
+                
+                if scraped_jobs:
+                    return {
+                        "jobs": scraped_jobs,
+                        "search_recommendations": [],
+                        "search_term": query_term,
+                        "search_method": "interest" if use_interest else "cv_based",
+                        "message": f"{message_prefix} toplam {len(scraped_jobs)} iş ilanı bulundu."
+                    }
+            except Exception as scrape_error:
+                print(f"Scraping işlemi başarısız: {scrape_error}")
+            
+            # Eğer scraping başarısız olursa fallback olarak temel siteler
             search_sites = [
                 {
                     "site_name": "LinkedIn",
-                    "search_url": f"https://www.linkedin.com/jobs/search/?keywords={interest.replace(' ', '%20')}&location=Turkey",
+                    "search_url": f"https://www.linkedin.com/jobs/search/?keywords={query_term.replace(' ', '%20')}&location=Turkey",
                     "description": "Dünya çapında profesyonel iş ağı"
                 },
                 {
                     "site_name": "Kariyer.net",
-                    "search_url": f"https://www.kariyer.net/is-ilanlari?q={interest.replace(' ', '+')}",
+                    "search_url": f"https://www.kariyer.net/is-ilanlari?q={query_term.replace(' ', '+')}",
                     "description": "Türkiye'nin en büyük iş arama sitesi"
                 },
                 {
-                    "site_name": "Yenibiris.com",
-                    "search_url": f"https://www.yenibiris.com/is-ara?q={interest.replace(' ', '+')}",
-                    "description": "Türkiye'de iş arama platformu"
-                },
-                {
                     "site_name": "Indeed Türkiye",
-                    "search_url": f"https://tr.indeed.com/jobs?q={interest.replace(' ', '+')}&l=Turkey",
+                    "search_url": f"https://tr.indeed.com/jobs?q={query_term.replace(' ', '+')}&l=Turkey",
                     "description": "Uluslararası iş arama motoru"
-                },
-                {
-                    "site_name": "SecretCV",
-                    "search_url": f"https://www.secretcv.com/is-ilanlari?q={interest.replace(' ', '+')}",
-                    "description": "Gizli profil ile iş arama"
                 }
             ]
             
@@ -249,7 +389,9 @@ class JobMatchingAIAgent:
             return {
                 "jobs": [],
                 "search_recommendations": search_sites,
-                "message": f"{interest} alanında güncel iş ilanları için aşağıdaki siteleri kontrol edin:"
+                "search_term": query_term,
+                "search_method": "interest" if use_interest else "cv_based",
+                "message": f"{message_prefix} için iş scraping başarısız oldu. İş arama sitelerini kontrol edin:"
             }
             
         except Exception as e:
@@ -259,9 +401,11 @@ class JobMatchingAIAgent:
                 "search_recommendations": [
                     {
                         "site_name": "LinkedIn",
-                        "search_url": f"https://www.linkedin.com/jobs/search/?keywords={interest.replace(' ', '%20')}&location=Turkey",
+                        "search_url": f"https://www.linkedin.com/jobs/search/?keywords={search_term.replace(' ', '%20')}&location=Turkey",
                         "description": "Profesyonel iş ağı"
                     }
                 ],
+                "search_term": search_term,
+                "search_method": "interest" if use_interest else "cv_based",
                 "message": "İş arama sitelerine yönlendiriliyorsunuz..."
             }
