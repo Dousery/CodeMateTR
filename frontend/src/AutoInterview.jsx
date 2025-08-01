@@ -89,7 +89,31 @@ export default function AutoInterview() {
       
       setStep('interviewing');
     } catch (err) {
-      setError(err.response?.data?.error || 'Otomatik mülakat başlatılamadı.');
+      if (err.response?.data?.error === 'Aktif bir mülakat oturumunuz zaten var.') {
+        // Aktif oturum varsa kullanıcıya seçenek sun
+        setStep('session_choice');
+      } else {
+        setError(err.response?.data?.error || 'Otomatik mülakat başlatılamadı.');
+        setStep('starting');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Aktif oturumu temizle ve yeni başlat
+  const clearActiveSession = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await axios.post('http://localhost:5000/debug/clear_auto_interview_sessions', {}, { 
+        withCredentials: true 
+      });
+      
+      // Temizleme başarılı olduktan sonra yeni mülakat başlat
+      await startAutoInterview();
+    } catch (err) {
+      setError('Oturum temizlenemedi. Lütfen tekrar deneyin.');
       setStep('starting');
     } finally {
       setLoading(false);
@@ -302,7 +326,7 @@ export default function AutoInterview() {
             <Button
               variant="contained"
               color="primary"
-              onClick={startAutoInterview}
+              onClick={clearActiveSession}
               disabled={loading}
               startIcon={loading ? <CircularProgress size={20} /> : <Refresh />}
               sx={{
@@ -318,7 +342,7 @@ export default function AutoInterview() {
                 }
               }}
             >
-              {loading ? 'Başlatılıyor...' : 'Yeni Mülakat Başlat'}
+              {loading ? 'Temizleniyor...' : 'Aktif Oturumu Temizle ve Yeni Başlat'}
             </Button>
             
             <Button
