@@ -16,9 +16,7 @@ from agents.test_agent import TestAIAgent
 from agents.interview_agent import InterviewAIAgent
 from agents.case_study_agent import CaseStudyAIAgent
 from agents.code_agent import CodeAIAgent
-from agents.cv_job_matcher import CVJobMatcher
-from agents.advanced_cv_job_agent import AdvancedCVJobAgent
-from agents.job_scraper_agent import JobScraperAgent
+from agents.intelligent_job_agent import IntelligentJobAgent
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import json
@@ -157,13 +155,6 @@ class UserActivity(db.Model):
     related_comment_id = db.Column(db.Integer, db.ForeignKey('forum_comment.id'), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-class UserHistory(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), nullable=False)
-    activity_type = db.Column(db.String(32), nullable=False)  # test, code, job_search, interview
-    detail = db.Column(db.Text, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-
 class TestPerformance(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False)
@@ -260,19 +251,6 @@ def extract_text_from_file(file_path):
             
     except Exception as e:
         return f"Dosya okuma hatası: {str(e)}"
-
-def extract_text_from_pdf_bytes(pdf_bytes):
-    """PDF bytes'ından metin çıkarır"""
-    try:
-        import io
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text() + "\n"
-        return text
-    except Exception as e:
-        print(f"PDF bytes okuma hatası: {e}")
-        return "PDF okunamadı"
 
 def get_file_mimetype(filename):
     ext = filename.rsplit('.', 1)[1].lower()
@@ -375,9 +353,151 @@ def profile():
             session.clear()
             return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
         
+        # Test istatistikleri
+        test_performances = TestPerformance.query.filter_by(username=user.username).all()
+        total_tests = len(test_performances)
+        avg_score = sum(p.success_rate for p in test_performances) / total_tests if total_tests > 0 else 0
+        
+        # Son 5 test performansı
+        recent_tests = TestPerformance.query.filter_by(username=user.username)\
+            .order_by(TestPerformance.created_at.desc()).limit(5).all()
+        
+        test_trend = []
+        for test in recent_tests:
+            test_trend.append({
+                'date': test.created_at.strftime('%Y-%m-%d'),
+                'score': test.success_rate,
+                'interest': test.interest
+            })
+        
+        # Forum aktiviteleri
+        forum_posts = ForumPost.query.filter_by(author_username=user.username).count()
+        forum_comments = ForumComment.query.filter_by(author_username=user.username).count()
+        
+        # Kodlama odası aktiviteleri
+        code_activities = UserActivity.query.filter(
+            UserActivity.username == user.username,
+            UserActivity.activity_type.like('code%')
+        ).all()
+        
+        total_code_sessions = len(code_activities)
+        total_code_points = sum(activity.points_earned for activity in code_activities)
+        
+        # Son 5 kodlama aktivitesi
+        recent_code_activities = UserActivity.query.filter(
+            UserActivity.username == user.username,
+            UserActivity.activity_type.like('code%')
+        ).order_by(UserActivity.created_at.desc()).limit(5).all()
+        
+        code_trend = []
+        for activity in recent_code_activities:
+            code_trend.append({
+                'date': activity.created_at.strftime('%Y-%m-%d'),
+                'type': activity.activity_type,
+                'points': activity.points_earned
+            })
+        
+        # Forum puanları
+        forum_activities = UserActivity.query.filter_by(username=user.username).all()
+        total_forum_points = sum(activity.points_earned for activity in forum_activities)
+        
+        # Beceri seviyesi analizi
+        skill_level = "Başlangıç"
+        if avg_score >= 80:
+            skill_level = "İleri"
+        elif avg_score >= 60:
+            skill_level = "Orta"
+        elif avg_score >= 40:
+            skill_level = "Gelişen"
+        
+        # CV analizi durumu
+        has_cv = bool(user.cv_analysis)
+        
+        # Başarı rozetleri hesaplama
+        achievements = []
+        
+        # Test rozetleri
+        if total_tests >= 10:
+            achievements.append({"name": "Test Uzmanı", "icon": "quiz", "description": "10+ test tamamladı"})
+        if avg_score >= 90:
+            achievements.append({"name": "Mükemmeliyetçi", "icon": "star", "description": "90%+ ortalama"})
+        if total_tests >= 1:
+            achievements.append({"name": "İlk Adım", "icon": "flag", "description": "İlk testi tamamladı"})
+            
+        # Kodlama odası rozetleri
+        if total_code_sessions >= 10:
+            achievements.append({"name": "Kod Savaşçısı", "icon": "code", "description": "10+ kodlama oturumu"})
+        if total_code_points >= 200:
+            achievements.append({"name": "Algoritma Ustası", "icon": "psychology", "description": "200+ kodlama puanı"})
+        if total_code_sessions >= 1:
+            achievements.append({"name": "İlk Kod", "icon": "code", "description": "İlk kodlama oturumu"})
+            
+        # Forum rozetleri
+        if forum_posts >= 5:
+            achievements.append({"name": "Aktif Üye", "icon": "forum", "description": "5+ forum gönderisi"})
+        if total_forum_points >= 100:
+            achievements.append({"name": "Forum Kahramanı", "icon": "trophy", "description": "100+ forum puanı"})
+            
+        # CV rozeti
+        if has_cv:
+            achievements.append({"name": "Hazırlıklı", "icon": "work", "description": "CV analizi tamamlandı"})
+        
+        # Günlük aktivite (son 7 gün)
+        from datetime import datetime, timedelta
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        
+        daily_activity = []
+        for i in range(7):
+            date = datetime.utcnow() - timedelta(days=i)
+            date_str = date.strftime('%Y-%m-%d')
+            
+            # O günkü test sayısı
+            daily_tests = TestPerformance.query.filter(
+                TestPerformance.username == user.username,
+                TestPerformance.created_at >= date.replace(hour=0, minute=0, second=0),
+                TestPerformance.created_at < date.replace(hour=23, minute=59, second=59)
+            ).count()
+            
+            # O günkü forum aktivitesi
+            daily_forum = UserActivity.query.filter(
+                UserActivity.username == user.username,
+                UserActivity.activity_type.in_(['forum_post', 'forum_comment']),
+                UserActivity.created_at >= date.replace(hour=0, minute=0, second=0),
+                UserActivity.created_at < date.replace(hour=23, minute=59, second=59)
+            ).count()
+            
+            # O günkü kodlama aktivitesi
+            daily_code = UserActivity.query.filter(
+                UserActivity.username == user.username,
+                UserActivity.activity_type == 'code_session',
+                UserActivity.created_at >= date.replace(hour=0, minute=0, second=0),
+                UserActivity.created_at < date.replace(hour=23, minute=59, second=59)
+            ).count()
+            
+            daily_activity.append({
+                'date': date_str,
+                'day_name': date.strftime('%A')[:3],
+                'tests': daily_tests,
+                'forum_activity': daily_forum,
+                'code_activity': daily_code,
+                'total_activity': daily_tests + daily_forum + daily_code
+            })
+        
         return jsonify({
             'username': user.username,
-            'interest': user.interest
+            'interest': user.interest,
+            'stats': {
+                'total_tests': total_tests,
+                'average_score': round(avg_score, 1),
+                'skill_level': skill_level,
+                'forum_posts': forum_posts,
+                'forum_comments': forum_comments,
+                'forum_points': total_forum_points,
+                'has_cv': has_cv,
+                'test_trend': test_trend,
+                'achievements': achievements,
+                'daily_activity': daily_activity
+            }
         })
     except Exception as e:
         print(f"ERROR in profile endpoint: {str(e)}")
@@ -655,12 +775,6 @@ def interview_speech_evaluation():
                 import shutil
                 shutil.move(result['audio_file'], audio_path)
                 
-                # Geçmişe kaydet
-                detail = f"Sesli mülakat: {question[:60]}..."
-                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
-                db.session.add(history)
-                db.session.commit()
-                
                 return jsonify({
                     'evaluation': result['feedback_text'],
                     'audio_url': f'/static/audio/{audio_filename}',
@@ -706,12 +820,6 @@ def interview_speech_evaluation():
                 import shutil
                 shutil.move(result['audio_file'], audio_path)
                 
-                # Geçmişe kaydet
-                detail = f"Mülakat sorusu: {question[:60]}..."
-                history = UserHistory(username=user.username, activity_type='interview', detail=detail)
-                db.session.add(history)
-                db.session.commit()
-                
                 return jsonify({
                     'evaluation': result['feedback_text'],
                     'audio_url': None,
@@ -739,168 +847,6 @@ def interview_simulation():
         'message': f'{user.interest} alanında mülakat başlatıldı.',
         'question': question
     })
-
-# ==================== İŞ BULMA SİSTEMİ ====================
-
-@app.route('/job_search', methods=['POST'])
-def job_search():
-    """CV yükle ve iş ilanlarını getir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    user = User.query.filter_by(username=session['username']).first()
-    
-    # CV dosyası kontrolü
-    if 'cv' not in request.files:
-        return jsonify({'error': 'CV dosyası yüklemelisiniz.'}), 400
-    
-    cv_file = request.files['cv']
-    if cv_file.filename == '':
-        return jsonify({'error': 'CV dosyası seçilmedi.'}), 400
-    
-    if not allowed_file(cv_file.filename):
-        return jsonify({'error': 'Sadece PDF, DOC ve DOCX dosyaları kabul edilir.'}), 400
-    
-    try:
-        # CV Job Matcher agent'ı başlat
-        agent = CVJobMatcher()
-        
-        # PDF dosyası mı kontrol et
-        file_extension = cv_file.filename.rsplit('.', 1)[1].lower()
-        
-        if file_extension == 'pdf':
-            # PDF dosyasını doğrudan bytes olarak oku ve analiz et
-            cv_data = cv_file.read()
-            cv_text = extract_text_from_pdf_bytes(cv_data)
-            cv_analysis = agent.analyze_cv_and_find_jobs(cv_text)
-            print(f"PDF doğrudan analiz edildi")
-        else:
-            # Diğer dosya türleri için eski yöntemi kullan (DOCX, DOC)
-            # CV'yi kaydet
-            filename = secure_filename(f"cv_{user.username}_{int(time.time())}.{file_extension}")
-            cv_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            cv_file.save(cv_path)
-            
-            # CV'den metin çıkar
-            cv_text = extract_text_from_file(cv_path)
-            cv_analysis = agent.analyze_cv_and_find_jobs(cv_text)
-            print(f"DOCX/DOC analizi yapıldı")
-        
-        # CV analizini user'a kaydet
-        user.cv_analysis = json.dumps(cv_analysis)
-        db.session.commit()
-        
-        # CV analizine göre iş ilanları oluştur
-        job_search_data = agent.generate_job_listings(cv_analysis.get('job_areas', []))
-        
-        if not job_search_data:
-            return jsonify({'error': 'İş ilanları oluşturulamadı'}), 500
-        
-        # İş ilanlarını CV ile eşleştir
-        matching_results = []
-        for job in job_search_data:
-            match_score = agent.calculate_similarity_score(cv_analysis, job.get('description', ''), job.get('title', ''))
-            matching_results.append({
-                'job': job,
-                'score': match_score.get('similarity_score', 50),
-                'match_reasons': match_score.get('match_reasons', []),
-                'missing_skills': match_score.get('missing_skills', [])
-            })
-        
-        # En iyi 5 iş ilanını seç
-        matching_results.sort(key=lambda x: x.get('score', 0), reverse=True)
-        top_matches = matching_results[:5]
-        
-        # İş ilanı detaylarını ekle
-        result_jobs = []
-        for match in top_matches:
-            job = match.get('job', {})
-            job['match_score'] = match.get('score', 0)
-            job['match_reasons'] = match.get('match_reasons', [])
-            job['missing_skills'] = match.get('missing_skills', [])
-            result_jobs.append(job)
-        
-        # Geçmişe kaydet
-        detail = f"İş eşleştirmesi yapıldı: {len(result_jobs)} uygun iş bulundu"
-        history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
-        db.session.add(history)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'cv_analysis': cv_analysis,
-            'jobs': result_jobs,
-            'positions_found': cv_analysis.get('job_areas', []),
-            'message': f'CV\'nize uygun {len(result_jobs)} iş ilanı bulundu.'
-        })
-        
-    except Exception as e:
-        print(f"Job search error: {e}")
-        return jsonify({'error': 'İş arama işlemi başarısız'}), 500
-
-@app.route('/advanced_cv_job_search', methods=['POST'])
-def advanced_cv_job_search():
-    """Gelişmiş CV analizi ve iş arama - CrewAI ve LangChain kullanarak"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
-    user = User.query.filter_by(username=session['username']).first()
-    
-    # CV dosyası kontrolü
-    if 'cv' not in request.files:
-        return jsonify({'error': 'CV dosyası yüklemelisiniz.'}), 400
-    
-    cv_file = request.files['cv']
-    if cv_file.filename == '':
-        return jsonify({'error': 'CV dosyası seçilmedi.'}), 400
-    
-    if not allowed_file(cv_file.filename):
-        return jsonify({'error': 'Sadece PDF, DOC ve DOCX dosyaları kabul edilir.'}), 400
-    
-    try:
-        # CV'den metin çıkar
-        file_extension = cv_file.filename.rsplit('.', 1)[1].lower()
-        
-        if file_extension == 'pdf':
-            # PDF dosyasını doğrudan bytes olarak oku
-            cv_data = cv_file.read()
-            cv_text = extract_text_from_pdf_bytes(cv_data)
-        else:
-            # Diğer dosya türleri için kaydet ve oku
-            filename = secure_filename(f"cv_{user.username}_{int(time.time())}.{file_extension}")
-            cv_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            cv_file.save(cv_path)
-            cv_text = extract_text_from_file(cv_path)
-        
-        # Gelişmiş CV analizi agent'ını başlat
-        advanced_agent = AdvancedCVJobAgent()
-        
-        # CV'yi analiz et ve işleri bul
-        result = advanced_agent.analyze_cv_and_find_jobs(cv_text)
-        
-        # CV analizini user'a kaydet
-        user.cv_analysis = json.dumps(result['cv_analysis'])
-        db.session.commit()
-        
-        # Geçmişe kaydet
-        detail = f"Gelişmiş CV analizi: {len(result['top_matches'])} uygun iş bulundu"
-        history = UserHistory(username=user.username, activity_type='job_search', detail=detail)
-        db.session.add(history)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'cv_analysis': result['cv_analysis'],
-            'job_areas': result['job_areas'],
-            'top_matches': result['top_matches'],
-            'total_jobs_found': result['total_jobs_found'],
-            'analysis_date': result['analysis_date'],
-            'message': f'CV\'nize uygun {len(result["top_matches"])} iş ilanı bulundu.'
-        })
-        
-    except Exception as e:
-        print(f"Advanced CV job search error: {e}")
-        return jsonify({'error': 'Gelişmiş CV analizi işlemi başarısız'}), 500
 
 @app.route('/code_room', methods=['POST'])
 def code_room():
@@ -1014,19 +960,6 @@ def user_test_stats():
         'recent_tests': recent_tests_data
     })
 
-@app.route('/user_history', methods=['GET'])
-def user_history():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    history = UserHistory.query.filter_by(username=session['username']).order_by(UserHistory.created_at.desc()).all()
-    return jsonify([
-        {
-            'activity_type': h.activity_type,
-            'detail': h.detail,
-            'created_at': h.created_at.strftime('%Y-%m-%d %H:%M')
-        } for h in history
-    ])
-
 # Test çözümü kaydı
 @app.route('/test_your_skill/evaluate', methods=['POST'])
 def test_your_skill_evaluate():
@@ -1099,14 +1032,6 @@ def test_your_skill_evaluate():
              f"({summary['success_rate']}%) - Seviye: {summary['skill_level']} - "
              f"Süre: {int(time_taken//60)}dk {int(time_taken%60)}sn")
     
-    history = UserHistory(
-        username=user.username, 
-        activity_type='test', 
-        detail=detail
-    )
-    db.session.add(history)
-    db.session.commit()
-    
     # Test session'ını tamamlandı olarak işaretle
     test_session.status = 'completed'
     db.session.commit()
@@ -1139,11 +1064,6 @@ def code_room_evaluate():
         return jsonify({'error': 'Kod ve soru gerekli.'}), 400
     agent = CodeAIAgent(user.interest)
     evaluation = agent.evaluate_code(user_code, question)
-    # Geçmişe kaydet
-    detail = f"Kodlama sorusu: {question[:60]}..."
-    history = UserHistory(username=user.username, activity_type='code', detail=detail)
-    db.session.add(history)
-    db.session.commit()
     return jsonify({'evaluation': evaluation})
 
 @app.route('/code_room/run', methods=['POST'])
@@ -1277,12 +1197,6 @@ def code_room_evaluate_with_execution():
         agent = CodeAIAgent(user.interest, language)
         result = agent.evaluate_code_with_execution(user_code, question)
         
-        # Geçmişe kaydet
-        detail = f"Kodlama değerlendirmesi (Puan: {result.get('score', 0)}): {question[:50]}..."
-        history = UserHistory(username=user.username, activity_type='code', detail=detail)
-        db.session.add(history)
-        db.session.commit()
-        
         return jsonify({
             'success': True,
             'result': result
@@ -1308,11 +1222,6 @@ def case_study_room_evaluate():
         evaluation = agent.evaluate_case_solution(case, user_solution)
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
-    # Geçmişe kaydet
-    detail = f"Case: {case[:60]}..."
-    history = UserHistory(username=user.username, activity_type='case', detail=detail)
-    db.session.add(history)
-    db.session.commit()
     return jsonify({'evaluation': evaluation})
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
@@ -1340,10 +1249,6 @@ def interview_simulation_evaluate():
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
     
     # Geçmişe kaydet
-    detail = f"Mülakat sorusu: {question[:60]}..."
-    history = UserHistory(username=user.username, activity_type='interview', detail=detail)
-    db.session.add(history)
-    db.session.commit()
     
     return jsonify({
         'evaluation': evaluation,
@@ -1659,14 +1564,6 @@ def complete_auto_interview():
         
         # Geçmişe kaydet
         detail = f"Otomatik mülakat tamamlandı - {len(questions)} soru"
-        history = UserHistory(
-            username=interview_session.username, 
-            activity_type='auto_interview', 
-            detail=detail
-        )
-        
-        db.session.add(history)
-        db.session.commit()
         
         return jsonify({
             'final_evaluation': final_evaluation,
@@ -1850,16 +1747,6 @@ def create_forum_post():
         )
         
         db.session.add(new_post)
-        db.session.commit()
-        
-        # Geçmişe kaydet
-        detail = f"Forum gönderisi oluşturuldu: {title[:60]}..."
-        history = UserHistory(
-            username=session['username'],
-            activity_type='forum_post',
-            detail=detail
-        )
-        db.session.add(history)
         db.session.commit()
         
         return jsonify({
@@ -2665,6 +2552,190 @@ def get_forum_analytics():
         
     except Exception as e:
         return jsonify({'error': f'Analitik hatası: {str(e)}'}), 500
+
+# ============================================
+# İş Arama ve CV Analizi Endpoints (Yeni)
+# ============================================
+
+@app.route('/api/analyze-cv', methods=['POST'])
+def analyze_cv():
+    """CV'yi Gemini AI ile analiz eder"""
+    try:
+        # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
+        # if 'user_id' not in session:
+        #     return jsonify({'error': 'Giriş yapmanız gerekiyor'}), 401
+        
+        # Test için user_id ata
+        user_id = session.get('user_id', 'test_user')
+        
+        # CV dosyasını kontrol et
+        if 'cv_file' not in request.files:
+            return jsonify({'error': 'CV dosyası bulunamadı'}), 400
+        
+        cv_file = request.files['cv_file']
+        if cv_file.filename == '':
+            return jsonify({'error': 'Dosya seçilmedi'}), 400
+        
+        if not cv_file or not allowed_file(cv_file.filename):
+            return jsonify({'error': 'Geçersiz dosya formatı. PDF destekleniyor.'}), 400
+        
+        # CV'yi kaydet
+        filename = secure_filename(cv_file.filename)
+        timestamp = int(time.time())
+        unique_filename = f"cv_{user_id}_{timestamp}.{filename.split('.')[-1]}"
+        cv_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        cv_file.save(cv_path)
+        
+        try:
+            # PDF'den metin çıkarmak yerine direkt PDF bytes'ını gönder
+            with open(cv_path, 'rb') as file:
+                pdf_bytes = file.read()
+            
+            # Akıllı Job Agent'ı başlat
+            job_agent = IntelligentJobAgent()
+            
+            # CV'yi direkt PDF bytes ile analiz et (Yeni yöntem!)
+            print(f"CV PDF analiz ediliyor - Kullanıcı: {user_id}")
+            cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
+            
+            # Sonucu döndür
+            return jsonify({
+                'success': True,
+                'cv_analysis': cv_analysis,
+                'cv_filename': unique_filename
+            })
+            
+        except Exception as e:
+            print(f"CV analiz hatası: {e}")
+            return jsonify({'error': f'CV analizi sırasında hata: {str(e)}'}), 500
+        
+        finally:
+            # Geçici dosyayı temizle
+            try:
+                if os.path.exists(cv_path):
+                    os.remove(cv_path)
+            except:
+                pass
+    
+    except Exception as e:
+        print(f"CV analiz endpoint hatası: {e}")
+        return jsonify({'error': 'Beklenmedik hata oluştu'}), 500
+
+@app.route('/api/search-jobs', methods=['POST'])
+def search_jobs():
+    """CV analizine göre iş ilanları arar ve eşleştirir"""
+    try:
+        # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
+        # if 'user_id' not in session:
+        #     return jsonify({'error': 'Giriş yapmanız gerekiyor'}), 401
+        
+        data = request.json
+        if not data or 'cv_analysis' not in data:
+            return jsonify({'error': 'CV analizi verisi bulunamadı'}), 400
+        
+        cv_analysis = data['cv_analysis']
+        location = data.get('location', 'Türkiye')
+        max_jobs = data.get('max_jobs', 20)
+        
+        # Akıllı Job Agent'ı başlat
+        job_agent = IntelligentJobAgent()
+        
+        # 1. İş ilanlarını scrape et
+        print(f"İş ilanları aranıyor - Kullanıcı: test_user")
+        job_areas = cv_analysis.get('uygun_iş_alanları', ['Software Developer'])
+        jobs = job_agent.scrape_linkedin_jobs(
+            job_areas=job_areas,
+            location=location,
+            max_per_search=max_jobs // len(job_areas) if job_areas else 10
+        )
+        
+        if not jobs:
+            return jsonify({
+                'success': True,
+                'message': 'Şu anda uygun iş ilanı bulunamadı. Daha sonra tekrar deneyin.',
+                'jobs': [],
+                'stats': {
+                    'total_found': 0,
+                    'matched': 0,
+                    'search_areas': job_areas
+                }
+            })
+        
+        # 2. CV ile işleri eşleştir
+        print(f"CV-İş eşleştirmesi yapılıyor...")
+        matched_jobs = job_agent.match_cv_with_jobs(cv_analysis, jobs)
+        
+        # 3. İstatistikler
+        stats = {
+            'total_found': len(jobs),
+            'matched': len(matched_jobs),
+            'search_areas': job_areas,
+            'avg_match_score': sum(job.get('score', 0) for job in matched_jobs) / len(matched_jobs) if matched_jobs else 0
+        }
+        
+        return jsonify({
+            'success': True,
+            'jobs': matched_jobs,
+            'stats': stats
+        })
+    
+    except Exception as e:
+        print(f"İş arama hatası: {e}")
+        return jsonify({'error': f'İş arama sırasında hata: {str(e)}'}), 500
+
+@app.route('/api/job-application-tips', methods=['POST'])
+def get_job_application_tips():
+    """Belirli bir iş için başvuru önerileri verir"""
+    try:
+        # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
+        # if 'user_id' not in session:
+        #     return jsonify({'error': 'Giriş yapmanız gerekiyor'}), 401
+        
+        data = request.json
+        if not data or 'cv_analysis' not in data or 'job' not in data:
+            return jsonify({'error': 'CV analizi ve iş verisi gerekli'}), 400
+        
+        cv_analysis = data['cv_analysis']
+        job = data['job']
+        
+        # Akıllı Job Agent'ı başlat
+        job_agent = IntelligentJobAgent()
+        
+        # Başvuru önerilerini oluştur
+        tips = job_agent.generate_job_application_tips(cv_analysis, job)
+        
+        return jsonify({
+            'success': True,
+            'tips': tips
+        })
+    
+    except Exception as e:
+        print(f"Başvuru önerileri hatası: {e}")
+        return jsonify({'error': f'Başvuru önerileri oluşturulurken hata: {str(e)}'}), 500
+
+def extract_text_from_pdf(file_path):
+    """PDF dosyasından metin çıkarır"""
+    text = ""
+    try:
+        # PyPDF2 ile dene
+        with open(file_path, 'rb') as file:
+            pdf_reader = PyPDF2.PdfReader(file)
+            for page in pdf_reader.pages:
+                text += page.extract_text() + "\n"
+        
+        # Eğer PyPDF2 başarısızsa pdfplumber ile dene
+        if not text.strip():
+            with pdfplumber.open(file_path) as pdf:
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    if page_text:
+                        text += page_text + "\n"
+    
+    except Exception as e:
+        print(f"PDF metin çıkarma hatası: {e}")
+        return ""
+    
+    return text.strip()
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle

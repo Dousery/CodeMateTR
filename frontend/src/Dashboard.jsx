@@ -17,16 +17,16 @@ const modules = [
     path: '/test',
   },
   {
-    title: 'İş Bulma',
-    desc: 'CV ile uygun iş ilanlarını bul.',
-    icon: <WorkIcon fontSize="large" color="secondary" />, 
-    path: '/job-search',
-  },
-  {
     title: 'Kodlama Odası',
     desc: 'Kodlama becerilerini geliştir.',
     icon: <CodeIcon fontSize="large" color="success" />, 
     path: '/code',
+  },
+  {
+    title: 'Akıllı İş Bulma',
+    desc: 'CV\'ni analiz et, ideal işleri keşfet.',
+    icon: <WorkIcon fontSize="large" color="secondary" />, 
+    path: '/smart-job-finder',
   },
   {
     title: 'Mülakat',

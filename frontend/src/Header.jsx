@@ -6,19 +6,16 @@ import PsychologyIcon from '@mui/icons-material/Psychology';
 import CodeIcon from '@mui/icons-material/Code';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import ForumIcon from '@mui/icons-material/Forum';
-import HistoryEduIcon from '@mui/icons-material/HistoryEdu';
 import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './App';
 
 const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
-  { icon: <WorkIcon />, label: 'İş Bulma', route: '/job-search' },
-  { icon: <PsychologyIcon />, label: 'Gelişmiş CV Analizi', route: '/advanced-job-search' },
+  { icon: <WorkIcon />, label: 'Akıllı İş Bulma', route: '/smart-job-finder' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
   { icon: <ForumIcon />, label: 'Forum', route: '/forum' },
-  { icon: <HistoryEduIcon />, label: 'Geçmiş', route: '/history' },
 ];
 
 function CodeMateLogo({ onClick }) {

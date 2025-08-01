@@ -5,14 +5,12 @@ import Register from './Register';
 import Login from './Login';
 import Dashboard from './Dashboard';
 import Test from './Test';
-import JobSearch from './JobSearch';
-import AdvancedJobSearch from './AdvancedJobSearch';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
 import Forum from './Forum';
-import History from './History';
 import Header from './Header';
 import Profile from './Profile';
+import SmartJobFinder from './SmartJobFinder';
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 
 const theme = createTheme({
@@ -103,12 +101,10 @@ function App() {
               <Route path="/login" element={<Login setIsLoggedIn={setIsLoggedIn} />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/test" element={<ProtectedRoute><Test /></ProtectedRoute>} />
-              <Route path="/job-search" element={<ProtectedRoute><JobSearch /></ProtectedRoute>} />
-              <Route path="/advanced-job-search" element={<ProtectedRoute><AdvancedJobSearch /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
+              <Route path="/smart-job-finder" element={<ProtectedRoute><SmartJobFinder /></ProtectedRoute>} />
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
-              <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
             </Routes>
           </Box>
