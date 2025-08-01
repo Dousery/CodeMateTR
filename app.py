@@ -1481,9 +1481,17 @@ def start_auto_interview():
         session_id = f"auto_interview_{int(time.time())}_{user.username}"
         agent = InterviewAIAgent(user.interest)
         
+        # Conversation context'i kullanıcının nickname'i ile oluştur
+        conversation_context = f"Kullanıcının nickname: {user.username}"
+        
         # İlk sesli soruyu üret
         voice_name = data.get('voice_name', 'Kore')
-        result = agent.generate_dynamic_speech_question(voice_name=voice_name)
+        result = agent.generate_dynamic_speech_question(
+            previous_questions=None, 
+            user_answers=None, 
+            conversation_context=conversation_context, 
+            voice_name=voice_name
+        )
         
         first_question = result['question_text']
         audio_url = None
@@ -1498,9 +1506,6 @@ def start_auto_interview():
             import shutil
             shutil.move(result['audio_file'], audio_path)
             audio_url = f'/static/audio/{audio_filename}'
-        
-        # Conversation context'i kullanıcının nickname'i ile oluştur
-        conversation_context = f"Kullanıcının nickname: {user.username}"
         
         auto_session = AutoInterviewSession(
             session_id=session_id,
