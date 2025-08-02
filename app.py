@@ -474,9 +474,22 @@ def profile():
                 UserActivity.created_at < date.replace(hour=23, minute=59, second=59)
             ).count()
             
+            # Türkçe gün isimleri
+            day_names = {
+                'Mon': 'Pzt',
+                'Tue': 'Sal',
+                'Wed': 'Çar',
+                'Thu': 'Per',
+                'Fri': 'Cum',
+                'Sat': 'Cmt',
+                'Sun': 'Paz'
+            }
+            
+            day_name = day_names.get(date.strftime('%A')[:3], date.strftime('%A')[:3])
+            
             daily_activity.append({
                 'date': date_str,
-                'day_name': date.strftime('%A')[:3],
+                'day_name': day_name,
                 'tests': daily_tests,
                 'forum_activity': daily_forum,
                 'code_activity': daily_code,
@@ -493,6 +506,9 @@ def profile():
                 'forum_posts': forum_posts,
                 'forum_comments': forum_comments,
                 'forum_points': total_forum_points,
+                'total_code_sessions': total_code_sessions,
+                'total_code_points': total_code_points,
+                'code_trend': code_trend,
                 'has_cv': has_cv,
                 'test_trend': test_trend,
                 'achievements': achievements,
@@ -869,6 +885,16 @@ def code_room():
     try:
         agent = CodeAIAgent(user.interest)
         coding_question = agent.generate_coding_question()
+        
+        # Kodlama aktivitesi kaydet
+        activity = UserActivity(
+            username=user.username,
+            activity_type='code_session',
+            points_earned=10
+        )
+        db.session.add(activity)
+        db.session.commit()
+        
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
     return jsonify({
@@ -1075,6 +1101,16 @@ def code_room_evaluate():
         return jsonify({'error': 'Kod ve soru gerekli.'}), 400
     agent = CodeAIAgent(user.interest)
     evaluation = agent.evaluate_code(user_code, question)
+    
+    # Kodlama değerlendirme aktivitesi kaydet
+    activity = UserActivity(
+        username=user.username,
+        activity_type='code_evaluation',
+        points_earned=15
+    )
+    db.session.add(activity)
+    db.session.commit()
+    
     return jsonify({'evaluation': evaluation})
 
 @app.route('/code_room/run', methods=['POST'])
