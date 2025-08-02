@@ -169,19 +169,33 @@ class CodeAIAgent:
         {user_code}
         ```
         
-        Değerlendirme formatı:
-        1. Çıktı/Sonuç: [Kod çıktısı]
-        2. Doğruluk: [Doğru mu yanlış mı - 1 cümle]
-        3. Puan: [0-100 arası]
-        4. Ana sorun: [Varsa - 1 cümle]
-        5. Öneri: [Kısa iyileştirme önerisi - 1 cümle]
+        Aşağıdaki formatı kullanarak değerlendirme yap:
         
-        PUANLAMA YAPARAK DEĞERLENDİR.
+        Çıktı/Sonuç: [Kod çıktısı]
+        
+        Doğruluk: [Doğru mu yanlış mı - 1 cümle]
+        
+        Puan: [0-100 arası]
+        
+        Ana Sorun: [Varsa - 1 cümle]
+        
+        Öneri: [Kısa iyileştirme önerisi - 1 cümle]
+        
+        NOT: Markdown formatı (#, ##, **) kullanma. Sadece düz metin olarak yaz.
         """
         
         try:
             response = self.model.generate_content(prompt)
             response_text = response.text.strip()
+            
+            # Markdown formatını temizle
+            import re
+            # # ve ## işaretlerini kaldır
+            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
+            # ** işaretlerini kaldır
+            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
+            # Fazla boşlukları temizle
+            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
             
             result = {
                 "evaluation": response_text,
@@ -236,16 +250,18 @@ class CodeAIAgent:
         
         Lütfen aşağıdaki formatı kullan:
         
-        **Açıklama:**
+        Açıklama:
         Sorunun nasıl çözüleceğini kısaca açıkla (2-3 cümle)
         
-        **Kod:**
+        Kod:
         ```{self.language}
         # Çözüm kodunu buraya yaz
         ```
         
-        **Test:**
+        Test:
         Kodun nasıl çalıştığını göster ve test sonuçlarını açıkla.
+        
+        NOT: Markdown formatı (**) kullanma. Sadece düz metin olarak yaz.
         """
         
         try:
@@ -271,13 +287,13 @@ class CodeAIAgent:
                 line = line.strip()
                 
                 # Section başlıklarını tespit et
-                if "**Açıklama:**" in line or "Açıklama:" in line:
+                if "Açıklama:" in line:
                     current_section = "explanation"
                     continue
-                elif "**Kod:**" in line or "Kod:" in line:
+                elif "Kod:" in line:
                     current_section = "code"
                     continue
-                elif "**Test:**" in line or "Test:" in line:
+                elif "Test:" in line:
                     current_section = "test_results"
                     continue
                 
@@ -340,25 +356,37 @@ class CodeAIAgent:
         {code_with_error}
         ```
         
-        Kısaca:
-        1. Ana hata nedir? (1 cümle)
-        2. Düzeltilmiş kodu yaz ve çalıştır
-        3. Neden hata oldu? (1 cümle)
+        Aşağıdaki formatı kullan:
+        
+        Ana Hata: [Ana hata nedir? - 1 cümle]
+        
+        Düzeltilmiş Kod:
+        [Düzeltilmiş kodu buraya yaz]
+        
+        Hata Nedeni: [Neden hata oldu? - 1 cümle]
+        
+        NOT: Markdown formatı (#, ##, **) kullanma. Sadece düz metin olarak yaz.
         """
         
         try:
             response = self.model.generate_content(prompt)
+            response_text = response.text.strip()
+            
+            # Markdown formatını temizle
+            import re
+            # # ve ## işaretlerini kaldır
+            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
+            # ** işaretlerini kaldır
+            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
+            # Fazla boşlukları temizle
+            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
             
             debug_result = {
-                "error_explanation": "",
+                "error_explanation": response_text,
                 "corrected_code": "",
                 "execution_result": "",
                 "prevention_tips": ""
             }
-            
-            # Parse response text
-            response_text = response.text
-            debug_result["error_explanation"] = response_text
             
             # Try to extract corrected code
             code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
@@ -395,17 +423,29 @@ class CodeAIAgent:
             {config['name']} dili için {topic} konusunda öğrenmek için en iyi {num_resources} kaynak öner.
             
             Her kaynak için şu formatı kullan:
-            **Kaynak Adı:** [Kaynak başlığı]
-            - **URL:** [Gerçek erişilebilir URL]
-            - **Açıklama:** [Kısa açıklama - 1 cümle]
-            - **Neden Faydalı:** [Faydası - 1 cümle]
-            - **Zorluk Seviyesi:** [Başlangıç/Orta/İleri]
+            Kaynak Adı: [Kaynak başlığı]
+            - URL: [Gerçek erişilebilir URL]
+            - Açıklama: [Kısa açıklama - 1 cümle]
+            - Neden Faydalı: [Faydası - 1 cümle]
+            - Zorluk Seviyesi: [Başlangıç/Orta/İleri]
             
             Gerçek, erişilebilir URL'ler ver. Güncel ve kaliteli kaynakları öner.
+            NOT: Markdown formatı (**) kullanma. Sadece düz metin olarak yaz.
             """
             
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            response_text = response.text.strip()
+            
+            # Markdown formatını temizle
+            import re
+            # # ve ## işaretlerini kaldır
+            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
+            # ** işaretlerini kaldır
+            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
+            # Fazla boşlukları temizle
+            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            
+            return response_text
             
         except Exception as e:
             # Fallback: Önceden tanımlanmış kaynaklar
@@ -722,19 +762,36 @@ class CodeAIAgent:
         {user_code}
         ```
         
-        Detaylı değerlendirme:
-        1. Doğruluk: [Çözüm doğru mu? - 2 cümle]
-        2. Kod kalitesi: [Temizlik, okunabilirlik - 2 cümle]
-        3. Verimlilik: [Algoritma verimi - 1 cümle]
-        4. Puan: [0-100 arası]
-        5. İyileştirme önerileri: [3-4 madde]
+        Aşağıdaki formatı kullanarak değerlendirme yap:
         
-        DETAYLI PUANLAMA VE ÖNERİLER VER.
+        Doğruluk: [Çözüm doğru mu? - 2 cümle]
+        
+        Kod Kalitesi: [Temizlik, okunabilirlik - 2 cümle]
+        
+        Verimlilik: [Algoritma verimi - 1 cümle]
+        
+        Puan: [0-100 arası]
+        
+        İyileştirme Önerileri:
+        [3-4 madde halinde öneriler]
+        
+        NOT: Markdown formatı (#, ##, **) kullanma. Sadece düz metin olarak yaz.
         """
         
         try:
             response = self.model.generate_content(prompt)
-            return response.text.strip()
+            response_text = response.text.strip()
+            
+            # Markdown formatını temizle
+            import re
+            # # ve ## işaretlerini kaldır
+            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
+            # ** işaretlerini kaldır
+            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
+            # Fazla boşlukları temizle
+            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            
+            return response_text
             
         except Exception as e:
             return f"Detaylı değerlendirme hatası: {str(e)}" 

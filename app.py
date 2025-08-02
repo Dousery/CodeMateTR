@@ -882,9 +882,14 @@ def code_room():
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    language = data.get('language', 'python')  # Varsayılan olarak python
+    difficulty = data.get('difficulty', 'orta')  # Varsayılan olarak orta
+    
     try:
-        agent = CodeAIAgent(user.interest)
-        coding_question = agent.generate_coding_question()
+        agent = CodeAIAgent(user.interest, language)
+        coding_question = agent.generate_coding_question(difficulty)
         
         # Kodlama aktivitesi kaydet
         activity = UserActivity(
@@ -913,12 +918,13 @@ def code_room_generate_solution():
     
     data = request.json
     question = data.get('question')
+    language = data.get('language', 'python')  # Varsayılan olarak python
     
     if not question:
         return jsonify({'error': 'Soru gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest)
+        agent = CodeAIAgent(user.interest, language)
         solution = agent.generate_solution(question)
         return jsonify({
             'success': True,
@@ -1097,9 +1103,10 @@ def code_room_evaluate():
     data = request.json
     user_code = data.get('user_code')
     question = data.get('question')
+    language = data.get('language', 'python')  # Varsayılan olarak python
     if not user_code or not question:
         return jsonify({'error': 'Kod ve soru gerekli.'}), 400
-    agent = CodeAIAgent(user.interest)
+    agent = CodeAIAgent(user.interest, language)
     evaluation = agent.evaluate_code(user_code, question)
     
     # Kodlama değerlendirme aktivitesi kaydet

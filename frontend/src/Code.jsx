@@ -20,7 +20,6 @@ export default function Code() {
   const [error, setError] = useState('');
   const [difficulty, setDifficulty] = useState('orta');
   const [activeTab, setActiveTab] = useState(0);
-  const [useExecution, setUseExecution] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('python');
   const [cursorPosition, setCursorPosition] = useState(0);
   const codeEditorRef = useRef(null);
@@ -30,6 +29,7 @@ export default function Code() {
   const [complexityAnalysis, setComplexityAnalysis] = useState(null);
   const [generatedSolution, setGeneratedSolution] = useState(null);
   const [resources, setResources] = useState(null);
+  const [executionOutput, setExecutionOutput] = useState(null); // Yeni state: çalıştırma çıktısı
 
   // Dil konfigürasyonları
   const languageConfigs = {
@@ -375,7 +375,32 @@ export default function Code() {
     }
   };
 
-  const handleSubmit = async () => {
+
+
+  // Yeni fonksiyon: Sadece kodu çalıştır
+  const handleRunCode = async () => {
+    if (!userCode.trim()) {
+      setError('Lütfen kodunuzu yazın.');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    try {
+      const res = await axios.post('http://localhost:5000/code_room/run', {
+        user_code: userCode,
+        language: selectedLanguage
+      }, { withCredentials: true });
+      setExecutionOutput(res.data.result);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Kod çalıştırma başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Yeni fonksiyon: Sadece değerlendir
+  const handleEvaluateCode = async () => {
     if (!userCode.trim()) {
       setError('Lütfen kodunuzu yazın.');
       return;
@@ -387,7 +412,7 @@ export default function Code() {
       const res = await axios.post('http://localhost:5000/code_room/evaluate', {
         question: question,
         user_code: userCode,
-        use_execution: useExecution,
+        use_execution: false, // Sadece analiz, çalıştırma yok
         language: selectedLanguage
       }, { withCredentials: true });
       setResult(res.data);
@@ -514,7 +539,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
       if (e.ctrlKey && e.key === 'Enter') {
         e.preventDefault();
         if (userCode.trim() && !loading) {
-          handleSubmit();
+          handleRunCode();
         }
       }
     };
@@ -724,20 +749,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                   >
                     🔧 Format
                   </Button>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={useExecution}
-                        onChange={(e) => setUseExecution(e.target.checked)}
-                        color="primary"
-                      />
-                    }
-                    label={
-                      <Typography color="white" variant="body2">
-                        {useExecution ? '⚡ Kod Çalıştır' : '📝 Sadece Analiz'}
-                      </Typography>
-                    }
-                  />
                 </Box>
               </Box>
               
@@ -795,28 +806,87 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
               
               {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
               
+              {/* Çalıştırma çıktısı kartı */}
+              {executionOutput && (
+                <Card sx={{ mb: 3, backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                  <CardContent>
+                    <Typography variant="h6" color="white" mb={2}>
+                      🚀 Kod Çalıştırma Sonucu
+                    </Typography>
+                    <Box sx={{ 
+                      backgroundColor: 'rgba(0,0,0,0.3)', 
+                      p: 2, 
+                      borderRadius: 1,
+                      border: executionOutput.has_errors ? '1px solid #f44336' : '1px solid #4caf50'
+                    }}>
+                      <Typography 
+                        color={executionOutput.has_errors ? '#f44336' : '#4caf50'} 
+                        sx={{ 
+                          whiteSpace: 'pre-wrap', 
+                          fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                          fontSize: '14px'
+                        }}
+                      >
+                        {executionOutput.execution_output}
+                      </Typography>
+                    </Box>
+                    {executionOutput.has_errors && (
+                      <Alert severity="warning" sx={{ mt: 2 }}>
+                        ⚠️ Kodunuzda hatalar tespit edildi. Debug butonunu kullanarak yardım alabilirsiniz.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
                   <Button 
                     variant="contained" 
                     color="primary" 
                     fullWidth
-                    onClick={handleSubmit} 
+                    onClick={handleRunCode} 
                     disabled={loading || !userCode.trim()} 
                     endIcon={loading && <CircularProgress size={20} color="inherit" />}
                     startIcon={<PlayArrow />}
                     sx={{
-                      background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                      background: 'linear-gradient(45deg, #4caf50 0%, #66bb6a 100%)',
                       borderRadius: '15px',
                       py: 1.2,
                       textTransform: 'none',
                       fontWeight: 600,
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #388e3c 0%, #4caf50 100%)',
+                      }
                     }}
                   >
-                    {loading ? 'Değerlendiriliyor...' : useExecution ? 'Çalıştır & Değerlendir' : 'Değerlendir'}
+                    {loading ? 'Çalıştırılıyor...' : '🚀 Çalıştır'}
                   </Button>
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
+                  <Button 
+                    variant="contained" 
+                    color="secondary" 
+                    fullWidth
+                    onClick={handleEvaluateCode} 
+                    disabled={loading || !userCode.trim()} 
+                    endIcon={loading && <CircularProgress size={20} color="inherit" />}
+                    startIcon={<Psychology />}
+                    sx={{
+                      background: 'linear-gradient(45deg, #ff9800 0%, #ffb74d 100%)',
+                      borderRadius: '15px',
+                      py: 1.2,
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #f57c00 0%, #ff9800 100%)',
+                      }
+                    }}
+                  >
+                    {loading ? 'Değerlendiriliyor...' : '🧠 Değerlendir'}
+                  </Button>
+                </Grid>
+                <Grid item xs={12} md={4}>
                   <Button 
                     variant="outlined" 
                     fullWidth
@@ -1156,6 +1226,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                   setComplexityAnalysis(null);
                   setGeneratedSolution(null);
                   setResources(null);
+                  setExecutionOutput(null);
                   setActiveTab(0);
                   setError('');
                 }}
