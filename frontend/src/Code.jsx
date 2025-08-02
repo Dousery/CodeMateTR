@@ -2,11 +2,12 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Box, Typography, Paper, Button, TextField, CircularProgress, Alert, 
   Tabs, Tab, Select, MenuItem, FormControl, InputLabel, Card, CardContent,
-  Accordion, AccordionSummary, AccordionDetails, Chip, Grid, Switch, FormControlLabel
+  Accordion, AccordionSummary, AccordionDetails, Chip, Grid, Switch, FormControlLabel,
+  Dialog, DialogTitle, DialogContent, DialogActions, IconButton
 } from '@mui/material';
 import { 
   ExpandMore, PlayArrow, BugReport, Analytics, School, Code as CodeIcon,
-  AutoFixHigh, Speed, Psychology
+  AutoFixHigh, Speed, Psychology, Close
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
@@ -30,6 +31,38 @@ export default function Code() {
   const [generatedSolution, setGeneratedSolution] = useState(null);
   const [resources, setResources] = useState(null);
   const [executionOutput, setExecutionOutput] = useState(null); // Yeni state: çalıştırma çıktısı
+  const [autoCopyToIDE, setAutoCopyToIDE] = useState(false); // Otomatik IDE'ye kopyalama
+  const [showAiSolution, setShowAiSolution] = useState(false); // AI çözümünü göster/gizle
+  const [copyNotification, setCopyNotification] = useState(false); // Kopyalama bildirimi
+  
+
+
+  // State'leri sıfırlama fonksiyonu
+  const resetAllStates = () => {
+    setQuestion('');
+    setUserCode('');
+    setStep('start');
+    setLoading(false);
+    setResult(null);
+    setError('');
+    setDifficulty('orta');
+    setActiveTab(0);
+    setSelectedLanguage('python');
+    setCursorPosition(0);
+    setDebugResult(null);
+    setComplexityAnalysis(null);
+    setGeneratedSolution(null);
+    setResources(null);
+    setExecutionOutput(null);
+    setAutoCopyToIDE(false);
+    setShowAiSolution(false);
+    setCopyNotification(false);
+  };
+
+  // Component mount olduğunda state'leri sıfırla
+  useEffect(() => {
+    resetAllStates();
+  }, []); // Sadece component mount olduğunda çalışır
 
   // Dil konfigürasyonları
   const languageConfigs = {
@@ -299,39 +332,49 @@ export default function Code() {
   };
 
   // Kod formatlaması
-  const formatCode = () => {
-    const config = languageConfigs[selectedLanguage];
-    let formattedCode = userCode;
+  const formatCode = async () => {
+    if (!userCode.trim()) return;
     
-    // Satır sonu boşlukları temizle
-    formattedCode = formattedCode.replace(/[ \t]+$/gm, '');
-    
-    // Boş satırları normalize et
-    formattedCode = formattedCode.replace(/\n\s*\n\s*\n/g, '\n\n');
-    
-    // Girintileri düzelt
-    const lines = formattedCode.split('\n');
-    const formattedLines = lines.map(line => {
-      const trimmed = line.trim();
-      if (trimmed === '') return '';
+    setLoading(true);
+    try {
+      const res = await axios.post('http://localhost:5000/code_room/format_code', {
+        code: userCode,
+        language: selectedLanguage
+      }, { withCredentials: true });
       
-      // Girinti seviyesini hesapla
-      let indentLevel = 0;
-      for (let i = 0; i < lines.length; i++) {
-        const currentLine = lines[i].trim();
-        if (currentLine === trimmed) break;
-        
-        if (config.autoIndent.some(keyword => currentLine.startsWith(keyword))) {
-          indentLevel++;
-        } else if (config.deindent.some(keyword => currentLine.startsWith(keyword))) {
-          indentLevel = Math.max(0, indentLevel - 1);
-        }
+      if (res.data.success) {
+        setUserCode(res.data.formatted_code);
+        setError('✅ Kod başarıyla formatlandı!');
+        setTimeout(() => {
+          setError('');
+        }, 3000);
       }
-      
-      return ' '.repeat(indentLevel * config.indentSize) + trimmed;
-    });
+    } catch (err) {
+      setError('❌ Kod formatlanamadı: ' + (err.response?.data?.error || err.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // AI çözümü için kod formatlama fonksiyonu
+  const formatCodeString = async (code, language) => {
+    if (!code.trim()) return code;
     
-    setUserCode(formattedLines.join('\n'));
+    try {
+      const res = await axios.post('http://localhost:5000/code_room/format_code', {
+        code: code,
+        language: language
+      }, { withCredentials: true });
+      
+      if (res.data.success) {
+        return res.data.formatted_code;
+      }
+    } catch (err) {
+      console.error('AI çözümü formatlanamadı:', err);
+    }
+    
+    // Fallback: Basit formatlama
+    return code;
   };
 
   // Syntax highlighting için basit renklendirme
@@ -387,19 +430,64 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/code_room/run', {
+      // Sadece kod çalıştırma - analiz yok
+      const res = await axios.post('http://localhost:5000/code_room/run_simple', {
         user_code: userCode,
         language: selectedLanguage
       }, { withCredentials: true });
-      setExecutionOutput(res.data.result);
+      
+      if (res.data.success) {
+        const result = res.data.result;
+        
+        // Sadece çalıştırma sonucunu göster
+        const simpleOutput = {
+          execution_output: '',
+          has_errors: false,
+          execution_time: 'N/A',
+          memory_usage: 'N/A',
+          code_analysis: '',
+          suggestions: ''
+        };
+        
+        // Sadece çıktı/hata - kod gösterme
+        let output = '';
+        
+        if (result.output) {
+          output += `${result.output}\n`;
+        }
+        
+        if (result.error) {
+          output += `${result.error}\n`;
+          simpleOutput.has_errors = true;
+        }
+        
+        simpleOutput.execution_output = output.trim();
+        setExecutionOutput(simpleOutput);
+        
+        if (!simpleOutput.has_errors) {
+          console.log('✅ Kod başarıyla çalıştırıldı!');
+        }
+      } else {
+        setError(res.data.error || 'Kod çalıştırma başarısız.');
+      }
     } catch (err) {
-      setError(err.response?.data?.error || 'Kod çalıştırma başarısız.');
+      // Fallback: Eski API'yi dene
+      try {
+        console.log('🔄 Yeni API başarısız, eski API deneniyor...');
+        const fallbackRes = await axios.post('http://localhost:5000/code_room/run', {
+          user_code: userCode,
+          language: selectedLanguage
+        }, { withCredentials: true });
+        setExecutionOutput(fallbackRes.data.result);
+      } catch (fallbackErr) {
+        setError(err.response?.data?.error || fallbackErr.response?.data?.error || 'Kod çalıştırma başarısız.');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  // Yeni fonksiyon: Sadece değerlendir
+  // Yeni fonksiyon: Kod çalıştır ve analiz et
   const handleEvaluateCode = async () => {
     if (!userCode.trim()) {
       setError('Lütfen kodunuzu yazın.');
@@ -409,13 +497,27 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      // Mevcut code odası evaluate fonksiyonunu kullan
       const res = await axios.post('http://localhost:5000/code_room/evaluate', {
         question: question,
         user_code: userCode,
-        use_execution: false, // Sadece analiz, çalıştırma yok
+        use_execution: true, // Çalıştır ve analiz et
         language: selectedLanguage
       }, { withCredentials: true });
-      setResult(res.data);
+      
+      // Sonucu formatla
+      const evaluationResult = {
+        evaluation: res.data.evaluation || '',
+        execution_output: res.data.execution_output || '',
+        code_suggestions: res.data.code_suggestions || '',
+        has_errors: res.data.has_errors || false,
+        corrected_code: res.data.corrected_code || '',
+        score: res.data.score || 0,
+        feedback: res.data.feedback || '',
+        use_execution: true
+      };
+      
+      setResult(evaluationResult);
       setStep('result');
     } catch (err) {
       setError(err.response?.data?.error || 'Değerlendirme başarısız.');
@@ -432,8 +534,39 @@ export default function Code() {
         question: question,
         language: selectedLanguage
       }, { withCredentials: true });
+      
+      console.log('AI Response:', res.data); // Debug için
+      
+      // Kodu formatla
+      let formattedCode = '';
+      if (res.data && (res.data.code || res.data.solution?.code || res.data.solution || res.data.generated_code)) {
+        const rawCode = res.data.code || res.data.solution?.code || res.data.solution || res.data.generated_code || '';
+        formattedCode = await formatCodeString(rawCode, selectedLanguage);
+        
+        // Formatlanmış kodu response'a ekle
+        res.data.formatted_code = formattedCode;
+      }
+      
       setGeneratedSolution(res.data);
-      setActiveTab(1); // Çözüm sekmesine geç
+      
+      // AI çözümü üretildikten sonra sadece çözümü göster
+      if (res.data && (res.data.code || res.data.solution?.code || res.data.solution || res.data.generated_code)) {
+        console.log('AI solution generated successfully'); // Debug için
+        
+        // Başarı mesajını göster
+        setError('✅ AI çözümü başarıyla üretildi!');
+        
+        // AI çözümünü göster
+        setShowAiSolution(true);
+        
+        // 15 saniye sonra başarı mesajını temizle
+        setTimeout(() => {
+          setError('');
+        }, 15000);
+      } else {
+        console.log('No code found in response'); // Debug için
+        setError('❌ AI çözümünde kod bulunamadı!');
+      }
     } catch (err) {
       setError(err.response?.data?.error || 'Çözüm üretilemedi.');
     } finally {
@@ -455,7 +588,7 @@ export default function Code() {
         language: selectedLanguage
       }, { withCredentials: true });
       setDebugResult(res.data);
-      setActiveTab(2); // Debug sekmesine geç
+      setActiveTab(1); // Debug sekmesine geç
     } catch (err) {
       setError(err.response?.data?.error || 'Debug başarısız.');
     } finally {
@@ -477,7 +610,7 @@ export default function Code() {
         language: selectedLanguage
       }, { withCredentials: true });
       setComplexityAnalysis(res.data);
-      setActiveTab(3); // Analiz sekmesine geç
+      setActiveTab(2); // Analiz sekmesine geç
     } catch (err) {
       setError(err.response?.data?.error || 'Analiz başarısız.');
     } finally {
@@ -498,8 +631,9 @@ export default function Code() {
         topic: searchTopic,
         num_resources: 5
       }, { withCredentials: true });
-      setResources(res.data);
-      setActiveTab(4); // Kaynaklar sekmesine geç
+      
+            setResources(res.data);
+      setActiveTab(3); // Kaynaklar sekmesine geç
     } catch (err) {
       setError(err.response?.data?.error || 'Kaynaklar alınamadı.');
     } finally {
@@ -714,7 +848,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
             }}
           >
             <Tab label="Problem & Kod" icon={<CodeIcon />} />
-            <Tab label="AI Çözümü" icon={<AutoFixHigh />} />
             <Tab label="Debug" icon={<BugReport />} />
             <Tab label="Analiz" icon={<Analytics />} />
             <Tab label="Kaynaklar" icon={<School />} />
@@ -739,7 +872,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                   <Button
                     variant="outlined"
                     size="small"
-                    onClick={formatCode}
+                    onClick={() => formatCode()}
                     sx={{ 
                       color: 'rgba(255,255,255,0.8)', 
                       borderColor: 'rgba(255,255,255,0.3)',
@@ -804,14 +937,45 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                 </Box>
               </Box>
               
-              {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+              {error && (
+                <Alert 
+                  severity={error.startsWith('✅') ? 'success' : 'error'} 
+                  action={
+                    error.startsWith('✅') && (
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={() => setError('')}
+                        sx={{ 
+                          color: '#4caf50',
+                          '&:hover': { backgroundColor: 'rgba(76, 175, 80, 0.1)' }
+                        }}
+                      >
+                        ✕
+                      </Button>
+                    )
+                  }
+                  sx={{ 
+                    mb: 2,
+                    ...(error.startsWith('✅') && {
+                      backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                      border: '1px solid rgba(76, 175, 80, 0.3)',
+                      color: '#4caf50'
+                    })
+                  }}
+                >
+                  {error}
+                </Alert>
+              )}
               
-              {/* Çalıştırma çıktısı kartı */}
+
+              
+              {/* Basit çalıştırma çıktısı kartı */}
               {executionOutput && (
                 <Card sx={{ mb: 3, backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
                   <CardContent>
                     <Typography variant="h6" color="white" mb={2}>
-                      🚀 Kod Çalıştırma Sonucu
+                      📊 Çıktı
                     </Typography>
                     <Box sx={{ 
                       backgroundColor: 'rgba(0,0,0,0.3)', 
@@ -830,10 +994,145 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                         {executionOutput.execution_output}
                       </Typography>
                     </Box>
-                    {executionOutput.has_errors && (
+                    {executionOutput.has_errors ? (
                       <Alert severity="warning" sx={{ mt: 2 }}>
-                        ⚠️ Kodunuzda hatalar tespit edildi. Debug butonunu kullanarak yardım alabilirsiniz.
+                        ⚠️ Kodunuzda hatalar tespit edildi. "Değerlendir" butonunu kullanarak detaylı analiz alabilirsiniz.
                       </Alert>
+                    ) : (
+                      <Alert severity="success" sx={{ mt: 2 }}>
+                        ✅ Kod başarıyla çalıştırıldı! Detaylı analiz için "Değerlendir" butonunu kullanın.
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+              
+              {/* AI Çözümü Kartı */}
+              {showAiSolution && generatedSolution && (
+                <Card sx={{ mb: 3, backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="h6" color="white">🤖 AI Çözümü</Typography>
+                      <Button
+                        size="small"
+                        onClick={() => setShowAiSolution(false)}
+                        sx={{ 
+                          color: 'rgba(255,255,255,0.7)',
+                          '&:hover': { backgroundColor: 'rgba(255,255,255,0.1)' }
+                        }}
+                      >
+                        ✕
+                      </Button>
+                    </Box>
+                    
+                    <Accordion defaultExpanded sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                      <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
+                        <Typography color="white">💡 Açıklama</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap' }}>
+                          {generatedSolution.explanation || generatedSolution.solution?.explanation || 'Açıklama bulunamadı'}
+                        </Typography>
+                      </AccordionDetails>
+                    </Accordion>
+                    
+                    <Accordion defaultExpanded sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                      <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
+                        <Typography color="white">{languageConfigs[selectedLanguage].icon} {languageConfigs[selectedLanguage].name} Kodu</Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Box sx={{ position: 'relative' }}>
+                          <TextField
+                            multiline
+                            fullWidth
+                            rows={8}
+                            value={generatedSolution.formatted_code || generatedSolution.code || generatedSolution.solution?.code || generatedSolution.solution || generatedSolution.generated_code || 'Kod bulunamadı'}
+                            InputProps={{ readOnly: true }}
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                color: 'white',
+                                fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+                                backgroundColor: 'rgba(0,0,0,0.3)',
+                                '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' },
+                              },
+                            }}
+                          />
+                          <Button
+                            size="small"
+                            onClick={() => {
+                              const codeToCopy = generatedSolution.formatted_code || generatedSolution.code || generatedSolution.solution?.code || generatedSolution.solution || generatedSolution.generated_code || '';
+                              if (codeToCopy) {
+                                navigator.clipboard.writeText(codeToCopy);
+                                setCopyNotification(true);
+                                setTimeout(() => {
+                                  setCopyNotification(false);
+                                }, 2000);
+                              }
+                            }}
+                            sx={{
+                              position: 'absolute',
+                              top: 8,
+                              right: 40,
+                              minWidth: 'auto',
+                              width: 32,
+                              height: 32,
+                              backgroundColor: copyNotification ? 'rgba(76, 175, 80, 0.9)' : 'rgba(0,0,0,0.7)',
+                              color: copyNotification ? 'white' : 'rgba(255,255,255,0.8)',
+                              transition: 'all 0.3s ease',
+                              '&:hover': {
+                                backgroundColor: copyNotification ? 'rgba(76, 175, 80, 1)' : 'rgba(0,0,0,0.9)',
+                                color: 'white',
+                              },
+                            }}
+                          >
+                            {copyNotification ? '✅' : '📋'}
+                          </Button>
+                          
+                          {/* Kopyalama Bildirimi */}
+                          {copyNotification && (
+                            <Box
+                              sx={{
+                                position: 'absolute',
+                                top: -40,
+                                right: 0,
+                                backgroundColor: 'rgba(76, 175, 80, 0.95)',
+                                color: 'white',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                fontWeight: 500,
+                                zIndex: 1000,
+                                animation: 'slideIn 0.3s ease',
+                                '@keyframes slideIn': {
+                                  '0%': {
+                                    opacity: 0,
+                                    transform: 'translateY(10px)',
+                                  },
+                                  '100%': {
+                                    opacity: 1,
+                                    transform: 'translateY(0)',
+                                  },
+                                },
+                              }}
+                            >
+                              ✅ Kod panoya kopyalandı!
+                            </Box>
+                          )}
+                        </Box>
+                      </AccordionDetails>
+                    </Accordion>
+                    
+                    {(generatedSolution.test_results || generatedSolution.solution?.test_results) && (
+                      <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                        <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
+                          <Typography color="white">🧪 Test Sonuçları</Typography>
+                        </AccordionSummary>
+                        <AccordionDetails>
+                          <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                            {generatedSolution.test_results || generatedSolution.solution?.test_results}
+                          </Typography>
+                        </AccordionDetails>
+                      </Accordion>
                     )}
                   </CardContent>
                 </Card>
@@ -907,7 +1206,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
               </Grid>
               
               <Grid container spacing={2} sx={{ mt: 1 }}>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Button 
                     variant="text" 
                     fullWidth
@@ -919,7 +1218,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                     Debug
                   </Button>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Button 
                     variant="text" 
                     fullWidth
@@ -931,7 +1230,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                     Analiz
                   </Button>
                 </Grid>
-                <Grid item xs={4}>
+                <Grid item xs={3}>
                   <Button 
                     variant="text" 
                     fullWidth
@@ -947,65 +1246,9 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
             </Box>
           )}
 
-          {activeTab === 1 && (
-            <Box>
-              <Typography variant="h6" mb={2} color="white">🤖 AI Tarafından Üretilen Çözüm</Typography>
-              {generatedSolution ? (
-                <Box>
-                  <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                    <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                      <Typography color="white">💡 Açıklama</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {generatedSolution.explanation}
-                      </Typography>
-                    </AccordionDetails>
-                  </Accordion>
-                  
-                  <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                    <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                      <Typography color="white">{config.icon} {config.name} Kodu</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <TextField
-                        multiline
-                        fullWidth
-                        value={generatedSolution.code}
-                        InputProps={{ readOnly: true }}
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            color: 'white',
-                            fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                            backgroundColor: 'rgba(0,0,0,0.3)',
-                          },
-                        }}
-                      />
-                    </AccordionDetails>
-                  </Accordion>
-                  
-                  {generatedSolution.test_results && (
-                    <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                      <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                        <Typography color="white">🧪 Test Sonuçları</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                          {generatedSolution.test_results}
-                        </Typography>
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
-                </Box>
-              ) : (
-                <Typography color="rgba(255,255,255,0.7)">
-                  AI çözümü üretmek için "AI Çözümü Üret" butonuna tıklayın.
-                </Typography>
-              )}
-            </Box>
-          )}
 
-          {activeTab === 2 && (
+
+                      {activeTab === 1 && (
             <Box>
               <Typography variant="h6" mb={2} color="white">🐛 Debug Yardımı</Typography>
               {debugResult ? (
@@ -1065,7 +1308,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
             </Box>
           )}
 
-          {activeTab === 3 && (
+                      {activeTab === 2 && (
             <Box>
               <Typography variant="h6" mb={2} color="white">📊 Algoritma Karmaşıklığı Analizi</Typography>
               {complexityAnalysis ? (
@@ -1084,7 +1327,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
             </Box>
           )}
 
-          {activeTab === 4 && (
+                      {activeTab === 3 && (
             <Box>
               <Typography variant="h6" mb={2} color="white">📚 Öğrenme Kaynakları</Typography>
               {resources ? (
@@ -1126,20 +1369,42 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
     const config = languageConfigs[selectedLanguage];
     
     return (
-      <Box sx={{ minHeight: '100vh', width: '100vw', py: 4 }}>
-        <Paper 
-          component={motion.div} 
-          initial={{ opacity: 0, y: 40 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: 0.7 }} 
-          elevation={8} 
-          className="glass-card"
-          sx={{ p: 5, maxWidth: 800, mx: 'auto', borderRadius: 4 }}
-        >
-          <Typography variant="h4" fontWeight={700} mb={3} color="white" textAlign="center">
+      <Dialog 
+        open={true} 
+        maxWidth="md" 
+        fullWidth 
+        PaperProps={{
+          component: motion.div,
+          initial: { opacity: 0, scale: 0.8 },
+          animate: { opacity: 1, scale: 1 },
+          transition: { duration: 0.3 },
+          sx: {
+            backgroundColor: 'rgba(30, 30, 60, 0.95)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: 3,
+            border: '1px solid rgba(255, 255, 255, 0.1)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          backgroundColor: 'rgba(255,255,255,0.1)', 
+          color: 'white',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <Typography variant="h5" fontWeight={700}>
             📊 {config.name} Kod Değerlendirme Sonucu
           </Typography>
-          
+          <IconButton 
+            onClick={() => setStep('start')} 
+            sx={{ color: 'white' }}
+          >
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        
+        <DialogContent sx={{ p: 3 }}>
           {result && (
             <Box>
               {result.use_execution && (
@@ -1192,57 +1457,80 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
               )}
             </Box>
           )}
-          
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <Button 
-                variant="outlined" 
-                fullWidth
-                onClick={() => { 
-                  setStep('coding'); 
-                  setResult(null);
-                  setActiveTab(0);
-                }}
-                sx={{
-                  color: 'rgba(255,255,255,0.7)', 
-                  borderColor: 'rgba(255,255,255,0.3)',
-                  '&:hover': { borderColor: 'rgba(255,255,255,0.7)' }
-                }}
-              >
-                Kodu Düzenle
-              </Button>
-            </Grid>
-            <Grid item xs={6}>
-              <Button 
-                variant="contained" 
-                color="primary" 
-                fullWidth
-                onClick={() => { 
-                  setStep('start'); 
-                  setUserCode(''); 
-                  setQuestion('');
-                  setResult(null); 
-                  setDebugResult(null);
-                  setComplexityAnalysis(null);
-                  setGeneratedSolution(null);
-                  setResources(null);
-                  setExecutionOutput(null);
-                  setActiveTab(0);
-                  setError('');
-                }}
-                sx={{
-                  background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                  }
-                }}
-              >
-                Yeni Problem
-              </Button>
-            </Grid>
-          </Grid>
-        </Paper>
-      </Box>
+        </DialogContent>
+        
+        <DialogActions sx={{ p: 3, backgroundColor: 'rgba(255,255,255,0.05)' }}>
+          <Button 
+            onClick={() => setStep('start')} 
+            variant="contained" 
+            sx={{ 
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              color: 'white',
+              '&:hover': { backgroundColor: 'rgba(255,255,255,0.3)' }
+            }}
+          >
+            Kapat
+          </Button>
+        </DialogActions>
+      </Dialog>
     );
   }
+
+  // Ana return statement - coding step için
+  return (
+    <Box sx={{ minHeight: '100vh', width: '100vw', py: 4 }}>
+      <Paper 
+        component={motion.div} 
+        initial={{ opacity: 0, y: 40 }} 
+        animate={{ opacity: 1, y: 0 }} 
+        transition={{ duration: 0.7 }} 
+        elevation={8} 
+        className="glass-card"
+        sx={{ p: 5, maxWidth: 1200, mx: 'auto', borderRadius: 4 }}
+      >
+
+        
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <Button 
+              variant="outlined" 
+              fullWidth
+              onClick={() => { 
+                setStep('coding'); 
+                setResult(null);
+                setActiveTab(0);
+              }}
+              sx={{
+                color: 'rgba(255,255,255,0.7)', 
+                borderColor: 'rgba(255,255,255,0.3)',
+                '&:hover': { borderColor: 'rgba(255,255,255,0.7)' }
+              }}
+            >
+              Kodu Düzenle
+            </Button>
+          </Grid>
+          <Grid item xs={6}>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              fullWidth
+              onClick={() => { 
+                resetAllStates();
+              }}
+              sx={{
+                background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                }
+              }}
+            >
+              Yeni Problem
+            </Button>
+          </Grid>
+        </Grid>
+      </Paper>
+      
+
+    </Box>
+  );
 }

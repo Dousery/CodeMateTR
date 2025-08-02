@@ -1,9 +1,10 @@
-import google.generativeai as genai
 import os
 import json
 import traceback
 import re
 from dotenv import load_dotenv
+from google import genai
+from google.genai import types
 
 load_dotenv()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
@@ -12,11 +13,26 @@ class CodeAIAgent:
     def __init__(self, interest, language='python'):
         self.interest = interest
         self.language = language
-        # Configure Gemini API
+        
+        # Configure Gemini API with new client
         if not GEMINI_API_KEY:
             raise ValueError("GEMINI_API_KEY environment variable is not set")
-        genai.configure(api_key=GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.0-flash-lite')
+        
+        # Initialize the new client
+        self.client = genai.Client(api_key=GEMINI_API_KEY)
+        
+        # Create chat session with code execution capabilities
+        self.chat = self.client.chats.create(
+            model="gemini-2.0-flash-exp",
+            config=types.GenerateContentConfig(
+                tools=[types.Tool(code_execution=types.ToolCodeExecution)]
+            ),
+        )
+        
+        # Fallback model for non-code execution tasks (using old API for compatibility)
+        import google.generativeai as old_genai
+        old_genai.configure(api_key=GEMINI_API_KEY)
+        self.fallback_model = old_genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Dil konfigürasyonları
         self.language_configs = {
@@ -58,7 +74,7 @@ class CodeAIAgent:
         """
         Belirtilen zorluk seviyesinde kodlama sorusu üretir
         """
-        if not self.model:
+        if not self.fallback_model:
             return "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin."
             
         difficulty_levels = {
@@ -82,7 +98,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.fallback_model.generate_content(prompt)
             return response.text.strip()
             
         except Exception as e:
@@ -90,9 +106,9 @@ class CodeAIAgent:
 
     def run_code(self, user_code):
         """
-        Kullanıcının kodunu sadece çalıştırır, değerlendirmez
+        Kullanıcının kodunu gerçek zamanlı olarak çalıştırır ve sonuçları döndürür
         """
-        if not self.model:
+        if not self.chat:
             return {
                 "execution_output": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
                 "has_errors": True,
@@ -101,32 +117,62 @@ class CodeAIAgent:
             }
         
         config = self.language_configs.get(self.language, self.language_configs['python'])
-            
-        prompt = f"""
-        Bu {config['name']} kodunu çalıştır ve sadece çıktısını göster:
+        
+        # Kod çalıştırma için özel prompt
+        execution_prompt = f"""
+        Bu {config['name']} kodunu çalıştır ve sonuçları göster:
         
         ```{self.language}
         {user_code}
         ```
         
-        Sadece:
-        1. Kod çıktısı/sonucu
-        2. Varsa hata mesajı
-        3. Kod çalıştı mı? (Evet/Hayır)
-        
-        Değerlendirme, puan, öneri YOK. Sadece çalıştır.
+        Kodu çalıştır ve sadece çıktıyı ver. Hata varsa hata mesajını da göster.
         """
         
         try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Yeni chat session oluştur (her kod çalıştırma için temiz başlangıç)
+            execution_chat = self.client.chats.create(
+                model="gemini-2.0-flash-exp",
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(code_execution=types.ToolCodeExecution)]
+                ),
+            )
             
-            # Hata kontrolü için basit analiz
-            has_errors = any(keyword in response_text.lower() for keyword in 
-                           ['error', 'hata', 'exception', 'traceback', 'failed', 'başarısız'])
+            # Kodu çalıştır
+            response = execution_chat.send_message(execution_prompt)
+            
+            execution_output = ""
+            has_errors = False
+            code_output = ""
+            error_output = ""
+            
+            # Response'u parse et
+            for part in response.candidates[0].content.parts:
+                if part.executable_code is not None:
+                    code_output += f"Çalıştırılan Kod:\n{part.executable_code.code}\n\n"
+                
+                if part.code_execution_result is not None:
+                    if hasattr(part.code_execution_result, 'output') and part.code_execution_result.output:
+                        execution_output += f"Çıktı:\n{part.code_execution_result.output}\n"
+                    if hasattr(part.code_execution_result, 'error') and part.code_execution_result.error:
+                        error_output += f"Hata:\n{part.code_execution_result.error}\n"
+                        has_errors = True
+                    # Check for other possible error attributes
+                    elif hasattr(part.code_execution_result, 'stderr') and part.code_execution_result.stderr:
+                        error_output += f"Hata:\n{part.code_execution_result.stderr}\n"
+                        has_errors = True
+            
+            # Eğer code execution sonucu yoksa, text response'u kullan
+            if not execution_output and not error_output:
+                execution_output = response.text.strip()
+                has_errors = any(keyword in execution_output.lower() for keyword in 
+                               ['error', 'hata', 'exception', 'traceback', 'failed', 'başarısız'])
+            
+            # Final output'u birleştir
+            final_output = code_output + execution_output + error_output
             
             result = {
-                "execution_output": response_text,
+                "execution_output": final_output.strip(),
                 "has_errors": has_errors,
                 "execution_time": "N/A",  # Gerçek execution time için ayrı implementation gerek
                 "memory_usage": "N/A"
@@ -146,7 +192,7 @@ class CodeAIAgent:
         """
         Kullanıcının kodunu çalıştırarak değerlendirir - PUANLAMA İÇİN
         """
-        if not self.model:
+        if not self.chat:
             return {
                 "evaluation": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
                 "execution_output": "",
@@ -159,8 +205,8 @@ class CodeAIAgent:
         
         config = self.language_configs.get(self.language, self.language_configs['python'])
             
-        prompt = f"""
-        {config['name']} kodunu değerlendir ve puan ver:
+        evaluation_prompt = f"""
+        {config['name']} kodunu çalıştır, değerlendir ve puan ver:
         
         Soru: {question}
         
@@ -169,7 +215,7 @@ class CodeAIAgent:
         {user_code}
         ```
         
-        Aşağıdaki formatı kullanarak değerlendirme yap:
+        Önce kodu çalıştır, sonra aşağıdaki formatı kullanarak değerlendirme yap:
         
         Çıktı/Sonuç: [Kod çıktısı]
         
@@ -185,44 +231,77 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
-            response_text = response.text.strip()
+            # Yeni chat session oluştur (her değerlendirme için temiz başlangıç)
+            evaluation_chat = self.client.chats.create(
+                model="gemini-2.0-flash-exp",
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(code_execution=types.ToolCodeExecution)]
+                ),
+            )
+            
+            # Kodu çalıştır ve değerlendir
+            response = evaluation_chat.send_message(evaluation_prompt)
+            
+            execution_output = ""
+            evaluation_text = ""
+            has_errors = False
+            
+            # Response'u parse et
+            for part in response.candidates[0].content.parts:
+                if part.executable_code is not None:
+                    execution_output += f"Çalıştırılan Kod:\n{part.executable_code.code}\n\n"
+                
+                if part.code_execution_result is not None:
+                    if hasattr(part.code_execution_result, 'output') and part.code_execution_result.output:
+                        execution_output += f"Çıktı:\n{part.code_execution_result.output}\n"
+                    if hasattr(part.code_execution_result, 'error') and part.code_execution_result.error:
+                        execution_output += f"Hata:\n{part.code_execution_result.error}\n"
+                        has_errors = True
+                    # Check for other possible error attributes
+                    elif hasattr(part.code_execution_result, 'stderr') and part.code_execution_result.stderr:
+                        execution_output += f"Hata:\n{part.code_execution_result.stderr}\n"
+                        has_errors = True
+            
+            # Text response'u al
+            evaluation_text = response.text.strip()
+            
+            # Eğer code execution sonucu yoksa, sadece text response'u kullan
+            if not execution_output:
+                evaluation_text = response.text.strip()
+                has_errors = any(keyword in evaluation_text.lower() for keyword in 
+                               ['error', 'hata', 'exception', 'traceback', 'failed', 'başarısız'])
             
             # Markdown formatını temizle
             import re
             # # ve ## işaretlerini kaldır
-            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
+            evaluation_text = re.sub(r'^#+\s*', '', evaluation_text, flags=re.MULTILINE)
             # ** işaretlerini kaldır
-            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
+            evaluation_text = re.sub(r'\*\*(.*?)\*\*', r'\1', evaluation_text)
             # Fazla boşlukları temizle
-            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            evaluation_text = re.sub(r'\n\s*\n\s*\n', '\n\n', evaluation_text)
             
             result = {
-                "evaluation": response_text,
-                "execution_output": "",
+                "evaluation": evaluation_text,
+                "execution_output": execution_output,
                 "code_suggestions": "",
-                "has_errors": False,
+                "has_errors": has_errors,
                 "corrected_code": "",
                 "score": 0,
-                "feedback": response_text
+                "feedback": evaluation_text
             }
             
             # Puan çıkarmaya çalış
-            score_match = re.search(r'puan[:\s]*(\d+)', response_text.lower())
+            score_match = re.search(r'puan[:\s]*(\d+)', evaluation_text.lower())
             if score_match:
                 result["score"] = int(score_match.group(1))
             else:
                 # Puan bulunamazsa, doğruluk durumuna göre tahmin et
-                if any(word in response_text.lower() for word in ['doğru', 'correct', 'başarılı', 'successful']):
+                if any(word in evaluation_text.lower() for word in ['doğru', 'correct', 'başarılı', 'successful']):
                     result["score"] = 85
-                elif any(word in response_text.lower() for word in ['kısmen', 'partial', 'yarım']):
+                elif any(word in evaluation_text.lower() for word in ['kısmen', 'partial', 'yarım']):
                     result["score"] = 60
                 else:
                     result["score"] = 30
-            
-            # Hata kontrolü
-            result["has_errors"] = any(keyword in response_text.lower() for keyword in 
-                                     ['error', 'hata', 'exception', 'yanlış', 'wrong'])
             
             return result
             
@@ -265,8 +344,8 @@ class CodeAIAgent:
         """
         
         try:
-            # Yeni Gemini API kullan
-            response = self.model.generate_content(prompt)
+            # Fallback model kullan (code execution gerekmiyor)
+            response = self.fallback_model.generate_content(prompt)
             
             # Yanıtı parse et
             response_text = response.text
@@ -369,7 +448,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.fallback_model.generate_content(prompt)
             response_text = response.text.strip()
             
             # Markdown formatını temizle
@@ -433,7 +512,7 @@ class CodeAIAgent:
             NOT: Markdown formatı (**) kullanma. Sadece düz metin olarak yaz.
             """
             
-            response = self.model.generate_content(prompt)
+            response = self.chat.generate_content(prompt)
             response_text = response.text.strip()
             
             # Markdown formatını temizle
@@ -739,7 +818,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.fallback_model.generate_content(prompt)
             
             return response.text.strip()
             
@@ -779,7 +858,7 @@ class CodeAIAgent:
         """
         
         try:
-            response = self.model.generate_content(prompt)
+            response = self.fallback_model.generate_content(prompt)
             response_text = response.text.strip()
             
             # Markdown formatını temizle
@@ -795,3 +874,94 @@ class CodeAIAgent:
             
         except Exception as e:
             return f"Detaylı değerlendirme hatası: {str(e)}" 
+
+    def execute_complex_code(self, prompt, language='python'):
+        """
+        Karmaşık kod çalıştırma örneği - yeni API'nin tüm özelliklerini kullanır
+        """
+        if not self.chat:
+            return {
+                "success": False,
+                "output": "API bağlantısı kurulamadı. Lütfen API anahtarınızı kontrol edin.",
+                "code": "",
+                "error": "API bağlantısı hatası"
+            }
+        
+        try:
+            # Yeni chat session oluştur
+            execution_chat = self.client.chats.create(
+                model="gemini-2.0-flash-exp",
+                config=types.GenerateContentConfig(
+                    tools=[types.Tool(code_execution=types.ToolCodeExecution)]
+                ),
+            )
+            
+            # Kodu çalıştır
+            response = execution_chat.send_message(prompt)
+            
+            result = {
+                "success": True,
+                "output": "",
+                "code": "",
+                "error": ""
+            }
+            
+            # Response'u parse et
+            for part in response.candidates[0].content.parts:
+                if part.executable_code is not None:
+                    result["code"] = part.executable_code.code
+                
+                if part.code_execution_result is not None:
+                    if hasattr(part.code_execution_result, 'output') and part.code_execution_result.output:
+                        result["output"] = part.code_execution_result.output
+                    if hasattr(part.code_execution_result, 'error') and part.code_execution_result.error:
+                        result["error"] = part.code_execution_result.error
+                        result["success"] = False
+                    # Check for other possible error attributes
+                    elif hasattr(part.code_execution_result, 'stderr') and part.code_execution_result.stderr:
+                        result["error"] = part.code_execution_result.stderr
+                        result["success"] = False
+            
+            # Eğer code execution sonucu yoksa, text response'u kullan
+            if not result["output"] and not result["error"]:
+                result["output"] = response.text.strip()
+            
+            return result
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "output": "",
+                "code": "",
+                "error": f"Çalıştırma hatası: {str(e)}"
+            }
+
+    def solve_math_problem(self, problem_description):
+        """
+        Matematik problemlerini çözmek için kod çalıştırma örneği
+        """
+        prompt = f"""
+        Bu matematik problemini çöz:
+        
+        {problem_description}
+        
+        Kodu çalıştır ve sonucu göster. Eğer hesaplama gerekiyorsa, 
+        uygun bir programlama dili kullanarak hesapla.
+        """
+        
+        return self.execute_complex_code(prompt)
+
+    def analyze_data(self, data_description, analysis_type="basic"):
+        """
+        Veri analizi için kod çalıştırma örneği
+        """
+        prompt = f"""
+        Bu veri analizi görevini gerçekleştir:
+        
+        Veri: {data_description}
+        Analiz Türü: {analysis_type}
+        
+        Uygun bir programlama dili kullanarak veriyi analiz et ve sonuçları göster.
+        """
+        
+        return self.execute_complex_code(prompt)

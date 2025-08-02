@@ -17,6 +17,7 @@ from agents.interview_agent import InterviewAIAgent
 from agents.case_study_agent import CaseStudyAIAgent
 from agents.code_agent import CodeAIAgent
 from agents.intelligent_job_agent import IntelligentJobAgent
+from utils.code_formatter import code_indenter
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import json
@@ -1095,30 +1096,163 @@ def test_your_skill_evaluate():
 # Code Room çözümü kaydı
 @app.route('/code_room/evaluate', methods=['POST'])
 def code_room_evaluate():
+    """Kodu değerlendirir ve puan verir"""
     if 'username' not in session:
         return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
     data = request.json
+    question = data.get('question', '')
     user_code = data.get('user_code')
-    question = data.get('question')
-    language = data.get('language', 'python')  # Varsayılan olarak python
-    if not user_code or not question:
-        return jsonify({'error': 'Kod ve soru gerekli.'}), 400
-    agent = CodeAIAgent(user.interest, language)
-    evaluation = agent.evaluate_code(user_code, question)
+    use_execution = data.get('use_execution', False)
+    language = data.get('language', 'python')
     
-    # Kodlama değerlendirme aktivitesi kaydet
-    activity = UserActivity(
-        username=user.username,
-        activity_type='code_evaluation',
-        points_earned=15
-    )
-    db.session.add(activity)
-    db.session.commit()
+    if not user_code:
+        return jsonify({'error': 'Kod gerekli.'}), 400
     
-    return jsonify({'evaluation': evaluation})
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        
+        if use_execution:
+            # Çalıştırarak değerlendir
+            result = agent.evaluate_code_with_execution(user_code, question)
+        else:
+            # Sadece analiz yap
+            evaluation_text = agent.evaluate_code(user_code, question)
+            result = {
+                "evaluation": evaluation_text,
+                "execution_output": "",
+                "code_suggestions": "",
+                "has_errors": False,
+                "corrected_code": "",
+                "score": 0,
+                "feedback": evaluation_text
+            }
+        
+        # Kodlama değerlendirme aktivitesi kaydet
+        activity = UserActivity(
+            username=user.username,
+            activity_type='code_evaluation',
+            points_earned=15
+        )
+        db.session.add(activity)
+        db.session.commit()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
+
+@app.route('/code_room/evaluate_advanced', methods=['POST'])
+def code_room_evaluate_advanced():
+    """Gelişmiş kod değerlendirme - çalıştırır ve detaylı analiz yapar"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    question = data.get('question', '')
+    user_code = data.get('user_code')
+    language = data.get('language', 'python')
+    
+    if not user_code:
+        return jsonify({'error': 'Kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        
+        # Gelişmiş değerlendirme için özel prompt
+        evaluation_prompt = f"""
+        Bu kodu çalıştır, değerlendir ve detaylı analiz yap:
+        
+        Soru: {question}
+        
+        Kod:
+        ```{language}
+        {user_code}
+        ```
+        
+        Lütfen şunları yap:
+        1. Kodu çalıştır
+        2. Çıktıyı göster
+        3. Kodu detaylı değerlendir (doğruluk, kalite, verimlilik)
+        4. Puan ver (0-100)
+        5. İyileştirme önerileri ver
+        6. Kod analizi yap
+        """
+        
+        # execute_complex_code metodunu kullan
+        result = agent.execute_complex_code(evaluation_prompt, language)
+        
+        # Sonucu analiz et ve formatla
+        analysis_result = {
+            'success': result['success'],
+            'evaluation': '',
+            'execution_output': '',
+            'code_suggestions': '',
+            'has_errors': False,
+            'corrected_code': '',
+            'score': 0,
+            'feedback': '',
+            'code_analysis': '',
+            'suggestions': ''
+        }
+        
+        if result['success']:
+            # Çalıştırma çıktısını ayarla
+            if result['code']:
+                analysis_result['execution_output'] += f"Çalıştırılan Kod:\n{result['code']}\n\n"
+            if result['output']:
+                analysis_result['execution_output'] += f"Çıktı:\n{result['output']}\n"
+            if result['error']:
+                analysis_result['execution_output'] += f"Hata:\n{result['error']}\n"
+                analysis_result['has_errors'] = True
+            
+            # Analiz metnini ayarla
+            if result['output']:
+                analysis_result['evaluation'] = result['output']
+                analysis_result['feedback'] = result['output']
+                
+                # Puan çıkarmaya çalış
+                import re
+                score_match = re.search(r'puan[:\s]*(\d+)', result['output'].lower())
+                if score_match:
+                    analysis_result['score'] = int(score_match.group(1))
+                else:
+                    # Puan bulunamazsa tahmin et
+                    if any(word in result['output'].lower() for word in ['doğru', 'correct', 'başarılı']):
+                        analysis_result['score'] = 85
+                    elif any(word in result['output'].lower() for word in ['kısmen', 'partial']):
+                        analysis_result['score'] = 60
+                    else:
+                        analysis_result['score'] = 30
+                
+                # Kod analizi ve öneriler
+                analysis_result['code_analysis'] = "Kod çalıştırıldı ve analiz edildi."
+                analysis_result['suggestions'] = "Detaylı değerlendirme sonuçları yukarıda gösterilmektedir."
+        
+        # Kodlama değerlendirme aktivitesi kaydet
+        activity = UserActivity(
+            username=user.username,
+            activity_type='code_evaluation',
+            points_earned=15
+        )
+        db.session.add(activity)
+        db.session.commit()
+        
+        return jsonify({
+            'success': True,
+            'result': analysis_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Gelişmiş değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/code_room/run', methods=['POST'])
 def code_room_run():
@@ -1146,6 +1280,143 @@ def code_room_run():
         })
     except Exception as e:
         return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
+
+@app.route('/code_room/run_simple', methods=['POST'])
+def code_room_run_simple():
+    """Basit kod çalıştırma - sadece çalıştırır, analiz yapmaz"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    user_code = data.get('user_code')
+    language = data.get('language', 'python')
+    
+    if not user_code:
+        return jsonify({'error': 'Kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        
+        # Sadece kod çalıştırma için basit prompt
+        simple_prompt = f"""
+        Bu kodu çalıştır ve sadece çıktıyı ver:
+        
+        ```{language}
+        {user_code}
+        ```
+        
+        Sadece çıktıyı göster, kod gösterme. Analiz yapma.
+        """
+        
+        # execute_complex_code metodunu kullan ama sadece çalıştırma
+        result = agent.execute_complex_code(simple_prompt, language)
+        
+        # Sadece çalıştırma sonucunu döndür
+        simple_result = {
+            'success': result['success'],
+            'code': result['code'],
+            'output': result['output'],
+            'error': result['error']
+        }
+        
+        return jsonify({
+            'success': True,
+            'result': simple_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
+
+@app.route('/code_room/run_advanced', methods=['POST'])
+def code_room_run_advanced():
+    """Gelişmiş kod çalıştırma - yeni CodeAIAgent özelliklerini kullanır"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    user_code = data.get('user_code')
+    language = data.get('language', 'python')
+    context = data.get('context', 'Kod çalıştırma')
+    
+    if not user_code:
+        return jsonify({'error': 'Kod gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        
+        # Gelişmiş kod çalıştırma için özel prompt oluştur
+        enhanced_prompt = f"""
+        Bu kodu çalıştır ve detaylı analiz yap:
+        
+        Bağlam: {context}
+        
+        Kod:
+        ```{language}
+        {user_code}
+        ```
+        
+        Lütfen şunları yap:
+        1. Kodu çalıştır
+        2. Çıktıyı göster
+        3. Varsa hataları tespit et
+        4. Kod kalitesi hakkında kısa analiz yap
+        5. İyileştirme önerileri ver
+        """
+        
+        # Yeni execute_complex_code metodunu kullan
+        result = agent.execute_complex_code(enhanced_prompt, language)
+        
+        # Sonucu gelişmiş formatta döndür
+        enhanced_result = {
+            'success': result['success'],
+            'code': result['code'],
+            'output': result['output'],
+            'error': result['error'],
+            'execution_time': 'N/A',  # Gerçek execution time için ayrı implementation gerek
+            'memory_usage': 'N/A',
+            'code_analysis': '',
+            'suggestions': ''
+        }
+        
+        # Eğer başarılıysa, kod analizi ve öneriler ekle
+        if result['success'] and result['output']:
+            try:
+                # Kod analizi için ayrı bir çağrı
+                analysis_prompt = f"""
+                Bu kodun kalitesini analiz et:
+                
+                ```{language}
+                {user_code}
+                ```
+                
+                Çıktı: {result['output']}
+                
+                Kısa bir analiz yap ve iyileştirme önerileri ver.
+                """
+                
+                analysis_result = agent.execute_complex_code(analysis_prompt, language)
+                if analysis_result['success'] and analysis_result['output']:
+                    enhanced_result['code_analysis'] = analysis_result['output']
+                    enhanced_result['suggestions'] = "Kod başarıyla çalıştı. Daha fazla iyileştirme için analiz sonuçlarını inceleyin."
+            except:
+                # Analiz başarısız olursa, basit öneri ver
+                enhanced_result['suggestions'] = "Kod başarıyla çalıştı. Performans için daha fazla optimizasyon yapılabilir."
+        
+        return jsonify({
+            'success': True,
+            'result': enhanced_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Gelişmiş kod çalıştırma hatası: {str(e)}'}), 500
 
 @app.route('/code_room/debug', methods=['POST'])
 def code_room_debug():
@@ -1229,6 +1500,43 @@ def code_room_suggest_resources():
     except Exception as e:
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
+@app.route('/code_room/format_code', methods=['POST'])
+def code_room_format_code():
+    """Kodu gelişmiş formatter ile formatlar"""
+    # Session kontrolünü kaldır - formatlama için gerekli değil
+    # if 'username' not in session:
+    #     return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    data = request.json
+    code = data.get('code', '')
+    language = data.get('language', 'python')
+    
+    if not code.strip():
+        return jsonify({'error': 'Kod gerekli.'}), 400
+    
+    try:
+        # Dil enum'una çevir
+        language_map = {
+            'python': 'PYTHON',
+            'javascript': 'JAVASCRIPT', 
+            'java': 'JAVA',
+            'cpp': 'CPP'
+        }
+        
+        from utils.code_formatter import Language
+        lang_enum = getattr(Language, language_map.get(language, 'PYTHON'))
+        
+        # Kodu formatla
+        formatted_code = code_indenter.indent_code(code, lang_enum)
+        
+        return jsonify({
+            'success': True,
+            'formatted_code': formatted_code,
+            'language': language
+        })
+    except Exception as e:
+        return jsonify({'error': f'Kod formatlanamadı: {str(e)}'}), 500
+
 @app.route('/code_room/evaluate_with_execution', methods=['POST'])
 def code_room_evaluate_with_execution():
     """Kodu çalıştırarak değerlendirir ve puan verir"""
@@ -1257,6 +1565,91 @@ def code_room_evaluate_with_execution():
         })
     except Exception as e:
         return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
+
+@app.route('/code_room/solve_math', methods=['POST'])
+def code_room_solve_math():
+    """Matematik problemlerini çözer"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    problem = data.get('problem')
+    language = data.get('language', 'python')
+    
+    if not problem:
+        return jsonify({'error': 'Problem gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        result = agent.solve_math_problem(problem)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Matematik problemi çözme hatası: {str(e)}'}), 500
+
+@app.route('/code_room/analyze_data', methods=['POST'])
+def code_room_analyze_data():
+    """Veri analizi yapar"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    data_description = data.get('data_description')
+    analysis_type = data.get('analysis_type', 'basic')
+    language = data.get('language', 'python')
+    
+    if not data_description:
+        return jsonify({'error': 'Veri açıklaması gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        result = agent.analyze_data(data_description, analysis_type)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Veri analizi hatası: {str(e)}'}), 500
+
+@app.route('/code_room/execute_complex', methods=['POST'])
+def code_room_execute_complex():
+    """Karmaşık kod çalıştırma"""
+    if 'username' not in session:
+        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+    
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    prompt = data.get('prompt')
+    language = data.get('language', 'python')
+    
+    if not prompt:
+        return jsonify({'error': 'Görev açıklaması gerekli.'}), 400
+    
+    try:
+        agent = CodeAIAgent(user.interest, language)
+        result = agent.execute_complex_code(prompt, language)
+        
+        return jsonify({
+            'success': True,
+            'result': result
+        })
+    except Exception as e:
+        return jsonify({'error': f'Karmaşık kod çalıştırma hatası: {str(e)}'}), 500
 
 # Case Study çözümü kaydı
 @app.route('/case_study_room/evaluate', methods=['POST'])
