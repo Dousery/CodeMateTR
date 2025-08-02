@@ -136,6 +136,28 @@ export default function AutoInterview() {
         voice_name: 'Kore'
       }, { withCredentials: true });
       
+      console.log('DEBUG: Response data:', res.data);
+      
+      if (res.data.status === 'completed') {
+        // Mülakat tamamlandı
+        setQuestionIndex(5); // 5 soru tamamlandı
+        
+        // Final değerlendirmeyi direkt al
+        setFinalEvaluation(res.data.final_evaluation);
+        setSessionInfo({
+          total_questions: res.data.total_questions,
+          total_answers: res.data.total_answers,
+          session_duration: res.data.session_duration
+        });
+        setStep('completed');
+        setShowFinalDialog(true);
+        
+        // Ses kaydını temizle
+        setRecordedAudio(null);
+        setAudioChunks([]);
+        return;
+      }
+      
       setCurrentQuestion(res.data.question);
       setQuestionIndex(res.data.question_index);
       setTotalQuestions(res.data.total_questions);
@@ -222,10 +244,36 @@ export default function AutoInterview() {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       
+      console.log('DEBUG: Voice response data:', res.data);
+      
+      if (res.data.status === 'completed') {
+        // Mülakat tamamlandı
+        setQuestionIndex(5); // 5 soru tamamlandı
+        
+        // Final değerlendirmeyi direkt al
+        setFinalEvaluation(res.data.final_evaluation);
+        setSessionInfo({
+          total_questions: res.data.total_questions,
+          total_answers: res.data.total_answers,
+          session_duration: res.data.session_duration
+        });
+        setStep('completed');
+        setShowFinalDialog(true);
+        
+        // Ses kaydını temizle
+        setRecordedAudio(null);
+        setAudioChunks([]);
+        return;
+      }
+      
       setCurrentQuestion(res.data.question);
       setQuestionIndex(res.data.question_index);
       setTotalQuestions(res.data.total_questions);
       setUserAnswer('');
+      
+      // Ses kaydını temizle
+      setRecordedAudio(null);
+      setAudioChunks([]);
       
       if (res.data.audio_url) {
         setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
@@ -401,13 +449,13 @@ export default function AutoInterview() {
               </Typography>
               <Chip 
                 icon={<Timer />} 
-                label={`${Math.round((questionIndex / 10) * 100)}%`} 
+                label={`${Math.round(((questionIndex || 0) / 5) * 100)}%`} 
                 color="primary" 
               />
             </Box>
             <LinearProgress 
               variant="determinate" 
-              value={(questionIndex / 10) * 100} 
+              value={Math.min(((questionIndex || 0) / 5) * 100, 100)} 
               sx={{ height: 8, borderRadius: 4 }}
             />
           </Paper>
@@ -454,7 +502,7 @@ export default function AutoInterview() {
                   placeholder="Cevabınızı buraya yazın..."
                   value={userAnswer}
                   onChange={(e) => setUserAnswer(e.target.value)}
-                  disabled={loading}
+                  disabled={loading || isRecording}
                 />
               </Grid>
               <Grid item xs={12} md={4}>
@@ -462,7 +510,7 @@ export default function AutoInterview() {
                   <Button
                     variant="contained"
                     onClick={submitAnswer}
-                    disabled={loading || !userAnswer.trim()}
+                    disabled={loading || !userAnswer.trim() || isRecording}
                     startIcon={loading ? <CircularProgress size={20} /> : <Send />}
                     fullWidth
                   >
@@ -485,12 +533,19 @@ export default function AutoInterview() {
                     <Button
                       variant="outlined"
                       onClick={submitVoiceAnswer}
-                      disabled={loading}
+                      disabled={loading || isRecording}
                       startIcon={<VolumeUp />}
                       fullWidth
-                      sx={{ bgcolor: 'success.light', color: 'white' }}
+                      sx={{ 
+                        bgcolor: isRecording ? 'grey.400' : 'success.light', 
+                        color: 'white',
+                        '&:disabled': {
+                          bgcolor: 'grey.400',
+                          color: 'grey.600'
+                        }
+                      }}
                     >
-                      Sesli Cevabı Gönder
+                      {isRecording ? 'Kayıt Devam Ediyor...' : 'Sesli Cevabı Gönder'}
                     </Button>
                   )}
                   
@@ -525,44 +580,59 @@ export default function AutoInterview() {
 
   if (step === 'completed') {
     return (
-      <Box sx={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Paper 
-          component={motion.div} 
-          initial={{ opacity: 0, y: 40 }} 
-          animate={{ opacity: 1, y: 0 }} 
-          transition={{ duration: 0.7 }} 
-          elevation={8} 
-          className="glass-card"
-          sx={{ p: 5, minWidth: 400, maxWidth: 600, borderRadius: 4 }}
-        >
-          <Typography variant="h4" fontWeight={700} mb={2} color="white" textAlign="center">
-            Mülakat Tamamlandı!
-          </Typography>
-          <Typography textAlign="center" mb={4} color="rgba(255,255,255,0.8)">
-            Otomatik mülakatınız başarıyla tamamlandı. Sonuçlarınızı görüntüleyebilirsiniz.
-          </Typography>
-          
-          <Button
-            variant="contained"
-            onClick={() => setShowFinalDialog(true)}
-            startIcon={<Psychology />}
-            fullWidth
-            sx={{
-              background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-              borderRadius: '25px',
-              py: 1.5,
-              textTransform: 'none',
-              fontWeight: 600,
-              boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
-              '&:hover': {
-                background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
-              }
-            }}
+      <Box sx={{ 
+        minHeight: '100vh', 
+        width: '100vw', 
+        display: 'flex', 
+        alignItems: 'center', 
+        justifyContent: 'center'
+      }}>
+        {/* Ana sayfa içeriği - dialog kapandığında görünür */}
+        {!showFinalDialog && (
+          <Paper 
+            component={motion.div} 
+            initial={{ opacity: 0, y: 40 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            transition={{ duration: 0.7 }} 
+            elevation={8} 
+            className="glass-card"
+            sx={{ p: 5, minWidth: 400, maxWidth: 600, borderRadius: 4 }}
           >
-            Sonuçları Görüntüle
-          </Button>
-        </Paper>
+            <Typography variant="h4" fontWeight={700} mb={2} color="white" textAlign="center">
+              Otomatik Mülakat Sistemi
+            </Typography>
+            <Typography textAlign="center" mb={4} color="rgba(255,255,255,0.8)">
+              Yapay zeka destekli otomatik mülakat sistemi ile kendinizi test edin. 
+              Sistem, cevaplarınıza göre dinamik olarak sorular üretecek.
+            </Typography>
+            
+            {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+            
+            <Button 
+              variant="contained" 
+              color="primary" 
+              size="large" 
+              fullWidth 
+              onClick={startAutoInterview} 
+              disabled={loading} 
+              endIcon={loading && <CircularProgress size={20} color="inherit" />}
+              sx={{
+                background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                borderRadius: '25px',
+                py: 1.5,
+                textTransform: 'none',
+                fontWeight: 600,
+                boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                  boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
+                }
+              }}
+            >
+              {loading ? 'Başlatılıyor...' : 'Mülakatı Başlat'}
+            </Button>
+          </Paper>
+        )}
 
         {/* Final Evaluation Dialog */}
         <Dialog 
@@ -570,42 +640,192 @@ export default function AutoInterview() {
           onClose={() => setShowFinalDialog(false)}
           maxWidth="md"
           fullWidth
+          sx={{
+            '& .MuiBackdrop-root': {
+              backgroundColor: 'rgba(0, 0, 0, 0.5)'
+            },
+            '& .MuiDialog-paper': {
+              marginTop: '140px',
+              marginBottom: '40px',
+              background: 'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #3730a3 100%)',
+              border: '1px solid rgba(255, 255, 255, 0.15)',
+              borderRadius: '16px',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+              overflow: 'hidden',
+              position: 'relative'
+            }
+          }}
         >
-          <DialogTitle>
-            <Typography variant="h5">Mülakat Sonuçları</Typography>
+          <DialogTitle sx={{ 
+            pb: 2, 
+            pt: 3,
+            textAlign: 'center',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.1)',
+            background: 'rgba(255, 255, 255, 0.05)'
+          }}>
+            <Typography 
+              variant="h5" 
+              fontWeight={600} 
+              textAlign="center"
+              sx={{
+                color: '#ffffff',
+                letterSpacing: '-0.3px',
+                fontSize: '1.5rem'
+              }}
+            >
+              Mülakat Sonuçları
+            </Typography>
           </DialogTitle>
-          <DialogContent>
-            <Box mb={3}>
-              <Typography variant="h6" gutterBottom color="primary">
+          
+          <DialogContent sx={{ p: 4, background: 'transparent' }}>
+            <Box mb={4}>
+              <Typography 
+                variant="h6" 
+                gutterBottom 
+                sx={{
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  mb: 2,
+                  letterSpacing: '-0.2px',
+                  fontSize: '1.1rem'
+                }}
+              >
                 Genel Değerlendirme
               </Typography>
-              <Typography variant="body1" paragraph sx={{ whiteSpace: 'pre-line' }}>
-                {finalEvaluation}
-              </Typography>
+              
+              <Box sx={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '12px',
+                p: 2.5,
+                border: '1px solid rgba(255, 255, 255, 0.12)'
+              }}>
+                <Typography 
+                  variant="body1" 
+                  paragraph 
+                  sx={{ 
+                    whiteSpace: 'pre-line',
+                    color: '#f8fafc',
+                    lineHeight: 1.6,
+                    fontSize: '0.9rem',
+                    '& h2': {
+                      fontSize: '1.2rem',
+                      fontWeight: 600,
+                      color: '#ffffff',
+                      marginTop: 2,
+                      marginBottom: 0.75,
+                      letterSpacing: '-0.2px'
+                    },
+                    '& h3': {
+                      fontSize: '1rem',
+                      fontWeight: 600,
+                      color: '#e0e7ff',
+                      marginTop: 1.25,
+                      marginBottom: 0.5,
+                      letterSpacing: '-0.1px'
+                    },
+                    '& strong': {
+                      fontWeight: 600,
+                      color: '#ffffff'
+                    },
+                    '& ul': {
+                      marginLeft: 1.5,
+                      marginTop: 0.5,
+                      marginBottom: 0.5,
+                      listStyle: 'none'
+                    },
+                    '& li': {
+                      marginBottom: 0.4,
+                      position: 'relative',
+                      paddingLeft: '1rem',
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        top: '0.4rem',
+                        width: '3px',
+                        height: '3px',
+                        borderRadius: '50%',
+                        background: '#e0e7ff'
+                      }
+                    }
+                  }}
+                  dangerouslySetInnerHTML={{
+                    __html: finalEvaluation
+                      .replace(/^##\s*/gm, '<h2>')
+                      .replace(/^###\s*/gm, '<h3>')
+                      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                      .replace(/^- (.*)/gm, '<li>$1</li>')
+                      .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+                  }}
+                />
+              </Box>
             </Box>
             
-            <Divider sx={{ my: 2 }} />
+            <Divider sx={{ 
+              my: 3, 
+              borderColor: 'rgba(255, 255, 255, 0.1)'
+            }} />
             
-            <Grid container spacing={2}>
+            <Grid container spacing={3}>
               <Grid item xs={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" color="primary">
+                <Card sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }
+                }}>
+                  <CardContent sx={{ textAlign: 'center', p: 2.5 }}>
+                    <Typography variant="body2" sx={{ 
+                      color: '#cbd5e1', 
+                      fontWeight: 500, 
+                      mb: 0.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px',
+                      fontSize: '0.7rem'
+                    }}>
                       Toplam Soru
                     </Typography>
-                    <Typography variant="h4">
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      letterSpacing: '-0.3px'
+                    }}>
                       {sessionInfo?.total_questions || 0}
                     </Typography>
                   </CardContent>
                 </Card>
               </Grid>
               <Grid item xs={6}>
-                <Card>
-                  <CardContent>
-                    <Typography variant="h6" color="primary">
+                <Card sx={{
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  border: '1px solid rgba(255, 255, 255, 0.15)',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    background: 'rgba(255, 255, 255, 0.15)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)'
+                  }
+                }}>
+                  <CardContent sx={{ textAlign: 'center', p: 2.5 }}>
+                    <Typography variant="body2" sx={{ 
+                      color: '#cbd5e1', 
+                      fontWeight: 500, 
+                      mb: 0.5,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.3px',
+                      fontSize: '0.7rem'
+                    }}>
                       Süre (Dakika)
                     </Typography>
-                    <Typography variant="h4">
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700,
+                      color: '#ffffff',
+                      letterSpacing: '-0.3px'
+                    }}>
                       {sessionInfo ? Math.round(sessionInfo.session_duration / 60) : 0}
                     </Typography>
                   </CardContent>
@@ -613,8 +833,45 @@ export default function AutoInterview() {
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setShowFinalDialog(false)}>
+          
+          <DialogActions sx={{ 
+            p: 2.5, 
+            background: 'rgba(255, 255, 255, 0.05)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+            gap: 2
+          }}>
+            <Button 
+              onClick={() => {
+                setShowFinalDialog(false);
+                setStep('starting');
+                setSessionId(null);
+                setCurrentQuestion('');
+                setUserAnswer('');
+                setQuestionIndex(0);
+                setTotalQuestions(0);
+                setFinalEvaluation('');
+                setSessionInfo(null);
+                setRecordedAudio(null);
+                setAudioChunks([]);
+                setIsRecording(false);
+              }}
+              sx={{
+                borderRadius: '8px',
+                px: 2.5,
+                py: 1.25,
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: '#cbd5e1',
+                fontWeight: 500,
+                textTransform: 'none',
+                fontSize: '0.8rem',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  background: 'rgba(255, 255, 255, 0.1)',
+                  color: '#f8fafc'
+                }
+              }}
+            >
               Kapat
             </Button>
             <Button 
@@ -629,6 +886,24 @@ export default function AutoInterview() {
                 setTotalQuestions(0);
                 setFinalEvaluation('');
                 setSessionInfo(null);
+                setRecordedAudio(null);
+                setAudioChunks([]);
+                setIsRecording(false);
+              }}
+              sx={{
+                borderRadius: '8px',
+                px: 3,
+                py: 1.25,
+                background: 'rgba(255, 255, 255, 0.15)',
+                fontWeight: 600,
+                textTransform: 'none',
+                fontSize: '0.8rem',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.25)',
+                  boxShadow: '0 6px 16px rgba(0, 0, 0, 0.3)'
+                }
               }}
             >
               Yeni Mülakat Başlat

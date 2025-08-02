@@ -480,31 +480,31 @@ class InterviewAIAgent:
             
             prompt += f"""
             
-            Bu mülakatın kapsamlı değerlendirmesini yap:
+            Bu mülakatın kapsamlı değerlendirmesini yap. Temiz ve düzenli bir format kullan:
             
-            **Güçlü Yönler:**
+            Güçlü Yönler:
             - Kullanıcının en iyi performans gösterdiği alanlar
             - Olumlu özellikler ve beceriler
             
-            **Geliştirilmesi Gereken Alanlar:**
+            Geliştirilmesi Gereken Alanlar:
             - Eksiklikler ve zayıf noktalar
             - İyileştirme önerileri
             
-            **Genel İzlenim:**
+            Genel İzlenim:
             - Mülakatın genel tonu ve atmosferi
             - Kullanıcının motivasyonu ve ilgisi
             
-            **Öneriler:**
+            Öneriler:
             - Kariyer gelişimi için öneriler
             - Öğrenme kaynakları ve yönlendirmeler
             
-            **Puanlama (1-10):**
+            Puanlama (1-10):
             - Genel performans: X/10
             - İletişim becerileri: X/10
             - Teknik bilgi: X/10
             - Problem çözme: X/10
             
-            Yapıcı, destekleyici ve detaylı bir değerlendirme yap.
+            Yapıcı, destekleyici ve detaylı bir değerlendirme yap. Gereksiz işaretler (*) kullanma, temiz markdown formatında yaz.
             """
             
             response = self.model.generate_content(prompt)

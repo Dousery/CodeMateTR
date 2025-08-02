@@ -1566,7 +1566,7 @@ def start_auto_interview():
             'status': 'success',
             'session_id': session_id,
             'question': first_question,
-            'question_index': 0,
+            'question_index': 0,  # İlk soru, henüz cevap yok
             'total_questions': 5,  # Toplam soru sayısı
             'audio_url': audio_url
         })
@@ -1651,18 +1651,34 @@ def submit_auto_interview_answer():
         answers.append(answer)
         
         auto_session.answers = json.dumps(answers)
-        auto_session.current_question_index += 1
         
-        # 5 soru tamamlandı mı kontrol et
-        if auto_session.current_question_index >= 5:
+        # 5 cevap tamamlandı mı kontrol et (5 soru, 5 cevap)
+        if len(answers) >= 5:
+            # Final değerlendirme üret
+            agent = InterviewAIAgent(auto_session.interest)
+            final_evaluation = agent.generate_final_evaluation(
+                questions, 
+                answers, 
+                auto_session.conversation_context
+            )
+            
+            # Session'ı tamamla
             auto_session.status = 'completed'
             auto_session.end_time = datetime.utcnow()
+            auto_session.final_evaluation = final_evaluation
             db.session.commit()
             
             return jsonify({
                 'status': 'completed',
-                'message': 'Mülakat tamamlandı!'
+                'message': 'Mülakat tamamlandı!',
+                'final_evaluation': final_evaluation,
+                'total_questions': len(questions),
+                'total_answers': len(answers),
+                'session_duration': (auto_session.end_time - auto_session.start_time).total_seconds()
             })
+        
+        # Sonraki soru için index'i güncelle (cevaplanan soru sayısı)
+        auto_session.current_question_index = len(answers)
         
         # Sonraki sesli soruyu üret
         agent = InterviewAIAgent(auto_session.interest)
@@ -1687,10 +1703,11 @@ def submit_auto_interview_answer():
         auto_session.questions = json.dumps(questions)
         db.session.commit()
         
+        print(f"DEBUG: question_index={auto_session.current_question_index}, answers_count={len(answers)}, questions_count={len(questions)}")
         return jsonify({
             'status': 'continue',
             'question': next_question,
-            'question_index': auto_session.current_question_index,
+            'question_index': auto_session.current_question_index,  # Şu anki soru index'i
             'total_questions': 5,
             'audio_url': audio_url
         })
