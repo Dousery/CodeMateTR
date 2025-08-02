@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Box,
   Container,
@@ -461,28 +462,31 @@ const Forum = () => {
     return colors[type] || 'default';
   };
 
-  if (loading && posts.length === 0) {
-    return (
-      <Container maxWidth="lg" sx={{ mt: 4 }}>
-        <Typography variant="h6" align="center" sx={{ color: 'white' }}>Yükleniyor...</Typography>
-      </Container>
-    );
-  }
-
   return (
-    <Box sx={{ 
-      minHeight: '100vh',
-      width: '100vw',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      pt: 8, // Add top padding to account for fixed header
-      pb: 4
-    }}>
-      <Container maxWidth="lg" sx={{ width: '100%' }}>
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -20 }}
+      transition={{ duration: 0.6, ease: "easeOut" }}
+    >
+      <Box sx={{ 
+        minHeight: '100vh',
+        width: '100vw',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pt: 8, // Add top padding to account for fixed header
+        pb: 4
+      }}>
+        <Container maxWidth="lg" sx={{ width: '100%' }}>
         {/* Header */}
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <Box>
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.1 }}
+        >
+          <Box sx={{ mb: 4, display: 'flex', justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+          <Box sx={{ display: 'none' }}>
             <Typography variant="h4" component="h1" gutterBottom sx={{ color: 'white' }}>
               <ForumIcon sx={{ mr: 2, verticalAlign: 'middle' }} />
               Forum
@@ -491,8 +495,53 @@ const Forum = () => {
               İlgi alanınızdaki diğer kullanıcılarla tartışın, sorular sorun ve deneyimlerinizi paylaşın.
             </Typography>
           </Box>
+        </Box>
+        </motion.div>
+
+      {/* Stats Cards */}
+      {stats && (
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 4 }}>
+            <Grid container spacing={2} sx={{ flex: 1 }}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="h6">{stats.total_posts}</Typography>
+                  <Typography variant="body2">Toplam Gönderi</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="h6">{stats.total_comments}</Typography>
+                  <Typography variant="body2">Toplam Yorum</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="h6">{stats.user_posts}</Typography>
+                  <Typography variant="body2">Sizin Gönderileriniz</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
+                <CardContent>
+                  <Typography variant="h6">{stats.user_comments}</Typography>
+                  <Typography variant="body2">Sizin Yorumlarınız</Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          </Grid>
           
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, ml: 2 }}>
             <Tooltip title="Liderlik Tablosu">
               <IconButton
                 onClick={() => setShowLeaderboard(!showLeaderboard)}
@@ -527,43 +576,7 @@ const Forum = () => {
             </Tooltip>
           </Box>
         </Box>
-
-      {/* Stats Cards */}
-      {stats && (
-        <Grid container spacing={2} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
-              <CardContent>
-                <Typography variant="h6">{stats.total_posts}</Typography>
-                <Typography variant="body2">Toplam Gönderi</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
-              <CardContent>
-                <Typography variant="h6">{stats.total_comments}</Typography>
-                <Typography variant="body2">Toplam Yorum</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
-              <CardContent>
-                <Typography variant="h6">{stats.user_posts}</Typography>
-                <Typography variant="body2">Sizin Gönderileriniz</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}>
-              <CardContent>
-                <Typography variant="h6">{stats.user_comments}</Typography>
-                <Typography variant="body2">Sizin Yorumlarınız</Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-        </Grid>
+        </motion.div>
       )}
 
             {/* Notifications Panel */}
@@ -752,114 +765,135 @@ const Forum = () => {
       )}
 
       {/* Filtering and Search */}
-      <Card sx={{ 
-        mb: 3, 
-        background: 'rgba(255,255,255,0.05)',
-        backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(255,255,255,0.1)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
-      }}>
-        <CardContent>
-          <Grid container spacing={2} alignItems="center">
-            <Grid item xs={12} md={4}>
-              <TextField
-                fullWidth
-                placeholder="Gönderilerde ara..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon sx={{ color: 'rgba(255,255,255,0.7)' }} />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    color: 'white',
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
-                    '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
-                    background: 'rgba(255,255,255,0.05)',
-                    borderRadius: 1
-                  },
-                  '& .MuiInputBase-input::placeholder': {
-                    color: 'rgba(255,255,255,0.5)',
-                    opacity: 1
-                  }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Gönderi Türü</InputLabel>
-                <Select
-                  value={postTypeFilter}
-                  onChange={(e) => setPostTypeFilter(e.target.value)}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.3 }}
+      >
+        <Card sx={{ 
+          mb: 3, 
+          background: 'rgba(255,255,255,0.05)',
+          backdropFilter: 'blur(20px)',
+          border: '1px solid rgba(255,255,255,0.1)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.3)'
+        }}>
+          <CardContent>
+            <Grid container spacing={2} alignItems="center">
+              <Grid item xs={12} md={4}>
+                <TextField
+                  fullWidth
+                  placeholder="Gönderilerde ara..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchIcon sx={{ color: 'rgba(255,255,255,0.7)' }} />
+                      </InputAdornment>
+                    ),
+                  }}
                   sx={{
-                    color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
-                    background: 'rgba(255,255,255,0.05)',
-                    borderRadius: 1
+                    '& .MuiOutlinedInput-root': {
+                      color: 'white',
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: 1
+                    },
+                    '& .MuiInputBase-input::placeholder': {
+                      color: 'rgba(255,255,255,0.5)',
+                      opacity: 1
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Gönderi Türü</InputLabel>
+                  <Select
+                    value={postTypeFilter}
+                    onChange={(e) => setPostTypeFilter(e.target.value)}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: 1
+                    }}
+                  >
+                    <MenuItem value="all">Tümü</MenuItem>
+                    {postTypes.map(type => (
+                      <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={3}>
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sıralama</InputLabel>
+                  <Select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    sx={{
+                      color: 'white',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      background: 'rgba(255,255,255,0.05)',
+                      borderRadius: 1
+                    }}
+                  >
+                    {sortOptions.map(option => (
+                      <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid item xs={12} md={2}>
+                <Button
+                  fullWidth
+                  variant="contained"
+                  onClick={() => setOpenPostDialog(true)}
+                  startIcon={<AddIcon />}
+                  sx={{ 
+                    background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                    '&:hover': { 
+                      background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                      transform: 'translateY(-1px)'
+                    },
+                    borderRadius: '20px',
+                    py: 1.5,
+                    fontWeight: 'bold',
+                    boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
+                    transition: 'all 0.2s ease'
                   }}
                 >
-                  <MenuItem value="all">Tümü</MenuItem>
-                  {postTypes.map(type => (
-                    <MenuItem key={type.value} value={type.value}>{type.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+                  Yeni Gönderi
+                </Button>
+              </Grid>
             </Grid>
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sıralama</InputLabel>
-                <Select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value)}
-                  sx={{
-                    color: 'white',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
-                    background: 'rgba(255,255,255,0.05)',
-                    borderRadius: 1
-                  }}
-                >
-                  {sortOptions.map(option => (
-                    <MenuItem key={option.value} value={option.value}>{option.label}</MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid item xs={12} md={2}>
-              <Button
-                fullWidth
-                variant="contained"
-                onClick={() => setOpenPostDialog(true)}
-                startIcon={<AddIcon />}
-                sx={{ 
-                  background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                  '&:hover': { 
-                    background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                    transform: 'translateY(-1px)'
-                  },
-                  borderRadius: '20px',
-                  py: 1.5,
-                  fontWeight: 'bold',
-                  boxShadow: '0 4px 12px rgba(79, 70, 229, 0.3)',
-                  transition: 'all 0.2s ease'
-                }}
-              >
-                Yeni Gönderi
-              </Button>
-            </Grid>
-          </Grid>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      </motion.div>
 
       {/* Posts List */}
-      <Box sx={{ mb: 3 }}>
-        {posts.map((post) => (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.4 }}
+      >
+        <Box sx={{ mb: 3 }}>
+          {posts.map((post, index) => (
+            <motion.div
+              key={post.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ 
+                duration: 0.5, 
+                delay: 0.5 + (index * 0.1),
+                ease: "easeOut"
+              }}
+            >
           <Card
             key={post.id}
             sx={{
@@ -1032,8 +1066,10 @@ const Forum = () => {
               </Box>
             </CardContent>
           </Card>
-        ))}
-      </Box>
+            </motion.div>
+          ))}
+        </Box>
+        </motion.div>
 
       {/* Pagination */}
       {totalPages > 1 && (
@@ -1727,9 +1763,10 @@ const Forum = () => {
           </Button>
         </DialogActions>
       </Dialog>
-      </Container>
+        </Container>
       </Box>
-    );
-  };
+    </motion.div>
+  );
+};
 
 export default Forum; 

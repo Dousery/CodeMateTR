@@ -288,69 +288,72 @@ export default function Profile({ setIsLoggedIn }) {
                   Günlük Aktivite Serisi
                 </Typography>
                 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: 120, px: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', height: 100, px: 1 }}>
                   {userStats?.stats?.daily_activity ? (
                     userStats.stats.daily_activity.slice().reverse().map((day, index) => {
-                      const height = day.total_activity > 0 ? Math.max(20, day.total_activity * 15) : 5;
+                      // Aktivite seviyesine göre maksimum yüksekliği sınırla (max 60px)
+                      const maxHeight = 60;
+                      const height = day.total_activity > 0 ? Math.min(maxHeight, Math.max(8, day.total_activity * 8)) : 8;
+                      
                       return (
                         <Box key={index} sx={{ textAlign: 'center', flex: 1, mx: 0.5 }}>
                           <Box
                             sx={{
                               height: height,
-                              minHeight: 5,
-                              bgcolor: day.total_activity > 0 ? 'rgba(79, 70, 229, 0.8)' : 'rgba(255,255,255,0.1)',
-                              borderRadius: '4px 4px 0 0',
+                              minHeight: 8,
+                              background: day.total_activity > 0 
+                                ? 'linear-gradient(180deg, rgba(79, 70, 229, 0.9) 0%, rgba(79, 70, 229, 0.6) 100%)'
+                                : 'rgba(255,255,255,0.1)',
+                              borderRadius: '6px 6px 0 0',
                               mb: 1,
                               transition: 'all 0.3s ease',
                               cursor: 'pointer',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              boxShadow: day.total_activity > 0 
+                                ? '0 4px 12px rgba(79, 70, 229, 0.3)' 
+                                : 'none',
                               '&:hover': {
-                                bgcolor: day.total_activity > 0 ? 'rgba(79, 70, 229, 1)' : 'rgba(255,255,255,0.2)',
-                                transform: 'scaleY(1.1)'
+                                transform: 'scaleY(1.05)',
+                                boxShadow: day.total_activity > 0 
+                                  ? '0 6px 20px rgba(79, 70, 229, 0.4)' 
+                                  : '0 2px 8px rgba(255,255,255,0.1)'
                               }
                             }}
                           />
-                          <Typography variant="caption" color="rgba(255,255,255,0.7)" sx={{ fontSize: '0.7rem' }}>
+                          <Typography variant="caption" color="rgba(255,255,255,0.8)" sx={{ fontSize: '0.7rem', fontWeight: 500 }}>
                             {day.day_name}
                           </Typography>
-                          <Typography variant="caption" color="white" fontWeight={600} sx={{ fontSize: '0.6rem', display: 'block' }}>
+                          <Typography variant="caption" color="white" fontWeight={700} sx={{ fontSize: '0.65rem', display: 'block' }}>
                             {day.total_activity}
                           </Typography>
                         </Box>
                       );
                     })
                   ) : (
-                    // Placeholder bars when no data
+                    // Placeholder when no data
                     Array.from({ length: 7 }, (_, index) => {
                       const days = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
                       return (
                         <Box key={index} sx={{ textAlign: 'center', flex: 1, mx: 0.5 }}>
                           <Box
                             sx={{
-                              height: 5,
+                              height: 8,
                               bgcolor: 'rgba(255,255,255,0.1)',
-                              borderRadius: '4px 4px 0 0',
-                              mb: 1
+                              borderRadius: '6px 6px 0 0',
+                              mb: 1,
+                              border: '1px solid rgba(255,255,255,0.05)'
                             }}
                           />
                           <Typography variant="caption" color="rgba(255,255,255,0.5)" sx={{ fontSize: '0.7rem' }}>
                             {days[index]}
                           </Typography>
-                          <Typography variant="caption" color="rgba(255,255,255,0.5)" sx={{ fontSize: '0.6rem', display: 'block' }}>
+                          <Typography variant="caption" color="rgba(255,255,255,0.5)" sx={{ fontSize: '0.65rem', display: 'block' }}>
                             0
                           </Typography>
                         </Box>
                       );
                     })
                   )}
-                </Box>
-                
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, px: 1 }}>
-                  <Typography variant="caption" color="rgba(255,255,255,0.6)">
-                    Düşük Aktivite
-                  </Typography>
-                  <Typography variant="caption" color="rgba(255,255,255,0.6)">
-                    Yüksek Aktivite
-                  </Typography>
                 </Box>
               </Box>
             </Paper>

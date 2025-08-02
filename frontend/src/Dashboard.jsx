@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip } from '@mui/material';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
 import QuizIcon from '@mui/icons-material/Quiz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
@@ -15,31 +16,30 @@ const modules = [
     desc: 'Bilgini test et, eksiklerini gör.',
     icon: <QuizIcon fontSize="large" color="primary" />, 
     path: '/test',
+    tags: ['AI Test Sistemi', 'Kişiselleştirilmiş Öneriler']
   },
   {
     title: 'Kodlama Odası',
     desc: 'Kodlama becerilerini geliştir.',
     icon: <CodeIcon fontSize="large" color="success" />, 
     path: '/code',
-  },
-  {
-    title: 'Akıllı İş Bulma',
-    desc: 'CV\'ni analiz et, ideal işleri keşfet.',
-    icon: <WorkIcon fontSize="large" color="secondary" />, 
-    path: '/smart-job-finder',
+    tags: ['AI Kod Asistanı', 'Kod Değerlendirme']
   },
   {
     title: 'Mülakat',
     desc: 'Yapay zeka ile dinamik mülakat.',
     icon: <RecordVoiceOverIcon fontSize="large" color="info" />, 
     path: '/auto-interview',
+    tags: ['AI Mülakat Simülasyonu', 'Gerçek Zamanlı']
   },
   {
-    title: 'Forum',
-    desc: 'İlgi alanındaki kullanıcılarla tartış.',
-    icon: <ForumIcon fontSize="large" color="warning" />, 
-    path: '/forum',
+    title: 'Akıllı İş Bulma',
+    desc: 'CV\'ni analiz et, ideal işleri keşfet.',
+    icon: <WorkIcon fontSize="large" color="secondary" />, 
+    path: '/smart-job-finder',
+    tags: ['AI CV Analizi', 'Kariyer Önerileri']
   },
+
 ];
 
 const alanlar = [
@@ -51,10 +51,34 @@ const alanlar = [
 ];
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const username = localStorage.getItem('username') || 'Geliştirici';
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
+
+  // Add CSS for pulse animation
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+          opacity: 1;
+        }
+        50% {
+          transform: scale(1.2);
+          opacity: 0.7;
+        }
+        100% {
+          transform: scale(1);
+          opacity: 1;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
 
 
   useEffect(() => {
@@ -230,71 +254,157 @@ export default function Dashboard() {
       
 
       {!alan ? null : (
-        <Grid container spacing={4} justifyContent="center" sx={{ mt: 2 }}>
-          {modules.map((mod, i) => (
-            <Grid item xs={12} sm={6} md={3} key={mod.title}>
-              <Card
-                component={motion.div}
-                whileHover={{ scale: 1.02, y: -8 }}
-                initial={{ opacity: 0, y: 40 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.1, duration: 0.6 }}
-                elevation={6}
-                className="glass-card"
-                sx={{ 
-                  borderRadius: 4, 
-                  minHeight: 260, 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between',
-                  cursor: 'pointer'
-                }}
-              >
-                <CardContent sx={{ textAlign: 'center' }}>
-                  <Avatar sx={{ 
-                    bgcolor: 'rgba(255,255,255,0.1)', 
-                    mx: 'auto', 
-                    mb: 2, 
-                    width: 64, 
-                    height: 64, 
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                    border: '1px solid rgba(255,255,255,0.2)'
-                  }}>
-                    {mod.icon}
-                  </Avatar>
-                  <Typography variant="h5" fontWeight={600} mb={1} color="white">
-                    {mod.title}
-                  </Typography>
-                  <Typography color="rgba(255,255,255,0.8)">{mod.desc}</Typography>
-                </CardContent>
-                <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
-                  <Button 
-                    variant="contained" 
-                    color="primary" 
-                    size="large" 
-                    href={mod.path}
-                    sx={{
-                      background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                      borderRadius: '25px',
-                      px: 4,
-                      py: 1.5,
-                      textTransform: 'none',
-                      fontWeight: 600,
-                      boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
-                      '&:hover': {
-                        background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                        boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
-                        transform: 'translateY(-2px)'
-                      }
-                    }}
-                  >
-                    Başla
-                  </Button>
-                </CardActions>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        <>
+          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2 }}>
+            {modules.map((mod, i) => (
+              <Grid item xs={12} sm={6} md={3} key={mod.title}>
+                <Card
+                  component={motion.div}
+                  whileHover={{ scale: 1.02, y: -8 }}
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.1, duration: 0.6 }}
+                  elevation={6}
+                  className="glass-card"
+                  sx={{ 
+                    borderRadius: 4, 
+                    minHeight: 260, 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    justifyContent: 'space-between',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <CardContent sx={{ textAlign: 'center' }}>
+                    <Avatar sx={{ 
+                      bgcolor: 'rgba(255,255,255,0.1)', 
+                      mx: 'auto', 
+                      mb: 2, 
+                      width: 64, 
+                      height: 64, 
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                      border: '1px solid rgba(255,255,255,0.2)'
+                    }}>
+                      {mod.icon}
+                    </Avatar>
+                    <Typography variant="h5" fontWeight={600} mb={1} color="white">
+                      {mod.title}
+                    </Typography>
+                    <Typography color="rgba(255,255,255,0.8)" mb={2}>{mod.desc}</Typography>
+                    
+                    {/* AI Tags */}
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', mb: 1 }}>
+                      {mod.tags.map((tag, index) => (
+                        <Chip
+                          key={index}
+                          label={tag}
+                          size="small"
+                          sx={{
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            backdropFilter: 'blur(10px)',
+                            color: 'white',
+                            fontSize: '0.7rem',
+                            fontWeight: 500,
+                            border: '1px solid rgba(255, 255, 255, 0.3)',
+                            '& .MuiChip-label': {
+                              px: 1,
+                            }
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </CardContent>
+                  <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
+                    <Button 
+                      variant="contained" 
+                      color="primary" 
+                      size="large" 
+                      href={mod.path}
+                      sx={{
+                        background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                        borderRadius: '25px',
+                        px: 4,
+                        py: 1.5,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
+                        '&:hover': {
+                          background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                          boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
+                          transform: 'translateY(-2px)'
+                        }
+                      }}
+                    >
+                      Başla
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+
+          {/* Floating Forum Button */}
+          <Box
+            component={motion.div}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.8, duration: 0.6 }}
+            sx={{
+              position: 'fixed',
+              bottom: 20,
+              right: 20,
+              zIndex: 1000,
+            }}
+          >
+            <Button
+              variant="contained"
+              onClick={() => {
+                // Smooth transition to forum
+                const button = event.target;
+                button.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                  navigate('/forum');
+                }, 150);
+              }}
+              sx={{
+                background: 'linear-gradient(135deg, #4c63d2 0%, #5a3d7a 100%)',
+                backdropFilter: 'blur(15px)',
+                borderRadius: '50px',
+                px: 3,
+                py: 1.5,
+                textTransform: 'none',
+                fontWeight: 500,
+                fontSize: '0.9rem',
+                boxShadow: '0 4px 15px rgba(76, 99, 210, 0.3)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                color: 'white',
+                minWidth: 'auto',
+                position: 'relative',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #3f52b5 0%, #4a3368 100%)',
+                  boxShadow: '0 6px 20px rgba(76, 99, 210, 0.4)',
+                  transform: 'translateY(-2px) scale(1.05)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                },
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  top: -2,
+                  right: -2,
+                  width: 8,
+                  height: 8,
+                  background: '#4ade80',
+                  borderRadius: '50%',
+                  border: '2px solid rgba(255, 255, 255, 0.9)',
+                  animation: 'pulse 2s infinite',
+                }
+              }}
+            >
+              <ForumIcon sx={{ mr: 0.5, fontSize: 20 }} />
+              Forum
+            </Button>
+          </Box>
+        </>
       )}
     </Box>
   );

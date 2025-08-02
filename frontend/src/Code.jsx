@@ -555,7 +555,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
 
   if (step === 'start') {
     return (
-      <Box sx={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ minHeight: '100vh', width: '100vw', display: 'flex', alignItems: 'center', justifyContent: 'center', pt: 8 }}>
         <Paper 
           component={motion.div} 
           initial={{ opacity: 0, y: 40 }} 
