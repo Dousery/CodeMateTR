@@ -467,7 +467,7 @@ export default function Test() {
     const summary = evaluation?.summary;
     
     return (
-      <Box sx={{ minHeight: '100vh', width: '100vw', py: 4 }}>
+      <Box sx={{ minHeight: '100vh', width: '100vw', py: 4, mt: 8 }}>
         <Grid container spacing={4} sx={{ maxWidth: 1200, mx: 'auto', px: 2 }}>
           {/* Ana Sonuç Kartı */}
           <Grid item xs={12} md={6}>
@@ -553,7 +553,7 @@ export default function Test() {
               transition={{ duration: 0.9 }} 
               elevation={8} 
               className="glass-card"
-              sx={{ p: 4, borderRadius: 4 }}
+              sx={{ p: 4, borderRadius: 4, mt: 2 }}
             >
               <Typography variant="h6" fontWeight={700} mb={3} color="white">
                 <School sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -575,217 +575,8 @@ export default function Test() {
             </Paper>
           </Grid>
 
-          {/* Tüm Kaynaklar - Birleştirilmiş Bölüm */}
-          {((result.resources && result.resources.length > 0) || 
-            (result.web_resources && (result.web_resources.youtube_videos || result.web_resources.websites))) && (
-            <Grid item xs={12}>
-                <Paper 
-                  component={motion.div} 
-                  initial={{ opacity: 0, y: 40 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  transition={{ duration: 1.0 }} 
-                  elevation={8} 
-                  className="glass-card"
-                  sx={{ p: 4, borderRadius: 4, mt: 3 }}
-                >
-                  <Typography variant="h6" fontWeight={700} mb={3} color="white">
-                    🌐 Önerilen Öğrenme Kaynakları
-                  </Typography>
-                  
-                  <Grid container spacing={3}>
-                    {/* Direkt URL Kaynakları */}
-                    {result.resources && result.resources.length > 0 && (
-                      <Grid item xs={12}>
-                        <Typography variant="subtitle2" color="#4f46e5" fontWeight={600} mb={2}>
-                          🎯 Doğrudan Erişim Kaynakları:
-                        </Typography>
-                        <Grid container spacing={2}>
-                          {result.resources.slice(0, 6).map((resource, i) => (
-                            <Grid item xs={12} sm={6} md={4} key={i}>
-                              <Card sx={{ 
-                                backgroundColor: 'rgba(79,70,229,0.1)', 
-                                border: '1px solid rgba(79,70,229,0.2)',
-                                height: '100%',
-                                display: 'flex',
-                                flexDirection: 'column'
-                              }}>
-                                <CardContent sx={{ py: 2, flexGrow: 1 }}>
-                                  <Stack spacing={1}>
-                                    <Typography color="white" fontWeight={600} variant="body2">
-                                      {resource.title || resource}
-                                    </Typography>
-                                    
-                                    <Stack direction="row" spacing={1} flexWrap="wrap">
-                                      {resource.type && (
-                                        <Chip 
-                                          label={resource.type} 
-                                          size="small" 
-                                          sx={{ backgroundColor: '#4f46e5', color: 'white', fontSize: '0.7rem' }}
-                                        />
-                                      )}
-                                      {resource.level && (
-                                        <Chip 
-                                          label={resource.level} 
-                                          size="small" 
-                                          variant="outlined"
-                                          sx={{ borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)', fontSize: '0.7rem' }}
-                                        />
-                                      )}
-                                    </Stack>
-                                    
-                                    {resource.description && (
-                                      <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block">
-                                        {resource.description}
-                                      </Typography>
-                                    )}
-                                    
-                                    {resource.url && (
-                                      <Button
-                                        variant="outlined"
-                                        size="small"
-                                        onClick={() => window.open(resource.url, '_blank')}
-                                        sx={{
-                                          borderColor: '#4f46e5',
-                                          color: '#4f46e5',
-                                          textTransform: 'none',
-                                          fontSize: '0.75rem',
-                                          mt: 'auto',
-                                          '&:hover': {
-                                            borderColor: '#7c3aed',
-                                            backgroundColor: 'rgba(79,70,229,0.1)'
-                                          }
-                                        }}
-                                      >
-                                        🔗 Kaynağa Git
-                                      </Button>
-                                    )}
-                                  </Stack>
-                                </CardContent>
-                              </Card>
-                            </Grid>
-                          ))}
-                        </Grid>
-                      </Grid>
-                    )}
-                    
-                    {/* YouTube Videoları */}
-                    {result.web_resources && result.web_resources.youtube_videos && result.web_resources.youtube_videos.length > 0 && (
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" color="#ff4444" fontWeight={600} mb={2}>
-                          📺 YouTube Videoları:
-                        </Typography>
-                        <Stack spacing={2}>
-                          {result.web_resources.youtube_videos.slice(0, 3).map((video, i) => (
-                            <Card key={i} sx={{ backgroundColor: 'rgba(255,68,68,0.1)', border: '1px solid rgba(255,68,68,0.2)' }}>
-                              <CardContent sx={{ py: 2 }}>
-                                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                                  <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
-                                    {video.title}
-                                  </Typography>
-                                  {video.level && (
-                                    <Chip 
-                                      label={video.level} 
-                                      size="small" 
-                                      sx={{ backgroundColor: '#ff4444', color: 'white' }}
-                                    />
-                                  )}
-                                </Stack>
-                                {video.description && (
-                                  <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
-                                    {video.description}
-                                  </Typography>
-                                )}
-                                {video.duration_estimate && (
-                                  <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
-                                    ⏱️ Süre: {video.duration_estimate}
-                                  </Typography>
-                                )}
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  onClick={() => window.open(video.url, '_blank')}
-                                  sx={{
-                                    borderColor: '#ff4444',
-                                    color: '#ff4444',
-                                    textTransform: 'none',
-                                    fontSize: '0.75rem',
-                                    '&:hover': {
-                                      borderColor: '#ff6666',
-                                      backgroundColor: 'rgba(255,68,68,0.1)'
-                                    }
-                                  }}
-                                >
-                                  📺 YouTube'da Ara
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </Stack>
-                      </Grid>
-                    )}
-                    
-                    {/* Web Siteleri */}
-                    {result.web_resources && result.web_resources.websites && result.web_resources.websites.length > 0 && (
-                      <Grid item xs={12} md={6}>
-                        <Typography variant="subtitle2" color="#4fc3f7" fontWeight={600} mb={2}>
-                          🌐 Web Kaynakları ve Makaleler:
-                        </Typography>
-                        <Stack spacing={2}>
-                          {result.web_resources.websites.slice(0, 3).map((website, i) => (
-                            <Card key={i} sx={{ backgroundColor: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.2)' }}>
-                              <CardContent sx={{ py: 2 }}>
-                                <Stack direction="row" alignItems="center" spacing={1} mb={1}>
-                                  <Typography color="white" fontWeight={600} variant="body2" sx={{ flexGrow: 1 }}>
-                                    {website.title}
-                                  </Typography>
-                                  {website.type && (
-                                    <Chip 
-                                      label={website.type} 
-                                      size="small" 
-                                      sx={{ backgroundColor: '#4fc3f7', color: 'white' }}
-                                    />
-                                  )}
-                                </Stack>
-                                {website.description && (
-                                  <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block" sx={{ mb: 1 }}>
-                                    {website.description}
-                                  </Typography>
-                                )}
-                                {website.level && (
-                                  <Typography color="rgba(255,255,255,0.6)" variant="caption" display="block" sx={{ mb: 2 }}>
-                                    📚 Seviye: {website.level}
-                                  </Typography>
-                                )}
-                                <Button
-                                  variant="outlined"
-                                  size="small"
-                                  onClick={() => window.open(website.url, '_blank')}
-                                  sx={{
-                                    borderColor: '#4fc3f7',
-                                    color: '#4fc3f7',
-                                    textTransform: 'none',
-                                    fontSize: '0.75rem',
-                                    '&:hover': {
-                                      borderColor: '#81d4fa',
-                                      backgroundColor: 'rgba(79,195,247,0.1)'
-                                    }
-                                  }}
-                                >
-                                  🔗 Siteye Git
-                                </Button>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </Stack>
-                      </Grid>
-                    )}
-                  </Grid>
-                </Paper>
-            </Grid>
-          )}
-
-          {/* Dinamik Öğrenme Kaynakları */}
-          {evaluation?.suggested_resources && evaluation.suggested_resources.length > 0 && (
+          {/* Topic Analysis ve Kaynak Önerileri */}
+          {evaluation?.wrong_question_resources && evaluation.wrong_question_resources.individual_question_analysis && (
             <Grid item xs={12}>
               <Paper 
                 component={motion.div} 
@@ -794,177 +585,175 @@ export default function Test() {
                 transition={{ duration: 1.0 }} 
                 elevation={8} 
                 className="glass-card"
-                sx={{ p: 4, borderRadius: 4 }}
+                sx={{ p: 4, borderRadius: 4, mt: 2 }}
               >
                 <Typography variant="h6" fontWeight={700} mb={3} color="white">
-                  <School sx={{ mr: 1, verticalAlign: 'middle' }} />
-                  🌐 Zayıf Alanlarınız İçin Öğrenme Kaynakları
+                  🎯 Yanlış Soruların Konu Analizi ve Öğrenme Kaynakları
                 </Typography>
                 
-                <Grid container spacing={3}>
-                  {evaluation.suggested_resources.map((resource, index) => (
-                    <Grid item xs={12} sm={6} md={4} key={index}>
-                      <Card
-                        component={motion.div}
-                        whileHover={{ scale: 1.02 }}
-                        sx={{
-                          background: 'linear-gradient(135deg, rgba(79,70,229,0.2) 0%, rgba(124,58,237,0.2) 100%)',
-                          backdropFilter: 'blur(10px)',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          borderRadius: 3,
-                          height: '100%',
-                          display: 'flex',
-                          flexDirection: 'column'
-                        }}
-                      >
-                        <CardContent sx={{ flexGrow: 1, p: 3 }}>
-                          <Stack spacing={2}>
-                            {/* Kaynak Türü Chip */}
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <Chip 
-                                label={resource.type || 'Kaynak'} 
-                                size="small" 
-                                sx={{ 
-                                  background: 'linear-gradient(45deg, #4f46e5, #7c3aed)',
-                                  color: 'white',
-                                  fontWeight: 600,
-                                  fontSize: '0.7rem'
-                                }} 
-                              />
-                              {resource.level && (
-                                <Chip 
-                                  label={resource.level} 
-                                  size="small" 
-                                  variant="outlined"
-                                  sx={{ 
-                                    borderColor: 'rgba(255,255,255,0.3)',
-                                    color: 'rgba(255,255,255,0.8)',
-                                    fontSize: '0.65rem'
-                                  }} 
-                                />
-                              )}
-                            </Box>
-                            
-                            {/* Başlık */}
-                            <Typography 
-                              variant="subtitle2" 
-                              fontWeight={700} 
-                              color="white"
-                              sx={{ 
-                                fontSize: '0.9rem',
-                                lineHeight: 1.3,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 2,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {resource.title}
-                            </Typography>
-                            
-                            {/* Açıklama */}
-                            <Typography 
-                              color="rgba(255,255,255,0.7)" 
-                              variant="caption" 
-                              sx={{ 
-                                fontSize: '0.75rem',
-                                lineHeight: 1.4,
-                                display: '-webkit-box',
-                                WebkitLineClamp: 3,
-                                WebkitBoxOrient: 'vertical',
-                                overflow: 'hidden'
-                              }}
-                            >
-                              {resource.description}
-                            </Typography>
-                            
-                            {/* İlgili Konu */}
-                            {resource.related_topic && (
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography 
-                                  color="rgba(255,255,255,0.6)" 
-                                  variant="caption"
-                                  sx={{ fontSize: '0.7rem' }}
-                                >
-                                  📚 Konu:
+                <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={3}>
+                  {evaluation.wrong_question_resources.message}
+                </Typography>
+                
+                {/* Priority Topics */}
+                {evaluation.wrong_question_resources.priority_topics && (
+                  <Box sx={{ mb: 4 }}>
+                    <Typography variant="subtitle2" color="#ff9800" fontWeight={600} mb={2}>
+                      🚨 Öncelikli Öğrenme Konuları:
+                    </Typography>
+                    <Grid container spacing={2}>
+                      {evaluation.wrong_question_resources.priority_topics.slice(0, 3).map((topic, i) => (
+                        <Grid item xs={12} sm={6} md={4} key={i}>
+                          <Card sx={{ 
+                            backgroundColor: topic.priority === 'high' ? 'rgba(244, 67, 54, 0.1)' : 
+                                         topic.priority === 'medium' ? 'rgba(255, 152, 0, 0.1)' : 'rgba(76, 175, 80, 0.1)',
+                            border: `1px solid ${topic.priority === 'high' ? 'rgba(244, 67, 54, 0.3)' : 
+                                               topic.priority === 'medium' ? 'rgba(255, 152, 0, 0.3)' : 'rgba(76, 175, 80, 0.3)'}`
+                          }}>
+                            <CardContent sx={{ py: 2 }}>
+                              <Stack spacing={1}>
+                                <Typography color="white" fontWeight={600} variant="body2">
+                                  {topic.topic}
                                 </Typography>
-                                <Typography 
-                                  color="#4fc3f7" 
-                                  variant="caption" 
-                                  fontWeight={600}
-                                  sx={{ fontSize: '0.7rem' }}
-                                >
-                                  {resource.related_topic}
+                                <Stack direction="row" spacing={1}>
+                                  <Chip 
+                                    label={`${topic.wrong_count} yanlış`} 
+                                    size="small" 
+                                    color={topic.priority === 'high' ? 'error' : topic.priority === 'medium' ? 'warning' : 'success'}
+                                  />
+                                  <Chip 
+                                    label={`%${topic.confidence * 100}`} 
+                                    size="small" 
+                                    variant="outlined"
+                                    sx={{ borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)' }}
+                                  />
+                                </Stack>
+                                <Typography color="rgba(255,255,255,0.7)" variant="caption">
+                                  {topic.recommendation}
+                                </Typography>
+                              </Stack>
+                            </CardContent>
+                          </Card>
+                        </Grid>
+                      ))}
+                    </Grid>
+                  </Box>
+                )}
+                
+                {/* Individual Question Analysis */}
+                <Accordion sx={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                  <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
+                    <Typography color="white" fontWeight={600}>
+                      📝 Her Yanlış Soru İçin Detaylı Analiz ve Kaynaklar
+                    </Typography>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Stack spacing={3}>
+                      {evaluation.wrong_question_resources.individual_question_analysis.map((analysis, i) => (
+                        <Card key={i} sx={{ backgroundColor: 'rgba(79,70,229,0.1)', border: '1px solid rgba(79,70,229,0.2)' }}>
+                          <CardContent>
+                            <Stack spacing={2}>
+                              {/* Question Info */}
+                              <Box>
+                                <Typography color="white" fontWeight={600} variant="body2" mb={1}>
+                                  Soru {analysis.question_id}: {analysis.question_preview}
+                                </Typography>
+                                <Stack direction="row" spacing={1} mb={1}>
+                                  <Chip 
+                                    label={analysis.identified_topic} 
+                                    size="small" 
+                                    sx={{ backgroundColor: '#4f46e5', color: 'white' }}
+                                  />
+                                  <Chip 
+                                    label={`%${analysis.topic_confidence * 100} güven`} 
+                                    size="small" 
+                                    variant="outlined"
+                                    sx={{ borderColor: 'rgba(255,255,255,0.3)', color: 'rgba(255,255,255,0.8)' }}
+                                  />
+                                  <Chip 
+                                    label={analysis.difficulty} 
+                                    size="small" 
+                                    color={analysis.difficulty === 'beginner' ? 'success' : analysis.difficulty === 'intermediate' ? 'warning' : 'error'}
+                                  />
+                                </Stack>
+                                <Typography color="rgba(255,255,255,0.7)" variant="caption">
+                                  Cevabınız: {analysis.your_answer} | Doğru: {analysis.correct_answer}
                                 </Typography>
                               </Box>
-                            )}
-                            
-                            {/* Süre Bilgisi */}
-                            {resource.estimated_duration && (
-                              <Typography 
-                                color="rgba(255,255,255,0.6)" 
-                                variant="caption"
-                                sx={{ fontSize: '0.7rem' }}
-                              >
-                                ⏱️ {resource.estimated_duration}
+                              
+                              {/* Topic Description */}
+                              <Typography color="rgba(255,255,255,0.8)" variant="body2">
+                                📚 {analysis.topic_description}
                               </Typography>
-                            )}
-                          </Stack>
-                          
-                          {/* Kaynak Erişim Butonu */}
-                          <Button
-                            variant="contained"
-                            size="small"
-                            fullWidth
-                            onClick={() => window.open(resource.url, '_blank')}
-                            sx={{
-                              mt: 2,
-                              background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                              borderRadius: '20px',
-                              textTransform: 'none',
-                              fontWeight: 600,
-                              fontSize: '0.75rem',
-                              py: 1,
-                              boxShadow: '0 2px 10px rgba(79, 70, 229, 0.3)',
-                              '&:hover': {
-                                background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                                boxShadow: '0 4px 15px rgba(79, 70, 229, 0.5)',
-                                transform: 'translateY(-1px)'
-                              }
-                            }}
-                          >
-                            {resource.type === 'YouTube Video' || resource.type === 'Video' || resource.type === 'YouTube Kanal' ? '📹' : 
-                             resource.type === 'Kurs' ? '🎓' :
-                             resource.type === 'Doküman' ? '📖' :
-                             resource.type === 'Tutorial' ? '📝' :
-                             resource.type === 'Oyun' ? '🎮' :
-                             resource.type === 'Challenge' ? '🏆' : '🌐'} 
-                            {' '}{resource.type === 'YouTube Video' || resource.type === 'Video' ? 'İzle' : 
-                                 resource.type === 'YouTube Kanal' ? 'Kanala Git' :
-                                 resource.type === 'Kurs' ? 'Kursa Başla' : 
-                                 'Kaynaşa Git'}
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    </Grid>
-                  ))}
-                </Grid>
-                
-                {/* Kaynak İstatistikleri */}
-                <Box sx={{ mt: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
-                  <Typography variant="body2" color="rgba(255,255,255,0.8)" textAlign="center">
-                    💡 Bu kaynaklar yanlış cevapladığınız konulara göre özelleştirilmiştir
-                  </Typography>
-                  <Typography variant="caption" color="rgba(255,255,255,0.6)" textAlign="center" display="block" sx={{ mt: 1 }}>
-                    Toplam {evaluation.suggested_resources.length} kişiselleştirilmiş kaynak • 
-                    {evaluation.suggested_resources.filter(r => r.type?.includes('Video')).length} Video • 
-                    {evaluation.suggested_resources.filter(r => r.type === 'Kurs').length} Kurs • 
-                    {evaluation.suggested_resources.filter(r => r.type === 'Doküman').length} Doküman
-                  </Typography>
-                </Box>
+                              
+                              {/* Learning Resources */}
+                              <Box>
+                                <Typography variant="subtitle2" color="#4fc3f7" fontWeight={600} mb={1}>
+                                  🎯 Önerilen Öğrenme Kaynakları:
+                                </Typography>
+                                <Grid container spacing={1}>
+                                  {analysis.learning_resources.slice(0, 3).map((resource, j) => (
+                                    <Grid item xs={12} sm={6} key={j}>
+                                      <Card sx={{ backgroundColor: 'rgba(79,195,247,0.1)', border: '1px solid rgba(79,195,247,0.2)' }}>
+                                        <CardContent sx={{ py: 1 }}>
+                                          <Typography color="white" fontWeight={600} variant="caption">
+                                            {resource.title}
+                                          </Typography>
+                                          <Typography color="rgba(255,255,255,0.7)" variant="caption" display="block">
+                                            {resource.description}
+                                          </Typography>
+                                          <Stack direction="row" spacing={1} mt={1}>
+                                            <Chip 
+                                              label={resource.type} 
+                                              size="small" 
+                                              sx={{ backgroundColor: '#4fc3f7', color: 'white', fontSize: '0.6rem' }}
+                                            />
+                                            {resource.estimated_time && (
+                                              <Typography color="rgba(255,255,255,0.6)" variant="caption">
+                                                ⏱️ {resource.estimated_time}
+                                              </Typography>
+                                            )}
+                                          </Stack>
+                                          {resource.url && (
+                                            <Button
+                                              variant="outlined"
+                                              size="small"
+                                              onClick={() => window.open(resource.url, '_blank')}
+                                              sx={{
+                                                mt: 1,
+                                                borderColor: '#4fc3f7',
+                                                color: '#4fc3f7',
+                                                textTransform: 'none',
+                                                fontSize: '0.6rem',
+                                                '&:hover': {
+                                                  borderColor: '#81d4fa',
+                                                  backgroundColor: 'rgba(79,195,247,0.1)'
+                                                }
+                                              }}
+                                            >
+                                              🔗 Kaynağa Git
+                                            </Button>
+                                          )}
+                                        </CardContent>
+                                      </Card>
+                                    </Grid>
+                                  ))}
+                                </Grid>
+                              </Box>
+                            </Stack>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </Stack>
+                  </AccordionDetails>
+                </Accordion>
               </Paper>
             </Grid>
           )}
+
+
+
+
 
           {/* Detaylı Analiz */}
           <Grid item xs={12}>
@@ -975,7 +764,7 @@ export default function Test() {
               transition={{ duration: 1.1 }} 
               elevation={8} 
               className="glass-card"
-              sx={{ p: 4, borderRadius: 4 }}
+              sx={{ p: 4, borderRadius: 4, mt: 2 }}
             >
               <Typography variant="h6" fontWeight={700} mb={3} color="white">
                 <TrendingUp sx={{ mr: 1, verticalAlign: 'middle' }} />
@@ -1054,7 +843,7 @@ export default function Test() {
 
           {/* Aksiyonlar */}
           <Grid item xs={12}>
-            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2, mt: 3 }}>
               <Button 
                 variant="contained" 
                 color="primary" 

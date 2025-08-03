@@ -1049,14 +1049,9 @@ def test_your_skill_evaluate():
     # Summary'yi al
     summary = evaluation_result['summary']
     
-    # Zayıf olunan konular için kaynak önerileri
+    # Kaynak önerileri kaldırıldı
     resources = []
     web_resources = {}
-    if evaluation_result['weak_areas']:
-        weak_topic = evaluation_result['weak_areas'][0]['category']
-        resources = agent.suggest_resources(weak_topic)
-        # Web search ile YouTube ve website önerileri
-        web_resources = agent.search_web_resources(weak_topic)
     
     # Test performansını veritabanına kaydet
     test_performance = TestPerformance(
