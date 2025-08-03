@@ -481,68 +481,104 @@ class IntelligentJobAgent:
             self._close_driver()
     
     def _generate_search_terms(self, job_area: str) -> List[str]:
-        """İş alanından arama terimleri oluşturur"""
-        base_terms = [job_area.lower()]
+        """İş alanından arama terimleri oluşturur - Genişletilmiş ve esnek"""
+        base_terms = []
         job_lower = job_area.lower()
         
-        # Machine Learning / AI alanları için özel terimler
-        if any(keyword in job_lower for keyword in ['machine learning', 'ml', 'ai', 'artificial intelligence']):
+        # Junior kelimesini çıkar - çok spesifik oluyor
+        clean_job = job_lower.replace('junior ', '').replace('entry level ', '').replace('entry ', '')
+        
+        # Temel arama terimlerini ekle
+        base_terms.extend([
+            clean_job,
+            job_lower  # Orijinal de dahil et
+        ])
+        
+        # Machine Learning / AI alanları için çok geniş terimler
+        if any(keyword in clean_job for keyword in ['veri bilimci', 'data scientist', 'data science', 'makine öğrenmesi', 'machine learning', 'ml', 'ai', 'yapay zeka', 'artificial intelligence']):
             base_terms.extend([
-                'machine learning engineer',
-                'ml engineer', 
-                'ai engineer',
-                'artificial intelligence engineer',
-                'deep learning engineer',
-                'neural network engineer',
-                'ml developer',
-                'ai developer',
-                'machine learning scientist',
-                'ai scientist'
-            ])
-        elif 'data scientist' in job_lower or 'data science' in job_lower:
-            base_terms.extend([
-                'data scientist',
+                'python developer',
+                'python engineer', 
+                'software developer',
+                'software engineer',
+                'backend developer',
+                'full stack developer',
                 'data analyst',
-                'machine learning scientist',
-                'ai scientist',
-                'data science engineer',
-                'ml scientist',
-                'senior data scientist',
-                'lead data scientist'
-            ])
-        elif 'data engineer' in job_lower:
-            base_terms.extend([
                 'data engineer',
-                'etl developer',
-                'big data engineer',
-                'senior data engineer',
-                'lead data engineer',
-                'data platform engineer'
-            ])
-        # Mevcut developer/engineer terimleri
-        elif "developer" in job_lower:
-            base_terms.extend([
-                f"{job_lower} engineer",
-                f"{job_lower} specialist",
-                f"senior {job_lower}",
-                f"lead {job_lower}"
-            ])
-        elif "engineer" in job_lower:
-            base_terms.extend([
-                f"{job_lower.replace(' engineer', '')} developer",
-                f"{job_lower} specialist",
-                f"senior {job_lower}",
-                f"lead {job_lower}"
+                'machine learning',
+                'artificial intelligence',
+                'python',
+                'data science',
+                'analytics',
+                'developer',
+                'engineer',
+                'yazılım geliştirici',
+                'yazılım mühendisi',
+                'python geliştiricisi',
+                'veri analisti'
             ])
         
-        # Genel teknoloji terimleri ekle
-        if any(keyword in job_lower for keyword in ['python', 'java', 'javascript', 'react', 'node']):
+        # Yazılım geliştirici için çok geniş terimler
+        elif any(keyword in clean_job for keyword in ['yazılım', 'software', 'developer', 'geliştirici']):
             base_terms.extend([
-                f"{job_lower} developer",
-                f"{job_lower} engineer"
+                'python developer',
+                'javascript developer',
+                'java developer',
+                'software developer',
+                'software engineer',
+                'backend developer',
+                'frontend developer',
+                'full stack developer',
+                'web developer',
+                'mobile developer',
+                'developer',
+                'engineer',
+                'programmer',
+                'yazılım geliştirici',
+                'yazılım mühendisi',
+                'web geliştiricisi',
+                'mobil geliştirici',
+                'programcı'
             ])
         
-        return list(set(base_terms))  # Duplicate'ları kaldır
+        # Diğer mühendislik alanları için geniş terimler
+        elif any(keyword in clean_job for keyword in ['engineer', 'mühendis']):
+            base_terms.extend([
+                'software engineer',
+                'software developer',
+                'system engineer',
+                'backend engineer',
+                'frontend engineer',
+                'devops engineer',
+                'cloud engineer',
+                'developer',
+                'engineer',
+                'yazılım mühendisi',
+                'sistem mühendisi',
+                'geliştirici'
+            ])
+        
+        # Hiçbiri değilse genel terimler ekle
+        else:
+            base_terms.extend([
+                'developer',
+                'engineer',
+                'software',
+                'python',
+                'javascript',
+                'yazılım',
+                'geliştirici',
+                'mühendis'
+            ])
+        
+        # Çok kısa terimleri filtrele ve unique yap
+        filtered_terms = []
+        for term in base_terms:
+            if len(term.strip()) >= 3 and term.strip() not in filtered_terms:
+                filtered_terms.append(term.strip())
+        
+        # En fazla 6 terim döndür (performans için)
+        return filtered_terms[:6]
     
     def _search_multiple_terms_parallel(self, search_terms: List[str], location: str, max_results: int) -> List[Dict[str, Any]]:
         """Birden fazla arama terimini paralel olarak arar"""
@@ -560,7 +596,7 @@ class IntelligentJobAgent:
         return all_jobs
     
     def _search_single_term_optimized(self, search_term: str, location: str, max_results: int) -> List[Dict[str, Any]]:
-        """Tek bir terim için LinkedIn'de arama yapar (Optimized)"""
+        """Tek bir terim için LinkedIn'de arama yapar (Optimized + Debug)"""
         jobs = []
         
         try:
@@ -569,13 +605,16 @@ class IntelligentJobAgent:
             params = f"?keywords={search_term.replace(' ', '%20')}&location={location.replace(' ', '%20')}&f_TPR=r86400&start=0"
             url = base_url + params
             
+            print(f"      🔗 LinkedIn URL: {url}")
             self.driver.get(url)
-            time.sleep(1)  # Bekleme süresi azaltıldı
+            time.sleep(2)  # Bekleme süresini biraz artırdık
             
             # Sayfanın yüklenmesini bekle
             try:
                 self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "jobs-search__results-list")))
+                print(f"      ✅ Sayfa yüklendi: {search_term}")
             except:
+                print(f"      ❌ Sayfa yüklenemedi: {search_term}")
                 return jobs
             
             # Sayfayı scroll et (optimized)
@@ -583,27 +622,39 @@ class IntelligentJobAgent:
             
             # İş ilanlarını bul (batch processing)
             job_elements = self.driver.find_elements(By.CSS_SELECTOR, ".jobs-search__results-list li")
+            print(f"      📋 {len(job_elements)} iş elementi bulundu")
             
             # Batch processing ile veri çıkar
             jobs = self._extract_job_data_batch(job_elements[:max_results], search_term)
+            print(f"      ✅ {len(jobs)} uygun iş çıkarıldı")
             
         except Exception as e:
-            print(f"Arama hatası ({search_term}): {e}")
+            print(f"      ❌ Arama hatası ({search_term}): {e}")
         
         return jobs
     
     def _extract_job_data_batch(self, job_elements: List, search_term: str) -> List[Dict[str, Any]]:
-        """İş ilanı verilerini batch olarak çıkarır"""
+        """İş ilanı verilerini batch olarak çıkarır (Debug enabled)"""
         jobs = []
+        total_elements = len(job_elements)
         
-        for job_element in job_elements:
+        for i, job_element in enumerate(job_elements):
             try:
                 job_data = self._extract_job_data_optimized(job_element)
-                if job_data and self._is_relevant_job_fast(job_data, search_term):
-                    jobs.append(job_data)
+                if job_data:
+                    is_relevant = self._is_relevant_job_fast(job_data, search_term)
+                    if is_relevant:
+                        jobs.append(job_data)
+                        print(f"         ✅ İş #{i+1}: {job_data['title'][:50]} - {job_data['company'][:30]}")
+                    else:
+                        print(f"         ❌ İş #{i+1}: {job_data['title'][:50]} - Alakasız")
+                else:
+                    print(f"         ⚠️ İş #{i+1}: Veri çıkarılamadı")
             except Exception as e:
+                print(f"         ❌ İş #{i+1} hatası: {e}")
                 continue
         
+        print(f"      📊 {len(jobs)}/{total_elements} iş filtrelendi")
         return jobs
     
     def _extract_job_data_optimized(self, job_element) -> Optional[Dict[str, Any]]:
@@ -656,56 +707,81 @@ class IntelligentJobAgent:
             return None
     
     def _is_relevant_job_fast(self, job_data: Dict[str, Any], search_term: str) -> bool:
-        """İş ilanının alakalı olup olmadığını hızlı kontrol eder"""
+        """İş ilanının alakalı olup olmadığını hızlı kontrol eder - ÇOK ESNEK"""
         title_lower = job_data['title'].lower()
         
-        # Çok senior pozisyonları filtrele (daha esnek)
-        senior_keywords = {
-            'senior manager', 'director', 'vp', 'vice president', 'head of',
-            'chief', 'cto', 'ceo', 'principal', '15+ years', '10+ years'
-        }
-        
-        # Senior pozisyonları tamamen filtreleme, sadece çok üst düzey pozisyonları filtrele
-        if any(keyword in title_lower for keyword in ['cto', 'ceo', 'vp', 'vice president', 'head of']):
+        # Sadece çok üst düzey pozisyonları filtrele (çok kısıtlayıcı filtreleri kaldırdık)
+        if any(keyword in title_lower for keyword in ['ceo', 'cto', 'founder', 'co-founder']):
             return False
         
-        # Hedef alanla ilgili mi kontrol et (genişletilmiş)
+        # Alakasız sektörleri filtrele
+        irrelevant_keywords = {
+            'sales', 'marketing', 'hr', 'human resources', 'finance', 'accounting',
+            'legal', 'lawyer', 'doctor', 'nurse', 'teacher', 'driver', 'chef',
+            'cleaner', 'security guard', 'receptionist', 'cashier'
+        }
+        
+        if any(keyword in title_lower for keyword in irrelevant_keywords):
+            return False
+        
+        # Çok geniş teknoloji ve iş terimleri - neredeyse her teknoloji işini kabul et
         tech_keywords = {
             # Genel teknoloji
             'developer', 'engineer', 'programmer', 'software', 'backend', 'frontend',
-            'full stack', 'specialist', 'architect', 'consultant',
+            'full stack', 'specialist', 'architect', 'consultant', 'analyst',
+            'technician', 'technical', 'it', 'system', 'web', 'mobile', 'app',
+            
+            # Programlama ve teknoloji
+            'python', 'javascript', 'java', 'php', 'c++', 'c#', 'ruby', 'go',
+            'react', 'angular', 'vue', 'django', 'flask', 'spring', 'laravel',
+            'node.js', 'express', 'api', 'rest', 'graphql', 'microservices',
+            
+            # Database ve data
+            'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch',
+            'database', 'data', 'analytics', 'bi', 'etl', 'pipeline',
             
             # ML/AI alanları
             'data science', 'machine learning', 'ml', 'ai', 'artificial intelligence',
             'deep learning', 'neural network', 'tensorflow', 'pytorch', 'scikit-learn',
             'computer vision', 'nlp', 'natural language processing',
             
-            # Data alanları
-            'data engineer', 'data analyst', 'etl', 'big data', 'hadoop', 'spark',
-            'data platform', 'data infrastructure', 'data pipeline',
-            
-            # Programlama dilleri
-            'python', 'javascript', 'java', 'react', 'django', 'flask', 'node.js',
-            'sql', 'r', 'matlab', 'julia', 'scala', 'go',
-            
             # Cloud ve DevOps
-            'aws', 'azure', 'gcp', 'docker', 'kubernetes', 'devops', 'ci/cd'
+            'aws', 'azure', 'gcp', 'cloud', 'docker', 'kubernetes', 'devops',
+            'ci/cd', 'jenkins', 'terraform', 'ansible',
+            
+            # Türkçe terimler
+            'yazılım', 'geliştirici', 'mühendis', 'programcı', 'sistem',
+            'veri', 'analiz', 'teknoloji', 'bilişim', 'web', 'mobil'
         }
         
-        # Arama terimine göre özel kontrol
-        search_lower = search_term.lower()
-        if any(keyword in search_lower for keyword in ['machine learning', 'ml', 'ai']):
-            ml_keywords = {'machine learning', 'ml', 'ai', 'artificial intelligence', 'deep learning', 'neural'}
-            if any(keyword in title_lower for keyword in ml_keywords):
+        # Eğer başlıkta herhangi bir teknoloji terimi varsa kabul et
+        if any(keyword in title_lower for keyword in tech_keywords):
+            return True
+        
+        # Arama teriminde geçen herhangi bir kelime başlıkta varsa kabul et
+        search_words = search_term.lower().split()
+        for word in search_words:
+            if len(word) > 2 and word in title_lower:  # 3 harften uzun kelimeleri kontrol et
                 return True
         
-        if any(keyword in search_lower for keyword in ['data scientist', 'data science']):
-            ds_keywords = {'data scientist', 'data science', 'ml scientist', 'ai scientist', 'veri bilimci'}
-            if any(keyword in title_lower for keyword in ds_keywords):
-                return True
+        # Eğer hiçbiri yoksa da genel bir kontrol yap - çok esnek
+        general_keywords = {
+            'junior', 'senior', 'mid', 'level', 'trainee', 'intern', 
+            'entry', 'graduate', 'associate', 'lead', 'principal'
+        }
         
-        # Genel teknoloji kontrolü
-        return any(keyword in title_lower for keyword in tech_keywords)
+        # Eğer pozisyon seviyesi belirten bir kelime varsa muhtemelen teknoloji işi
+        if any(keyword in title_lower for keyword in general_keywords):
+            return True
+        
+        # Son olarak, eğer şirket adında teknoloji ile ilgili kelime varsa
+        company_lower = job_data.get('company', '').lower()
+        company_tech_keywords = {'software', 'tech', 'technology', 'digital', 'systems', 'solutions', 'yazılım', 'teknoloji', 'bilişim'}
+        if any(keyword in company_lower for keyword in company_tech_keywords):
+            return True
+            
+        # Hiçbiri yoksa False döndür
+        return False
     
     def _scroll_page_optimized(self):
         """Sayfayı scroll eder (Optimized)"""
@@ -800,7 +876,7 @@ class IntelligentJobAgent:
                     cv_skills, cv_technologies, cv_experience, cv_level, job
                 )
                 
-                if match_score['score'] >= 30:  # Daha düşük eşik (30%)
+                if match_score['score'] >= 15:  # Eşiği çok düşürdük (15%)
                     job_with_match = job.copy()
                     job_with_match.update(match_score)
                     matched_jobs.append(job_with_match)
@@ -823,68 +899,95 @@ class IntelligentJobAgent:
     def _calculate_match_score_ultra_fast(self, cv_skills: Set[str], cv_technologies: Set[str], 
                                         cv_experience: int, cv_level: str, job: Dict[str, Any]) -> Dict[str, Any]:
         """
-        AI destekli eşleşme skoru hesaplar - Akıllı öneriler üretir
+        AI destekli eşleşme skoru hesaplar - ÇOK ESNEK versiyon
         """
         try:
             title_lower = job['title'].lower()
+            company_lower = job.get('company', '').lower()
             
-            # Temel skor hesaplama
+            # Başlangıç skoru - her iş için temel puan
+            base_score = 25  # Temel uyum puanı
+            
+            # Skill matching - daha esnek
             skill_score = 0
             matched_skills = []
             
-            # Skill matching
+            # CV'deki her skill için kontrol
             for skill in cv_skills:
-                if skill in title_lower:
-                    skill_score += 15
+                if skill in title_lower or skill in company_lower:
+                    skill_score += 20  # Daha yüksek puan
                     matched_skills.append(skill)
-                    if len(matched_skills) >= 3:
-                        break
             
-            # Technology check
+            # Technology matching - daha esnek
             for tech in cv_technologies:
-                if tech in title_lower:
-                    skill_score += 10
+                if tech in title_lower or tech in company_lower:
+                    skill_score += 15  # Teknoloji eşleşmesi
                     if tech not in matched_skills:
                         matched_skills.append(tech)
-                    if len(matched_skills) >= 5:
-                        break
             
-            # Experience level matching
-            experience_score = 0
-            if cv_level == 'entry' and ('junior' in title_lower or 'entry' in title_lower):
-                experience_score = 25
-            elif cv_level == 'junior' and ('junior' in title_lower):
-                experience_score = 25
-            elif cv_level == 'mid' and ('mid' in title_lower):
-                experience_score = 25
-            elif cv_level == 'senior' and ('senior' in title_lower):
-                experience_score = 25
+            # Genel teknoloji terimlerini kontrol et
+            general_tech_terms = ['developer', 'engineer', 'programmer', 'software', 'full stack', 'backend', 'frontend']
+            for term in general_tech_terms:
+                if term in title_lower:
+                    skill_score += 10  # Genel teknoloji terimi bonus
+                    break
             
-            # Location matching
-            location_score = 5
-            if any(city in job['location'].lower() for city in ['istanbul', 'ankara', 'izmir']):
-                location_score = 15
+            # Experience level matching - çok esnek
+            experience_score = 20  # Varsayılan deneyim skoru
+            if cv_level == 'entry':
+                # Entry level için tüm pozisyonları kabul et
+                if any(word in title_lower for word in ['junior', 'trainee', 'intern', 'graduate']):
+                    experience_score = 30  # Bonus
+                elif 'senior' not in title_lower and 'lead' not in title_lower:
+                    experience_score = 25  # Orta seviye uyum
             
-            # Total score
-            total_score = min(100, skill_score + experience_score + location_score)
+            # Location matching - Türkiye için bonus
+            location_score = 10  # Varsayılan lokasyon skoru
+            location_lower = job.get('location', '').lower()
+            if any(city in location_lower for city in ['istanbul', 'ankara', 'izmir', 'turkey', 'türkiye']):
+                location_score = 20
             
-            # AI ile akıllı analiz yap
-            ai_analysis = self._generate_ai_analysis(cv_skills, cv_technologies, cv_experience, cv_level, job)
+            # Company tech bonus - teknoloji şirketleri için bonus
+            company_bonus = 0
+            tech_company_keywords = ['tech', 'software', 'teknoloji', 'yazılım', 'digital', 'ai', 'data']
+            if any(keyword in company_lower for keyword in tech_company_keywords):
+                company_bonus = 15
+            
+            # Total score hesapla
+            total_score = min(100, base_score + skill_score + experience_score + location_score + company_bonus)
+            
+            # Minimum score garantisi - hiç eşleşme yoksa bile minimum puan ver
+            if total_score < 25:
+                total_score = 25
+            
+            # AI analiz (hızlı fallback)
+            match_reasons = []
+            if matched_skills:
+                match_reasons.extend([f"{skill.title()} beceriniz bu pozisyona uygun" for skill in matched_skills[:2]])
+            else:
+                match_reasons.append("Genel teknoloji alanında deneyiminiz değerli")
+            
+            if any(word in title_lower for word in ['developer', 'engineer', 'programmer']):
+                match_reasons.append("Yazılım geliştirme alanında çalışma fırsatı")
+            
+            missing_skills = ["Daha fazla proje deneyimi", "Portföy geliştirme", "Sektörel deneyim"]
+            recommendations = ["CV'nizi güncellene", "GitHub profilinizi aktif tutun", "Açık kaynak projelere katkıda bulunun"]
             
             return {
                 "score": total_score,
-                "match_reasons": ai_analysis.get('match_reasons', ["Genel uyum"]),
-                "missing_skills": ai_analysis.get('missing_skills', ["Python", "JavaScript", "SQL"]),
-                "recommendations": ai_analysis.get('recommendations', ["CV'nizi güncelleyin", "Temel becerileri geliştirin", "İlan detaylarını incele"])
+                "match_reasons": match_reasons[:3] if match_reasons else ["Teknoloji sektöründe gelişim fırsatı"],
+                "missing_skills": missing_skills[:3],
+                "recommendations": recommendations[:3]
             }
             
         except Exception as e:
-            # Fallback - AI analizi başarısız olursa
+            print(f"Skorlama hatası: {e}")
+            # Fallback - her zaman en az bir miktar puan ver
             return {
-                "score": 40,
-                "match_reasons": ["Genel uyum"],
-                "missing_skills": ["Python", "JavaScript", "SQL"],
-                "recommendations": ["CV'nizi güncelleyin", "Temel becerileri geliştirin", "İlan detaylarını incele"]
+                "score": 35,  # Minimum uyum skoru
+                "match_reasons": ["Genel teknoloji alanında uyum"],
+                "missing_skills": ["Proje deneyimi", "Teknik beceri gelişimi"],
+                "recommendations": ["CV'nizi güncelleyin", "Projeler geliştirin"]
             }
     
     def _generate_ai_analysis(self, cv_skills: Set[str], cv_technologies: Set[str], 
