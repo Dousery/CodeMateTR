@@ -5,6 +5,7 @@ import requests
 from urllib.parse import quote_plus, urljoin
 from bs4 import BeautifulSoup
 import time
+from .topic_analysis_agent import TopicAnalysisAgent
 
 class TestAIAgent:
     def __init__(self, interest):
@@ -187,12 +188,28 @@ class TestAIAgent:
         weak_areas = self._identify_weak_areas(results)
         strong_areas = self._identify_strong_areas(results)
         
-        # Zayıf alanlar için kaynak önerileri ekle
-        weak_topics = [area['category'] for area in weak_areas]
-        suggested_resources = self.suggest_resources(weak_topics, num_resources=8) if weak_topics else []
+        # Yanlış sorular için topic analizi ve kaynak önerileri
+        wrong_questions = [result for result in results if not result['is_correct']]
+        topic_analysis_agent = TopicAnalysisAgent(self.interest)
+        wrong_question_resources = topic_analysis_agent.analyze_wrong_questions(wrong_questions)
         
-        # Yanlış cevaplanan sorular için spesifik kaynak önerileri
-        wrong_question_resources = self._generate_wrong_question_resources(results)
+        # Genel kaynak önerileri (zayıf alanlar için)
+        weak_topics = [area['category'] for area in weak_areas]
+        suggested_resources = []
+        if weak_topics:
+            # Use topic analysis agent for weak areas too
+            weak_area_resources = topic_analysis_agent.analyze_wrong_questions([
+                {
+                    'question': f'Weak area: {topic}', 
+                    'question_id': i, 
+                    'difficulty': 'intermediate',
+                    'explanation': f'Bu konuda gelişim gerekli: {topic}',
+                    'user_answer': 'Unknown',
+                    'correct_answer': 'Unknown'
+                }
+                for i, topic in enumerate(weak_topics)
+            ])
+            suggested_resources = weak_area_resources.get('all_recommended_resources', [])
         
         return {
             'results': results,
