@@ -21,22 +21,55 @@ export default function Login({ setIsLoggedIn }) {
     localStorage.removeItem('interest');
     
     try {
-      const res = await axios.post(API_ENDPOINTS.LOGIN, form, { withCredentials: true });
-      localStorage.setItem('username', form.username);
+      const res = await axios.post(API_ENDPOINTS.LOGIN, form, { 
+        withCredentials: true,
+        timeout: 10000 // 10 saniye timeout
+      });
       
-      // Kullanıcının interest'ini al
-      const profileRes = await axios.get(API_ENDPOINTS.PROFILE, { withCredentials: true });
-      if (profileRes.data.interest) {
-        localStorage.setItem('interest', profileRes.data.interest);
+      if (res.data.message === 'Giriş başarılı.') {
+        localStorage.setItem('username', form.username);
+        
+        // Session durumunu kontrol et
+        try {
+          const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+            withCredentials: true,
+            timeout: 5000
+          });
+          console.log('Session status:', sessionRes.data);
+        } catch (sessionErr) {
+          console.warn('Session status check failed:', sessionErr);
+        }
+        
+        // Kullanıcının interest'ini al
+        try {
+          const profileRes = await axios.get(API_ENDPOINTS.PROFILE, { 
+            withCredentials: true,
+            timeout: 5000
+          });
+          if (profileRes.data.interest) {
+            localStorage.setItem('interest', profileRes.data.interest);
+          }
+        } catch (profileErr) {
+          console.warn('Profile bilgisi alınamadı:', profileErr);
+        }
+        
+        // localStorage değişikliğini tetikle
+        window.dispatchEvent(new Event('localStorageChange'));
+        
+        setIsLoggedIn(true);
+        setTimeout(() => navigate('/dashboard'), 1000);
+      } else {
+        setError('Giriş başarısız.');
       }
-      
-      // localStorage değişikliğini tetikle
-      window.dispatchEvent(new Event('localStorageChange'));
-      
-      setIsLoggedIn(true);
-      setTimeout(() => navigate('/dashboard'), 1000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Giriş başarısız.');
+      console.error('Login error:', err);
+      if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else if (err.response?.status === 401) {
+        setError(err.response.data.error || 'Geçersiz kullanıcı adı veya şifre.');
+      } else {
+        setError(err.response?.data?.error || 'Giriş başarısız. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }

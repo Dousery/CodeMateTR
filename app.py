@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, session
 from flask_cors import CORS
+from flask_session import Session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 import google.generativeai as genai
@@ -29,11 +30,29 @@ app = Flask(__name__, static_folder='static')
 
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['SESSION_COOKIE_SECURE'] = False
-app.config['SESSION_COOKIE_HTTPONLY'] = False
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_PATH'] = '/'
-app.config['SESSION_COOKIE_DOMAIN'] = None
+
+# Production'da session ayarlarını düzenle
+if os.getenv('FLASK_ENV') == 'production':
+    app.config['SESSION_COOKIE_SECURE'] = True
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_PATH'] = '/'
+    app.config['SESSION_COOKIE_DOMAIN'] = None
+    # Production'da session'ları kalıcı yap
+    app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 saat
+    app.config['SESSION_COOKIE_MAX_AGE'] = 86400  # 24 saat
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True
+    # Session'ları server-side sakla
+    app.config['SESSION_TYPE'] = 'filesystem'
+else:
+    app.config['SESSION_COOKIE_SECURE'] = False
+    app.config['SESSION_COOKIE_HTTPONLY'] = False
+    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+    app.config['SESSION_COOKIE_PATH'] = '/'
+    app.config['SESSION_COOKIE_DOMAIN'] = None
+    app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
+    app.config['SESSION_COOKIE_MAX_AGE'] = 3600  # 1 saat
+    app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 # CORS configuration for production
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
@@ -78,6 +97,9 @@ app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Her istekte session'ı yeni
 
 # Tek bir db instance oluştur
 db = SQLAlchemy(app)
+
+# Session'ı initialize et
+Session(app)
 
 # Model sınıflarını burada tanımla
 class User(db.Model):
@@ -342,6 +364,14 @@ def login_required(f):
         if 'username' not in session:
             print(f"DEBUG: No username in session")
             return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+        
+        # Kullanıcının hala veritabanında var olup olmadığını kontrol et
+        user = User.query.filter_by(username=session['username']).first()
+        if not user:
+            print(f"DEBUG: User not found in database: {session['username']}")
+            session.clear()
+            return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
+        
         print(f"DEBUG: Login check passed for user: {session['username']}")
         return f(*args, **kwargs)
     return decorated_function
@@ -375,13 +405,21 @@ def login():
     data = request.json
     username = data.get('username')
     password = data.get('password')
+    
+    if not username or not password:
+        return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
+    
     user = User.query.filter_by(username=username).first()
     if not user or not user.check_password(password):
         return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
     
-    # Session'ı basit tut
+    # Session'ı kalıcı yap
+    session.permanent = True
     session['username'] = username
     session['user_id'] = user.id
+    
+    # Session'ı hemen kaydet
+    session.modified = True
     
     # Debug için session bilgilerini logla
     print(f"Login successful for user: {username}, session: {dict(session)}")
@@ -395,7 +433,32 @@ def login():
 @app.route('/logout', methods=['POST'])
 def logout():
     session.pop('username', None)
+    session.pop('user_id', None)
+    session.modified = True
     return jsonify({'message': 'Çıkış başarılı.'})
+
+@app.route('/session-status', methods=['GET'])
+def session_status():
+    """Session durumunu kontrol etmek için test endpoint'i"""
+    return jsonify({
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session,
+        'session_permanent': session.permanent,
+        'session_modified': session.modified
+    })
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint'i"""
+    import os
+    return jsonify({
+        'status': 'healthy',
+        'timestamp': datetime.utcnow().isoformat(),
+        'pid': os.getpid(),
+        'flask_env': os.getenv('FLASK_ENV'),
+        'database_connected': db.engine.pool.checkedin() > 0
+    })
 
 @app.route('/set_interest', methods=['POST'])
 @login_required
