@@ -50,35 +50,74 @@ function ProtectedRoute({ children }) {
 }
 
 function App() {
-  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(localStorage.getItem('username')));
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [mode, setMode] = useState('light');
 
   const toggleTheme = () => {
     setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
   };
 
-  // localStorage değişirse state'i güncelle (başka sekmeden logout vs için)
+  // Session kontrolü ve localStorage senkronizasyonu
   useEffect(() => {
-    const syncLogin = () => setIsLoggedIn(Boolean(localStorage.getItem('username')));
-    
-    // Sayfa yüklendiğinde kontrol et
-    syncLogin();
-    
+    const checkSession = async () => {
+      try {
+        const username = localStorage.getItem('username');
+        if (!username) {
+          setIsLoggedIn(false);
+          setIsLoading(false);
+          return;
+        }
+
+        // Backend'de session'ı kontrol et
+        const response = await fetch('https://btk-project-backend.onrender.com/profile', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setIsLoggedIn(true);
+          // localStorage'ı güncelle
+          localStorage.setItem('username', data.username || username);
+          if (data.interest) {
+            localStorage.setItem('interest', data.interest);
+          }
+        } else {
+          // Session geçersiz, localStorage'ı temizle
+          localStorage.removeItem('username');
+          localStorage.removeItem('interest');
+          setIsLoggedIn(false);
+        }
+      } catch (error) {
+        console.error('Session check error:', error);
+        // Hata durumunda localStorage'ı temizle
+        localStorage.removeItem('username');
+        localStorage.removeItem('interest');
+        setIsLoggedIn(false);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    checkSession();
+
     // localStorage değişikliklerini dinle
-    window.addEventListener('storage', syncLogin);
-    
-    // Custom event listener ekle (aynı sekmede localStorage değişiklikleri için)
     const handleStorageChange = () => {
-      syncLogin();
+      setIsLoggedIn(Boolean(localStorage.getItem('username')));
     };
     
     window.addEventListener('localStorageChange', handleStorageChange);
     
     return () => {
-      window.removeEventListener('storage', syncLogin);
       window.removeEventListener('localStorageChange', handleStorageChange);
     };
   }, []);
+
+
 
   return (
     <ThemeProvider theme={theme}>
