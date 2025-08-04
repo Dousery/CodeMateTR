@@ -312,11 +312,12 @@ export default function AutoInterview() {
           sx={{ p: 5, minWidth: 400, maxWidth: 600, borderRadius: 4 }}
         >
           <Typography variant="h4" fontWeight={700} mb={2} color="white" textAlign="center">
-            Otomatik Mülakat Sistemi
+            🎤 Otomatik Mülakat Sistemi
           </Typography>
           <Typography textAlign="center" mb={4} color="rgba(255,255,255,0.8)">
             Yapay zeka destekli otomatik mülakat sistemi ile kendinizi test edin. 
-            Sistem, cevaplarınıza göre dinamik olarak sorular üretecek.
+            Sistem, cevaplarınıza göre dinamik olarak sorular üretecek ve sesli gerçek zamanlı mülakat deneyimi sunacak.
+            Profesyonel mülakat simülasyonu ile kendinizi geliştirin!
           </Typography>
           
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}

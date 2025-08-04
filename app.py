@@ -25,7 +25,7 @@ import json
 app = Flask(__name__, static_folder='static')
 app.secret_key = 'supersecretkey'  # Geliştirme için, prod'da değiştirilmeli
 
-# CORS ayarlarını daha spesifik yap
+# CORS ayarlarını daha spesifik yapimage.png
 CORS(app, 
      origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
      supports_credentials=True,
@@ -1830,7 +1830,7 @@ def test_case_generation():
 
 @app.route('/')
 def home():
-    return jsonify({'message': 'BTK Project API is running!'})
+            return jsonify({'message': 'CodeMateTR API is running!'})
 
 @app.route('/debug/clear_user_sessions', methods=['POST'])
 def clear_user_sessions():

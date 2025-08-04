@@ -117,7 +117,7 @@ export default function Test() {
           sx={{ p: 5, minWidth: 400, maxWidth: 600, borderRadius: 4 }}
         >
           <Typography variant="h4" fontWeight={700} mb={2} color="white" textAlign="center">
-            Seviye Tespit Sınavı
+            🧪 Seviye Tespit Sınavı
           </Typography>
           <Typography textAlign="center" mb={4} color="rgba(255,255,255,0.8)">
             Bilgi seviyenizi ölçmek için sorulara cevap verin. Test süreli olacak!

@@ -548,7 +548,7 @@ const SmartJobFinder = () => {
         sx={{ p: 5, minWidth: 400, maxWidth: 800, borderRadius: 4, maxHeight: '90vh', overflow: 'auto' }}
       >
         <Typography variant="h4" fontWeight={700} mb={2} color="#FFFFFF" textAlign="center">
-          İş Bulma Asistanı
+          💼 İş Bulma Asistanı
         </Typography>
         
         <Typography textAlign="center" mb={4} color="rgba(255,255,255,0.9)">

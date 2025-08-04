@@ -25,9 +25,6 @@ export default function Code() {
   const [cursorPosition, setCursorPosition] = useState(0);
   const codeEditorRef = useRef(null);
   
-  // Debug ve analiz state'leri
-  const [debugResult, setDebugResult] = useState(null);
-  const [complexityAnalysis, setComplexityAnalysis] = useState(null);
   const [generatedSolution, setGeneratedSolution] = useState(null);
   const [resources, setResources] = useState(null);
   const [executionOutput, setExecutionOutput] = useState(null); // Yeni state: çalıştırma çıktısı
@@ -49,8 +46,6 @@ export default function Code() {
     setActiveTab(0);
     setSelectedLanguage('python');
     setCursorPosition(0);
-    setDebugResult(null);
-    setComplexityAnalysis(null);
     setGeneratedSolution(null);
     setResources(null);
     setExecutionOutput(null);
@@ -574,50 +569,6 @@ export default function Code() {
     }
   };
 
-  const debugCode = async () => {
-    if (!userCode.trim()) {
-      setError('Debug için kod gerekli.');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post('http://localhost:5000/code_room/debug', {
-        code: userCode,
-        language: selectedLanguage
-      }, { withCredentials: true });
-      setDebugResult(res.data);
-      setActiveTab(1); // Debug sekmesine geç
-    } catch (err) {
-      setError(err.response?.data?.error || 'Debug başarısız.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const analyzeComplexity = async () => {
-    if (!userCode.trim()) {
-      setError('Analiz için kod gerekli.');
-      return;
-    }
-    
-    setLoading(true);
-    setError('');
-    try {
-      const res = await axios.post('http://localhost:5000/code_room/analyze_complexity', {
-        code: userCode,
-        language: selectedLanguage
-      }, { withCredentials: true });
-      setComplexityAnalysis(res.data);
-      setActiveTab(2); // Analiz sekmesine geç
-    } catch (err) {
-      setError(err.response?.data?.error || 'Analiz başarısız.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getResources = async () => {
     setLoading(true);
     setError('');
@@ -633,7 +584,7 @@ export default function Code() {
       }, { withCredentials: true });
       
             setResources(res.data);
-      setActiveTab(3); // Kaynaklar sekmesine geç
+      // setActiveTab(3); // Kaynaklar sekmesine geç
     } catch (err) {
       setError(err.response?.data?.error || 'Kaynaklar alınamadı.');
     } finally {
@@ -714,12 +665,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
               <Grid container spacing={1}>
                 <Grid item xs={6}>
                   <Chip icon={<PlayArrow />} label="Kod Çalıştırma" size="small" sx={{ color: 'white', mb: 1 }} />
-                </Grid>
-                <Grid item xs={6}>
-                  <Chip icon={<BugReport />} label="Debug Yardımı" size="small" sx={{ color: 'white', mb: 1 }} />
-                </Grid>
-                <Grid item xs={6}>
-                  <Chip icon={<Analytics />} label="Karmaşıklık Analizi" size="small" sx={{ color: 'white', mb: 1 }} />
                 </Grid>
                 <Grid item xs={6}>
                   <Chip icon={<AutoFixHigh />} label="Çözüm Üretme" size="small" sx={{ color: 'white', mb: 1 }} />
@@ -848,8 +793,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
             }}
           >
             <Tab label="Problem & Kod" icon={<CodeIcon />} />
-            <Tab label="Debug" icon={<BugReport />} />
-            <Tab label="Analiz" icon={<Analytics />} />
             <Tab label="Kaynaklar" icon={<School />} />
           </Tabs>
 
@@ -1210,30 +1153,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
                   <Button 
                     variant="text" 
                     fullWidth
-                    onClick={debugCode} 
-                    disabled={loading || !userCode.trim()}
-                    startIcon={<BugReport />}
-                    sx={{ color: 'rgba(255,255,255,0.8)' }}
-                  >
-                    Debug
-                  </Button>
-                </Grid>
-                <Grid item xs={3}>
-                  <Button 
-                    variant="text" 
-                    fullWidth
-                    onClick={analyzeComplexity} 
-                    disabled={loading || !userCode.trim()}
-                    startIcon={<Speed />}
-                    sx={{ color: 'rgba(255,255,255,0.8)' }}
-                  >
-                    Analiz
-                  </Button>
-                </Grid>
-                <Grid item xs={3}>
-                  <Button 
-                    variant="text" 
-                    fullWidth
                     onClick={getResources} 
                     disabled={loading}
                     startIcon={<School />}
@@ -1249,85 +1168,6 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
 
 
                       {activeTab === 1 && (
-            <Box>
-              <Typography variant="h6" mb={2} color="white">🐛 Debug Yardımı</Typography>
-              {debugResult ? (
-                <Box>
-                  <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                    <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                      <Typography color="white">🔍 Hata Açıklaması</Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap' }}>
-                        {debugResult.error_explanation}
-                      </Typography>
-                    </AccordionDetails>
-                  </Accordion>
-                  
-                  {debugResult.corrected_code && (
-                    <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                      <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                        <Typography color="white">✅ Düzeltilmiş Kod</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <TextField
-                          multiline
-                          fullWidth
-                          value={debugResult.corrected_code}
-                          InputProps={{ readOnly: true }}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              color: 'white',
-                              fontFamily: 'Consolas, Monaco, "Courier New", monospace',
-                              backgroundColor: 'rgba(0,0,0,0.3)',
-                            },
-                          }}
-                        />
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
-                  
-                  {debugResult.execution_result && (
-                    <Accordion sx={{ mb: 2, backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                      <AccordionSummary expandIcon={<ExpandMore sx={{ color: 'white' }} />}>
-                        <Typography color="white">🏃 Çalıştırma Sonucu</Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                          {debugResult.execution_result}
-                        </Typography>
-                      </AccordionDetails>
-                    </Accordion>
-                  )}
-                </Box>
-              ) : (
-                <Typography color="rgba(255,255,255,0.7)">
-                  Debug yardımı almak için kodunuzu yazın ve "Debug" butonuna tıklayın.
-                </Typography>
-              )}
-            </Box>
-          )}
-
-                      {activeTab === 2 && (
-            <Box>
-              <Typography variant="h6" mb={2} color="white">📊 Algoritma Karmaşıklığı Analizi</Typography>
-              {complexityAnalysis ? (
-                <Card sx={{ backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-                  <CardContent>
-                    <Typography color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap' }}>
-                      {complexityAnalysis.analysis}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Typography color="rgba(255,255,255,0.7)">
-                  Algoritma analizi için kodunuzu yazın ve "Analiz" butonuna tıklayın.
-                </Typography>
-              )}
-            </Box>
-          )}
-
-                      {activeTab === 3 && (
             <Box>
               <Typography variant="h6" mb={2} color="white">📚 Öğrenme Kaynakları</Typography>
               {resources ? (

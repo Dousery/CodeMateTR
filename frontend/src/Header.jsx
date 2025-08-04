@@ -12,9 +12,9 @@ import { useAuth } from './App';
 
 const menuItems = [
   { icon: <QuizIcon />, label: 'Test', route: '/test' },
-  { icon: <WorkIcon />, label: 'Akıllı İş Bulma', route: '/smart-job-finder' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
+  { icon: <WorkIcon />, label: 'Akıllı İş Bulma', route: '/smart-job-finder' },
   { icon: <ForumIcon />, label: 'Forum', route: '/forum' },
 ];
 
@@ -29,7 +29,7 @@ function CodeMateLogo({ onClick }) {
         <path d="M19 16L21 18L19 20" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
       </svg>
       <Box sx={{ fontWeight: 900, fontSize: 22, letterSpacing: 1, color: 'white', ml: 1, opacity: 1, fontFamily: 'monospace' }}>
-        CodeMate
+        CodeMateTR
       </Box>
     </Box>
   );

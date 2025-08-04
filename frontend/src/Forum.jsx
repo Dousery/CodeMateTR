@@ -50,7 +50,8 @@ import {
   Star as StarIcon,
   StarBorder as StarBorderIcon,
   AddComment as AddCommentIcon,
-  Send as SendIcon
+  Send as SendIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 
 const Forum = () => {
@@ -94,6 +95,8 @@ const Forum = () => {
   // Yeni state'ler ekle
   const [selectedPostForSolution, setSelectedPostForSolution] = useState(null);
   const [showSolutionDialog, setShowSolutionDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [postToDelete, setPostToDelete] = useState(null);
 
   const postTypes = [
     { value: 'discussion', label: 'Tartışma' },
@@ -258,6 +261,37 @@ const Forum = () => {
     } catch (err) {
       console.error('Çözüm işaretlenemedi:', err);
       setSnackbar({ open: true, message: 'Çözüm işaretlenirken hata oluştu', severity: 'error' });
+    }
+  };
+
+  const handleDeletePost = async (postId) => {
+    try {
+      const response = await fetch(`http://localhost:5000/forum/posts/${postId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setSnackbar({ open: true, message: 'Gönderi başarıyla silindi!', severity: 'success' });
+        setShowDeleteDialog(false);
+        setPostToDelete(null);
+        
+        // Gönderi listesini yenile
+        fetchPosts();
+        fetchStats();
+        
+        // Eğer silinen gönderi açık dialog'da ise, dialog'u kapat
+        if (selectedPost && selectedPost.post.id === postId) {
+          setOpenCommentDialog(false);
+          setSelectedPost(null);
+        }
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gönderi silinemedi');
+      }
+    } catch (err) {
+      console.error('Gönderi silinemedi:', err);
+      setSnackbar({ open: true, message: 'Gönderi silinirken hata oluştu', severity: 'error' });
     }
   };
 
@@ -1031,26 +1065,6 @@ const Forum = () => {
                 </Box>
                 
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <IconButton
-                    size="small"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setReportData(prev => ({ ...prev, post_id: post.id, comment_id: null }));
-                      setShowReportDialog(true);
-                    }}
-                    sx={{ 
-                      color: 'rgba(255,255,255,0.7)',
-                      '&:hover': { 
-                        bgcolor: 'rgba(244, 67, 54, 0.1)',
-                        transform: 'scale(1.1)'
-                      },
-                      transition: 'all 0.2s ease'
-                    }}
-                  >
-                    <ReportIcon />
-                  </IconButton>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <CommentIcon sx={{ color: 'rgba(255,255,255,0.7)' }} />
                   <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
                     {post.comments_count}
@@ -1063,6 +1077,51 @@ const Forum = () => {
                   </Typography>
                 </Box>
                 
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {/* Sadece gönderi sahibi olmayan kullanıcılar raporlayabilir */}
+                  {post.author !== localStorage.getItem('username') && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReportData(prev => ({ ...prev, post_id: post.id, comment_id: null }));
+                        setShowReportDialog(true);
+                      }}
+                      sx={{ 
+                        color: 'rgba(255,255,255,0.7)',
+                        '&:hover': { 
+                          bgcolor: 'rgba(244, 67, 54, 0.1)',
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <ReportIcon />
+                    </IconButton>
+                  )}
+                  
+                  {/* Sadece gönderi sahibi silebilir */}
+                  {post.author === localStorage.getItem('username') && (
+                    <IconButton
+                      size="small"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setPostToDelete(post);
+                        setShowDeleteDialog(true);
+                      }}
+                      sx={{ 
+                        color: 'rgba(255,255,255,0.7)',
+                        '&:hover': { 
+                          bgcolor: 'rgba(244, 67, 54, 0.2)',
+                          transform: 'scale(1.1)'
+                        },
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      <DeleteIcon />
+                    </IconButton>
+                  )}
+                </Box>
               </Box>
             </CardContent>
           </Card>
@@ -1760,6 +1819,96 @@ const Forum = () => {
           </Button>
           <Button onClick={reportContent} variant="contained" sx={{ bgcolor: '#f44336', color: 'white' }}>
             Raporla
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Post Dialog */}
+      <Dialog 
+        open={showDeleteDialog} 
+        onClose={() => setShowDeleteDialog(false)} 
+        maxWidth="sm" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            background: 'rgba(20, 20, 40, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            color: 'white'
+          }
+        }}
+      >
+        <DialogTitle sx={{ 
+          background: 'rgba(30, 30, 50, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderBottom: '1px solid rgba(255,255,255,0.1)',
+          fontWeight: 600
+        }}>
+          Gönderiyi Sil
+        </DialogTitle>
+        <DialogContent sx={{ 
+          background: 'rgba(20, 20, 40, 0.9)',
+          backdropFilter: 'blur(20px)',
+          pt: 3
+        }}>
+          <Typography variant="body1" sx={{ mb: 2, color: 'white' }}>
+            Bu gönderiyi silmek istediğinizden emin misiniz?
+          </Typography>
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 3 }}>
+            Bu işlem geri alınamaz. Gönderi ve tüm yorumları kalıcı olarak silinecektir.
+          </Typography>
+          {postToDelete && (
+            <Card sx={{ 
+              background: 'rgba(255,255,255,0.05)',
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 2
+            }}>
+              <CardContent>
+                <Typography variant="h6" sx={{ color: 'white', mb: 1 }}>
+                  {postToDelete.title}
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                  {postToDelete.content.substring(0, 100)}...
+                </Typography>
+              </CardContent>
+            </Card>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ 
+          background: 'rgba(30, 30, 50, 0.9)',
+          backdropFilter: 'blur(20px)',
+          borderTop: '1px solid rgba(255,255,255,0.1)',
+          p: 2
+        }}>
+          <Button 
+            onClick={() => setShowDeleteDialog(false)} 
+            sx={{
+              color: 'rgba(255,255,255,0.7)',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+            }}
+          >
+            İptal
+          </Button>
+          <Button
+            onClick={() => postToDelete && handleDeletePost(postToDelete.id)}
+            variant="contained"
+            sx={{ 
+              background: 'linear-gradient(45deg, #f44336 0%, #d32f2f 100%)',
+              '&:hover': { 
+                background: 'linear-gradient(45deg, #d32f2f 0%, #b71c1c 100%)',
+                transform: 'translateY(-1px)'
+              },
+              borderRadius: '20px',
+              px: 3,
+              py: 1,
+              fontWeight: 'bold',
+              boxShadow: '0 4px 12px rgba(244, 67, 54, 0.3)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            Sil
           </Button>
         </DialogActions>
       </Dialog>
