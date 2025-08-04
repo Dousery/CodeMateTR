@@ -28,6 +28,9 @@ export const API_ENDPOINTS = {
   // Auto Interview endpoints
   AUTO_INTERVIEW_PAGE: `${API_BASE_URL}/auto-interview`,
 
+  // Smart Job Finder endpoints
+  SMART_JOB_FINDER_PAGE: `${API_BASE_URL}/smart-job-finder`,
+
   // Interview endpoints
   INTERVIEW_SIMULATION: `${API_BASE_URL}/interview_simulation`,
   INTERVIEW_EVALUATE: `${API_BASE_URL}/interview_simulation/evaluate`,

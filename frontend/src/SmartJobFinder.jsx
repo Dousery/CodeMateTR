@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import API_ENDPOINTS from './config.js';
+import axios from 'axios';
 import {
   Container,
   Paper,
@@ -55,6 +56,31 @@ const SmartJobFinder = () => {
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
 
+  // Component mount olduğunda session kontrolü yap
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        console.log('Checking session status for smart job finder...');
+        const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Session status:', sessionRes.data);
+        
+        // Smart job finder endpoint'ini de kontrol et
+        const smartJobRes = await axios.get(API_ENDPOINTS.SMART_JOB_FINDER_PAGE, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Smart job finder page status:', smartJobRes.data);
+      } catch (err) {
+        console.error('Session check failed for smart job finder:', err);
+      }
+    };
+    
+    checkSession();
+  }, []);
+
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file && file.type === 'application/pdf') {
@@ -82,13 +108,21 @@ const SmartJobFinder = () => {
     formData.append('cv_file', file);
 
     try {
-      const response = await fetch(API_ENDPOINTS.ANALYZE_CV, {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
+      console.log('Analyzing CV with:', API_ENDPOINTS.ANALYZE_CV);
+      console.log('CV file data:', { 
+        filename: file.name,
+        size: file.size,
+        type: file.type
+      });
+      
+      const response = await axios.post(API_ENDPOINTS.ANALYZE_CV, formData, {
+        withCredentials: true,
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 60000
       });
 
-      const data = await response.json();
+      const data = response.data;
+      console.log('CV analysis response:', data);
 
       if (data.success) {
         setCvAnalysis(data.cv_analysis);
@@ -103,7 +137,14 @@ const SmartJobFinder = () => {
       }
     } catch (error) {
       console.error('CV analizi hatası:', error);
-      setError('CV analizi sırasında bir hata oluştu');
+      console.error('Error response:', error.response);
+      if (error.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (error.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(error.response?.data?.error || 'CV analizi sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -119,20 +160,24 @@ const SmartJobFinder = () => {
     setActiveStep(2);
 
     try {
-      const response = await fetch(API_ENDPOINTS.SEARCH_JOBS, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          cv_analysis: analysis,
-          location: 'Türkiye',
-          max_jobs: 20
-        }),
-        credentials: 'include'
+      console.log('Searching jobs with:', API_ENDPOINTS.SEARCH_JOBS);
+      console.log('Search data:', { 
+        cv_analysis_keys: Object.keys(analysis),
+        location: 'Türkiye',
+        max_jobs: 20
+      });
+      
+      const response = await axios.post(API_ENDPOINTS.SEARCH_JOBS, {
+        cv_analysis: analysis,
+        location: 'Türkiye',
+        max_jobs: 20
+      }, {
+        withCredentials: true,
+        timeout: 60000
       });
 
-      const data = await response.json();
+      const data = response.data;
+      console.log('Job search response:', data);
 
       if (data.success) {
         setJobs(data.jobs);
@@ -143,7 +188,14 @@ const SmartJobFinder = () => {
       }
     } catch (error) {
       console.error('İş arama hatası:', error);
-      setError('İş arama sırasında bir hata oluştu');
+      console.error('Error response:', error.response);
+      if (error.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (error.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(error.response?.data?.error || 'İş arama sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -151,19 +203,23 @@ const SmartJobFinder = () => {
 
   const getJobApplicationTips = async (job) => {
     try {
-      const response = await fetch(API_ENDPOINTS.JOB_TIPS, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          cv_analysis: cvAnalysis,
-          job: job
-        }),
-        credentials: 'include'
+      console.log('Getting job application tips with:', API_ENDPOINTS.JOB_TIPS);
+      console.log('Job data:', { 
+        job_title: job.title,
+        company: job.company,
+        url: job.url
+      });
+      
+      const response = await axios.post(API_ENDPOINTS.JOB_TIPS, {
+        cv_analysis: cvAnalysis,
+        job: job
+      }, {
+        withCredentials: true,
+        timeout: 30000
       });
 
-      const data = await response.json();
+      const data = response.data;
+      console.log('Job tips response:', data);
       
       if (data.success) {
         // Tips'i job objesine ekle
@@ -174,6 +230,12 @@ const SmartJobFinder = () => {
       }
     } catch (err) {
       console.error('Başvuru önerileri alınamadı:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        console.error('Session expired while getting job tips');
+      } else if (err.code === 'ECONNABORTED') {
+        console.error('Timeout while getting job tips');
+      }
     }
   };
 

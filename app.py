@@ -681,6 +681,16 @@ def auto_interview_page():
         'has_user_id': 'user_id' in session
     })
 
+@app.route('/smart-job-finder', methods=['GET'])
+def smart_job_finder_page():
+    """Akıllı iş bulma sayfası için basit endpoint"""
+    return jsonify({
+        'message': 'Akıllı iş bulma sayfası erişilebilir',
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session
+    })
+
 @app.route('/test_your_skill', methods=['POST'])
 @login_required
 def test_your_skill():
@@ -2768,6 +2778,9 @@ def get_forum_analytics():
 @login_required
 def analyze_cv():
     """CV'yi Gemini AI ile analiz eder"""
+    print(f"DEBUG: analyze_cv called by user: {session.get('username')}")
+    print(f"DEBUG: Session data: {dict(session)}")
+    
     try:
         # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
         # if 'user_id' not in session:
@@ -2842,6 +2855,9 @@ def analyze_cv():
 @login_required
 def search_jobs():
     """CV analizine göre iş ilanları arar ve eşleştirir"""
+    print(f"DEBUG: search_jobs called by user: {session.get('username')}")
+    print(f"DEBUG: Session data: {dict(session)}")
+    
     try:
         # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
         # if 'user_id' not in session:
@@ -2904,6 +2920,7 @@ def search_jobs():
 @app.route('/api/job-application-tips', methods=['POST'])
 @login_required
 def get_job_application_tips():
+    print(f"DEBUG: get_job_application_tips called by user: {session.get('username')}")
     """Belirli bir iş için başvuru önerileri verir"""
     try:
         # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
