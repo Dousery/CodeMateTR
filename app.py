@@ -35,15 +35,19 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # CORS configuration for production
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
-CORS_ORIGINS = [FRONTEND_URL]
-if os.getenv('FLASK_ENV') == 'development':
-    CORS_ORIGINS.extend(['http://localhost:3000', 'http://127.0.0.1:5173'])
+
+# Production'da tüm origin'lere izin ver (güvenlik için daha sonra kısıtlanabilir)
+if os.getenv('FLASK_ENV') == 'production':
+    CORS_ORIGINS = ['*']
+else:
+    CORS_ORIGINS = [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:5173']
 
 CORS(app, 
      origins=CORS_ORIGINS,
      supports_credentials=True,
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
+     expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
 
 # Database configuration
 DATABASE_URL = os.getenv('DATABASE_URL')

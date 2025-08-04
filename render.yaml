@@ -16,13 +16,13 @@ services:
           name: btk-project-db
           property: connectionString
       - key: FRONTEND_URL
-        value: https://btk-project-frontend.onrender.com
+        value: https://codematetr.onrender.com
       - key: GEMINI_API_KEY
         sync: false
 
   # Frontend Static Site
   - type: web
-    name: btk-project-frontend
+    name: codematetr
     env: static
     buildCommand: cd frontend && npm install && npm run build
     staticPublishPath: ./frontend/dist
