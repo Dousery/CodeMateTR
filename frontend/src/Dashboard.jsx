@@ -270,8 +270,8 @@ export default function Dashboard() {
                   onClick={() => navigate(mod.path)}
                   sx={{ 
                     borderRadius: 4, 
-                    height: 280, 
-                    maxWidth: 250,
+                    height: 300, 
+                    maxWidth: 260,
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
