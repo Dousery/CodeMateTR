@@ -2831,7 +2831,8 @@ def extract_text_from_pdf(file_path):
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
 else:
     # Production ortamında (Render) sadece veritabanını başlat
     init_app()
