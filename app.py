@@ -81,12 +81,13 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=False)  # scrypt hash için daha uzun alan
     interest = db.Column(db.String(80), nullable=True)
     cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
 
     def set_password(self, password):
-        self.password_hash = generate_password_hash(password)
+        # Daha kısa hash için method belirt
+        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
@@ -287,6 +288,22 @@ def init_app():
             # Veritabanı tablolarını güvenli bir şekilde oluştur
             db.create_all()
             print("Veritabanı tabloları başarıyla oluşturuldu.")
+            
+            # Migration: password_hash sütununu güncelle
+            try:
+                from sqlalchemy import text
+                with db.engine.connect() as conn:
+                    conn.execute(text("""
+                        ALTER TABLE "user" 
+                        ALTER COLUMN password_hash TYPE VARCHAR(255)
+                    """))
+                    conn.commit()
+                    print("✅ Database migration completed - password_hash column updated")
+            except Exception as migration_error:
+                print(f"⚠️ Migration note: {migration_error}")
+                # Migration hatası kritik değil, devam et
+                pass
+                
         except Exception as e:
             print(f"Veritabanı tabloları zaten mevcut veya oluşturulamadı: {e}")
             # Hata durumunda devam et
