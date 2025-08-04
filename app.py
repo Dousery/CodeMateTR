@@ -22,17 +22,39 @@ import threading
 import json
 from functools import wraps
 
-app = Flask(__name__, static_folder='static')
-app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')  # .env'den al, fallback için
+# Load environment variables
+load_dotenv()
 
-# CORS ayarlarını daha spesifik yapimage.png
+app = Flask(__name__, static_folder='static')
+
+# Production settings
+app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# CORS configuration for production
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+CORS_ORIGINS = [FRONTEND_URL]
+if os.getenv('FLASK_ENV') == 'development':
+    CORS_ORIGINS.extend(['http://localhost:3000', 'http://127.0.0.1:5173'])
+
 CORS(app, 
-     origins=["http://localhost:5173", "http://localhost:3000", "http://127.0.0.1:5173"],
+     origins=CORS_ORIGINS,
      supports_credentials=True,
      methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
      allow_headers=["Content-Type", "Authorization", "X-Requested-With"])
 
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///btk_project.db'
+# Database configuration
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+
+if DATABASE_URL:
+    app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
+else:
+    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///btk_project.db'
+
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
 app.config['UPLOAD_FOLDER'] = 'uploads'
@@ -45,9 +67,6 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 
 # Session ayarları
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
-app.config['SESSION_COOKIE_SECURE'] = False  # Development için (production'da True olmalı)
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_MAX_AGE'] = 3600  # 1 saat
 app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Her istekte session'ı yenile
 

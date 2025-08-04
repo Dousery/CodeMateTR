@@ -68,7 +68,7 @@ export default function Header() {
   const handleLogout = async () => {
     try {
       // Backend'e logout isteği gönder
-      await fetch('http://localhost:5000/logout', {
+      await fetch(API_ENDPOINTS.LOGOUT, {
         method: 'POST',
         credentials: 'include'
       });
@@ -122,7 +122,7 @@ export default function Header() {
     setPasswordChangeSuccess('');
 
     try {
-      const response = await fetch('http://localhost:5000/change_password', {
+      const response = await fetch(API_ENDPOINTS.CHANGE_PASSWORD, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -154,7 +154,7 @@ export default function Header() {
     if (!username) return;
     
     try {
-      const response = await fetch('http://localhost:5000/forum/notifications', {
+      const response = await fetch(API_ENDPOINTS.FORUM_NOTIFICATIONS, {
         credentials: 'include'
       });
       
@@ -189,7 +189,7 @@ export default function Header() {
 
   const handleMarkAllRead = async () => {
     try {
-      const response = await fetch('http://localhost:5000/forum/notifications/mark-read', {
+      const response = await fetch(API_ENDPOINTS.FORUM_NOTIFICATIONS_MARK_READ, {
         method: 'POST',
         credentials: 'include'
       });
@@ -209,7 +209,7 @@ export default function Header() {
 
   const handleDeleteNotification = async (notificationId) => {
     try {
-      const response = await fetch(`http://localhost:5000/forum/notifications/${notificationId}`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_NOTIFICATIONS}/${notificationId}`, {
         method: 'DELETE',
         credentials: 'include'
       });

@@ -10,6 +10,7 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import API_ENDPOINTS, { getAudioUrl } from './config.js';
 
 export default function AutoInterview() {
   const [sessionId, setSessionId] = useState(null);
@@ -70,7 +71,7 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/auto_interview/start', {}, { 
+      const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_START, {}, { 
         withCredentials: true 
       });
       
@@ -80,10 +81,10 @@ export default function AutoInterview() {
       setTotalQuestions(res.data.total_questions);
       
       if (res.data.audio_url) {
-        setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
+        setAudioUrl(getAudioUrl(res.data.audio_url));
         // Ses otomatik çalsın
         setTimeout(() => {
-          playAudio(`http://localhost:5000${res.data.audio_url}`);
+          playAudio(getAudioUrl(res.data.audio_url));
         }, 500);
       }
       
@@ -106,7 +107,7 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
-      await axios.post('http://localhost:5000/debug/clear_auto_interview_sessions', {}, { 
+      await axios.post(API_ENDPOINTS.DEBUG_CLEAR_SESSIONS, {}, { 
         withCredentials: true 
       });
       
@@ -130,7 +131,7 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/auto_interview/submit_answer', {
+      const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT, {
         session_id: sessionId,
         answer: userAnswer,
         voice_name: 'Kore'
@@ -164,10 +165,10 @@ export default function AutoInterview() {
       setUserAnswer('');
       
       if (res.data.audio_url) {
-        setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
+        setAudioUrl(getAudioUrl(res.data.audio_url));
         // Ses otomatik çalsın
         setTimeout(() => {
-          playAudio(`http://localhost:5000${res.data.audio_url}`);
+          playAudio(getAudioUrl(res.data.audio_url));
         }, 500);
       }
       
@@ -183,7 +184,7 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/auto_interview/complete', {
+      const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_COMPLETE, {
         session_id: sessionId
       }, { withCredentials: true });
       
@@ -205,7 +206,7 @@ export default function AutoInterview() {
   // Aktif oturum kontrolü - basitleştirilmiş
   const checkActiveSession = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/auto_interview/status', { 
+      const res = await axios.get(API_ENDPOINTS.AUTO_INTERVIEW_STATUS, { 
         withCredentials: true 
       });
       
@@ -239,7 +240,7 @@ export default function AutoInterview() {
     formData.append('voice_name', 'Kore');
     
     try {
-      const res = await axios.post('http://localhost:5000/auto_interview/submit_answer', formData, {
+      const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT, formData, {
         withCredentials: true,
         headers: { 'Content-Type': 'multipart/form-data' }
       });
@@ -276,9 +277,9 @@ export default function AutoInterview() {
       setAudioChunks([]);
       
       if (res.data.audio_url) {
-        setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
+        setAudioUrl(getAudioUrl(res.data.audio_url));
         setTimeout(() => {
-          playAudio(`http://localhost:5000${res.data.audio_url}`);
+          playAudio(getAudioUrl(res.data.audio_url));
         }, 500);
       }
       

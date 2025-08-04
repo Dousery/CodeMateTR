@@ -1,0 +1,37 @@
+services:
+  # Backend API Service
+  - type: web
+    name: btk-project-backend
+    env: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: btk-project-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://btk-project-frontend.onrender.com
+      - key: GEMINI_API_KEY
+        sync: false
+
+  # Frontend Static Site
+  - type: web
+    name: btk-project-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://btk-project-backend.onrender.com
+
+databases:
+  - name: btk-project-db
+    databaseName: btk_project
+    user: btk_project_user
+    plan: starter 

@@ -3,6 +3,7 @@ import { Box, Typography, Paper, TextField, Button, Alert, Link, FormControl, In
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 export default function Register({ setIsLoggedIn }) {
   const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', interest: '' });
@@ -39,7 +40,7 @@ export default function Register({ setIsLoggedIn }) {
     localStorage.removeItem('interest');
     
     try {
-      const res = await axios.post('http://localhost:5000/register', {
+      const res = await axios.post(API_ENDPOINTS.REGISTER, {
         username: form.username,
         password: form.password,
         interest: form.interest

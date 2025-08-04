@@ -115,7 +115,7 @@ const Forum = () => {
 
   const fetchLeaderboard = async () => {
     try {
-      const response = await fetch('http://localhost:5000/forum/leaderboard', {
+      const response = await fetch(API_ENDPOINTS.FORUM_LEADERBOARD, {
         credentials: 'include'
       });
 
@@ -130,7 +130,7 @@ const Forum = () => {
 
   const reportContent = async () => {
     try {
-      const response = await fetch('http://localhost:5000/forum/report', {
+      const response = await fetch(API_ENDPOINTS.FORUM_REPORT, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -163,7 +163,7 @@ const Forum = () => {
       if (response.ok) {
         // Seçili gönderiyi yeniden yükle
         if (selectedPost) {
-          const postResponse = await fetch(`http://localhost:5000/forum/posts/${selectedPost.post.id}`, {
+          const postResponse = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${selectedPost.post.id}`, {
             credentials: 'include'
           });
           if (postResponse.ok) {
@@ -183,7 +183,7 @@ const Forum = () => {
 
   const handleMarkAsSolution = async (postId, commentId, solvedBy) => {
     try {
-      const response = await fetch(`http://localhost:5000/forum/posts/${postId}/solve`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${postId}/solve`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -202,7 +202,7 @@ const Forum = () => {
         
         // Seçili gönderiyi hemen güncelle
         if (selectedPost) {
-          const postResponse = await fetch(`http://localhost:5000/forum/posts/${selectedPost.post.id}`, {
+          const postResponse = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${selectedPost.post.id}`, {
             credentials: 'include'
           });
           if (postResponse.ok) {
@@ -228,7 +228,7 @@ const Forum = () => {
 
   const handleDeletePost = async (postId) => {
     try {
-      const response = await fetch(`http://localhost:5000/forum/posts/${postId}`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${postId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -268,7 +268,7 @@ const Forum = () => {
         search: searchTerm
       });
 
-      const response = await fetch(`http://localhost:5000/forum/posts?${params}`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}?${params}`, {
         credentials: 'include'
       });
 
@@ -297,7 +297,7 @@ const Forum = () => {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('http://localhost:5000/forum/stats', {
+      const response = await fetch(API_ENDPOINTS.FORUM_STATS, {
         credentials: 'include'
       });
 
@@ -312,7 +312,7 @@ const Forum = () => {
 
   const handleCreatePost = async () => {
     try {
-      const response = await fetch('http://localhost:5000/forum/posts', {
+      const response = await fetch(API_ENDPOINTS.FORUM_POSTS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -352,7 +352,7 @@ const Forum = () => {
 
   const handleLikePost = async (postId) => {
     try {
-      const response = await fetch(`http://localhost:5000/forum/posts/${postId}/like`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${postId}/like`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -373,7 +373,7 @@ const Forum = () => {
 
   const handlePostClick = async (post) => {
     try {
-      const response = await fetch(`http://localhost:5000/forum/posts/${post.id}`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${post.id}`, {
         credentials: 'include'
       });
 
@@ -391,7 +391,7 @@ const Forum = () => {
     if (!selectedPost) return;
     
     try {
-      const response = await fetch(`http://localhost:5000/forum/posts/${selectedPost.post.id}/comments`, {
+      const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${selectedPost.post.id}/comments`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -417,7 +417,7 @@ const Forum = () => {
       });
       
       // Gönderiyi yeniden yükle
-      const postResponse = await fetch(`http://localhost:5000/forum/posts/${selectedPost.post.id}`, {
+              const postResponse = await fetch(`${API_ENDPOINTS.FORUM_POSTS}/${selectedPost.post.id}`, {
         credentials: 'include'
       });
       if (postResponse.ok) {

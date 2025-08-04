@@ -8,6 +8,7 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import API_ENDPOINTS, { getAudioUrl } from './config.js';
 
 export default function Interview() {
   const [question, setQuestion] = useState('');
@@ -121,7 +122,7 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/interview_simulation', {}, { 
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_SIMULATION, {}, { 
         withCredentials: true,
         timeout: 30000 // 30 saniye timeout
       });
@@ -143,7 +144,7 @@ export default function Interview() {
     setError('');
     setIsSpeechMode(true); // Sesli soru alındığında otomatik olarak sesli moda geç
     try {
-      const res = await axios.post('http://localhost:5000/interview_speech_question', {
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_SPEECH_QUESTION, {
         voice_name: 'Kore'
       }, { 
         withCredentials: true,
@@ -152,10 +153,10 @@ export default function Interview() {
       
       setQuestion(res.data.question);
       if (res.data.audio_url) {
-        setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
+        setAudioUrl(getAudioUrl(res.data.audio_url));
         // Ses otomatik çalsın
         setTimeout(() => {
-          playAudio(`http://localhost:5000${res.data.audio_url}`);
+          playAudio(getAudioUrl(res.data.audio_url));
         }, 500);
       }
       setStep('interview');
@@ -175,7 +176,7 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/interview_cv_based_question', {}, { 
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_CV_QUESTION, {}, { 
         withCredentials: true,
         timeout: 30000
       });
@@ -197,7 +198,7 @@ export default function Interview() {
     setError('');
     setIsSpeechMode(true); // CV tabanlı sesli soru alındığında otomatik olarak sesli moda geç
     try {
-      const res = await axios.post('http://localhost:5000/interview_cv_speech_question', {
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_CV_SPEECH_QUESTION, {
         voice_name: 'Kore'
       }, { 
         withCredentials: true,
@@ -206,10 +207,10 @@ export default function Interview() {
       
       setQuestion(res.data.question);
       if (res.data.audio_url) {
-        setAudioUrl(`http://localhost:5000${res.data.audio_url}`);
+        setAudioUrl(getAudioUrl(res.data.audio_url));
         // Ses otomatik çalsın
         setTimeout(() => {
-          playAudio(`http://localhost:5000${res.data.audio_url}`);
+          playAudio(getAudioUrl(res.data.audio_url));
         }, 500);
       }
       setStep('interview');
@@ -249,7 +250,7 @@ export default function Interview() {
     formData.append('cv_file', cvFile);
     
     try {
-      const res = await axios.post('http://localhost:5000/upload_cv', formData, {
+      const res = await axios.post(API_ENDPOINTS.UPLOAD_CV, formData, {
         withCredentials: true,
         timeout: 60000, // CV analizi uzun sürebilir
         headers: {
@@ -273,7 +274,7 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/interview_personalized_questions', {
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_PERSONALIZED, {
         difficulty: difficulty
       }, { 
         withCredentials: true,
@@ -300,7 +301,7 @@ export default function Interview() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/interview_simulation/evaluate', {
+      const res = await axios.post(API_ENDPOINTS.INTERVIEW_EVALUATE, {
         question: question,
         answer: answer.trim() // Backend'de 'answer' olarak bekliyor
       }, { 
@@ -359,7 +360,7 @@ export default function Interview() {
 
         console.log('Ses dosyası gönderiliyor, lütfen bekleyin...');
         
-        const res = await axios.post('http://localhost:5000/interview_speech_evaluation', formData, {
+        const res = await axios.post(API_ENDPOINTS.INTERVIEW_SPEECH_EVALUATION, formData, {
           withCredentials: true,
           timeout: 120000, // 2 dakika timeout (ses işleme uzun sürebilir)
           headers: {
@@ -375,13 +376,13 @@ export default function Interview() {
         if (res.data.audio_url) {
           // Geri bildirim sesini otomatik çal
           setTimeout(() => {
-            playAudio(`http://localhost:5000${res.data.audio_url}`);
+            playAudio(getAudioUrl(res.data.audio_url));
           }, 500);
         }
         setStep('result');
       } else {
         // Sadece metin cevap varsa
-        const res = await axios.post('http://localhost:5000/interview_speech_evaluation', {
+        const res = await axios.post(API_ENDPOINTS.INTERVIEW_SPEECH_EVALUATION, {
           question: question,
           user_answer: answer.trim(),
           voice_name: 'Enceladus'
@@ -393,7 +394,7 @@ export default function Interview() {
         setResult(res.data);
         if (res.data.audio_url) {
           setTimeout(() => {
-            playAudio(`http://localhost:5000${res.data.audio_url}`);
+            playAudio(getAudioUrl(res.data.audio_url));
           }, 500);
         }
         setStep('result');
@@ -965,7 +966,7 @@ export default function Interview() {
               {result.audio_url && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', mb: 2 }}>
                   <IconButton 
-                    onClick={() => playAudio(`http://localhost:5000${result.audio_url}`)}
+                    onClick={() => playAudio(getAudioUrl(result.audio_url))}
                     sx={{ 
                       color: 'primary.main',
                       backgroundColor: 'rgba(255,255,255,0.1)',

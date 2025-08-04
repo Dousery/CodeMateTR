@@ -15,6 +15,7 @@ import StarIcon from '@mui/icons-material/Star';
 import CommentIcon from '@mui/icons-material/Comment';
 import CodeIcon from '@mui/icons-material/Code';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 const alanlar = {
   'AI': 'AI Developer',
@@ -38,7 +39,7 @@ export default function Profile({ setIsLoggedIn }) {
 
   const fetchUserStats = async () => {
     try {
-      const response = await axios.get('http://localhost:5000/profile', {
+      const response = await axios.get(API_ENDPOINTS.PROFILE, {
         withCredentials: true
       });
       setUserStats(response.data);
@@ -52,7 +53,7 @@ export default function Profile({ setIsLoggedIn }) {
   const handleLogout = async () => {
     try {
       // Backend'e logout isteği gönder
-      await fetch('http://localhost:5000/logout', {
+      await fetch(API_ENDPOINTS.LOGOUT, {
         method: 'POST',
         credentials: 'include'
       });

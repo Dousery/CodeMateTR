@@ -81,7 +81,7 @@ const SmartJobFinder = () => {
     formData.append('cv_file', file);
 
     try {
-      const response = await fetch('http://localhost:5000/api/analyze-cv', {
+      const response = await fetch(API_ENDPOINTS.ANALYZE_CV, {
         method: 'POST',
         body: formData,
         credentials: 'include'
@@ -118,7 +118,7 @@ const SmartJobFinder = () => {
     setActiveStep(2);
 
     try {
-      const response = await fetch('http://localhost:5000/api/search-jobs', {
+      const response = await fetch(API_ENDPOINTS.SEARCH_JOBS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -150,7 +150,7 @@ const SmartJobFinder = () => {
 
   const getJobApplicationTips = async (job) => {
     try {
-      const response = await fetch('http://localhost:5000/api/job-application-tips', {
+      const response = await fetch(API_ENDPOINTS.JOB_TIPS, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

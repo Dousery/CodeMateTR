@@ -11,6 +11,7 @@ import {
 } from '@mui/icons-material';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 export default function Code() {
   const [question, setQuestion] = useState('');
@@ -332,7 +333,7 @@ export default function Code() {
     
     setLoading(true);
     try {
-      const res = await axios.post('http://localhost:5000/code_room/format_code', {
+      const res = await axios.post(API_ENDPOINTS.CODE_FORMAT, {
         code: userCode,
         language: selectedLanguage
       }, { withCredentials: true });
@@ -356,7 +357,7 @@ export default function Code() {
     if (!code.trim()) return code;
     
     try {
-      const res = await axios.post('http://localhost:5000/code_room/format_code', {
+      const res = await axios.post(API_ENDPOINTS.CODE_FORMAT, {
         code: code,
         language: language
       }, { withCredentials: true });
@@ -400,7 +401,7 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/code_room', {
+      const res = await axios.post(API_ENDPOINTS.CODE_ROOM, {
         difficulty: difficulty,
         language: selectedLanguage
       }, { withCredentials: true });
@@ -426,7 +427,7 @@ export default function Code() {
     setError('');
     try {
       // Sadece kod çalıştırma - analiz yok
-      const res = await axios.post('http://localhost:5000/code_room/run_simple', {
+      const res = await axios.post(API_ENDPOINTS.CODE_RUN_SIMPLE, {
         user_code: userCode,
         language: selectedLanguage
       }, { withCredentials: true });
@@ -469,7 +470,7 @@ export default function Code() {
       // Fallback: Eski API'yi dene
       try {
         console.log('🔄 Yeni API başarısız, eski API deneniyor...');
-        const fallbackRes = await axios.post('http://localhost:5000/code_room/run', {
+        const fallbackRes = await axios.post(API_ENDPOINTS.CODE_RUN, {
           user_code: userCode,
           language: selectedLanguage
         }, { withCredentials: true });
@@ -493,7 +494,7 @@ export default function Code() {
     setError('');
     try {
       // Mevcut code odası evaluate fonksiyonunu kullan
-      const res = await axios.post('http://localhost:5000/code_room/evaluate', {
+      const res = await axios.post(API_ENDPOINTS.CODE_EVALUATE, {
         question: question,
         user_code: userCode,
         use_execution: true, // Çalıştır ve analiz et
@@ -525,7 +526,7 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/code_room/generate_solution', {
+      const res = await axios.post(API_ENDPOINTS.CODE_GENERATE, {
         question: question,
         language: selectedLanguage
       }, { withCredentials: true });
@@ -578,7 +579,7 @@ export default function Code() {
         ? `${config.name} programlama ${question.slice(0, 100)}` 
         : `${config.name} programlama başlangıç orta seviye`;
         
-      const res = await axios.post('http://localhost:5000/code_room/suggest_resources', {
+      const res = await axios.post(API_ENDPOINTS.CODE_SUGGEST, {
         topic: searchTopic,
         num_resources: 5
       }, { withCredentials: true });

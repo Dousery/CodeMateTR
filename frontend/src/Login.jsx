@@ -3,6 +3,7 @@ import { Box, Typography, Paper, TextField, Button, Alert, Link } from '@mui/mat
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 export default function Login({ setIsLoggedIn }) {
   const [form, setForm] = useState({ username: '', password: '' });
@@ -20,11 +21,11 @@ export default function Login({ setIsLoggedIn }) {
     localStorage.removeItem('interest');
     
     try {
-      const res = await axios.post('http://localhost:5000/login', form, { withCredentials: true });
+      const res = await axios.post(API_ENDPOINTS.LOGIN, form, { withCredentials: true });
       localStorage.setItem('username', form.username);
       
       // Kullanıcının interest'ini al
-      const profileRes = await axios.get('http://localhost:5000/profile', { withCredentials: true });
+      const profileRes = await axios.get(API_ENDPOINTS.PROFILE, { withCredentials: true });
       if (profileRes.data.interest) {
         localStorage.setItem('interest', profileRes.data.interest);
       }

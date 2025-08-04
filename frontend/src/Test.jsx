@@ -7,6 +7,7 @@ import {
 import { motion } from 'framer-motion';
 import { AccessTime, ExpandMore, CheckCircle, Cancel, School, TrendingUp } from '@mui/icons-material';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 export default function Test() {
   const [questions, setQuestions] = useState([]);
@@ -38,7 +39,7 @@ export default function Test() {
     console.log('Submitting with testSessionId:', testSessionId);
     try {
       const user_answers = questions.map((q, i) => answers[i] || '');
-      const res = await axios.post('http://localhost:5000/test_your_skill/evaluate', {
+      const res = await axios.post(API_ENDPOINTS.TEST_EVALUATE, {
         user_answers,
         test_session_id: testSessionId
       }, { withCredentials: true });
@@ -80,7 +81,7 @@ export default function Test() {
     setLoading(true);
     setError('');
     try {
-      const res = await axios.post('http://localhost:5000/test_your_skill', {
+      const res = await axios.post(API_ENDPOINTS.TEST_SKILL, {
         num_questions: numQuestions,
         difficulty: difficulty
       }, { withCredentials: true });

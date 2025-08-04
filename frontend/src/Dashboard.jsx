@@ -9,6 +9,7 @@ import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
 import WorkIcon from '@mui/icons-material/Work';
 import ForumIcon from '@mui/icons-material/Forum';
 import axios from 'axios';
+import API_ENDPOINTS from './config.js';
 
 const modules = [
   {
@@ -84,7 +85,7 @@ export default function Dashboard() {
   useEffect(() => {
     // Eğer ilgi alanı yoksa önce backend'den çek
     if (!alan) {
-      axios.get('http://localhost:5000/profile', { withCredentials: true })
+      axios.get(API_ENDPOINTS.PROFILE, { withCredentials: true })
         .then(res => {
           if (res.data.interest) {
             localStorage.setItem('interest', res.data.interest);
@@ -101,7 +102,7 @@ export default function Dashboard() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await axios.post('http://localhost:5000/set_interest', { interest: alan }, { withCredentials: true });
+      await axios.post(API_ENDPOINTS.SET_INTEREST, { interest: alan }, { withCredentials: true });
       localStorage.setItem('interest', alan);
       setOpen(false);
     } catch (err) {
