@@ -23,6 +23,31 @@ export default function Test() {
   const [numQuestions, setNumQuestions] = useState(10);
   const [showTimer, setShowTimer] = useState(false);
 
+  // Sayfa yüklendiğinde session durumunu kontrol et
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        console.log('Checking session status...');
+        const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Session status:', sessionRes.data);
+        
+        // Test endpoint'ini de kontrol et
+        const testRes = await axios.get(API_ENDPOINTS.TEST_PAGE, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Test page status:', testRes.data);
+      } catch (err) {
+        console.error('Session check failed:', err);
+      }
+    };
+    
+    checkSession();
+  }, []);
+
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
@@ -81,12 +106,18 @@ export default function Test() {
     setLoading(true);
     setError('');
     try {
+      console.log('Fetching questions from:', API_ENDPOINTS.TEST_SKILL);
+      console.log('Request data:', { num_questions: numQuestions, difficulty: difficulty });
+      
       const res = await axios.post(API_ENDPOINTS.TEST_SKILL, {
         num_questions: numQuestions,
         difficulty: difficulty
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 15000
+      });
       
-      console.log('New test session created:', res.data.test_session_id);
+      console.log('Response received:', res.data);
       setQuestions(res.data.questions);
       setTestSessionId(res.data.test_session_id);
       setTimeLeft(res.data.duration);
@@ -99,7 +130,15 @@ export default function Test() {
         setShowTimer(false);
       }, 5000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Soru alınamadı.');
+      console.error('Error fetching questions:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Soru alınamadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }

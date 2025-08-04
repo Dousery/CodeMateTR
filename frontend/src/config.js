@@ -18,6 +18,7 @@ export const API_ENDPOINTS = {
   HEALTH: `${API_BASE_URL}/health`,
 
   // Test endpoints
+  TEST_PAGE: `${API_BASE_URL}/test`,
   TEST_SKILL: `${API_BASE_URL}/test_your_skill`,
   TEST_EVALUATE: `${API_BASE_URL}/test_your_skill/evaluate`,
 

@@ -651,11 +651,29 @@ def profile():
         # Veritabanı hatası durumunda session'ı temizleme, sadece hata döndür
         return jsonify({'error': 'Sunucu hatası. Lütfen daha sonra tekrar deneyin.'}), 500
 
+@app.route('/test', methods=['GET'])
+def test_page():
+    """Test sayfası için basit endpoint"""
+    return jsonify({
+        'message': 'Test sayfası erişilebilir',
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session
+    })
+
 @app.route('/test_your_skill', methods=['POST'])
 @login_required
 def test_your_skill():
+    print(f"DEBUG: test_your_skill called by user: {session.get('username')}")
+    print(f"DEBUG: Session data: {dict(session)}")
+    
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        print(f"DEBUG: User not found in database: {session.get('username')}")
+        return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
+    
     if not user.interest:
+        print(f"DEBUG: User has no interest: {session.get('username')}")
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     data = request.json
