@@ -61,4 +61,7 @@ export const API_ENDPOINTS = {
   DEBUG_CLEAR_SESSIONS: `${API_BASE_URL}/debug/clear_auto_interview_sessions`,
 };
 
-export default API_ENDPOINTS; 
+export default API_ENDPOINTS;
+
+// Debug için console.log ekle
+console.log('API_ENDPOINTS loaded:', API_ENDPOINTS); 

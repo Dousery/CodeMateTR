@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import API_ENDPOINTS from './config.js';
 import {
   Box,
   Container,

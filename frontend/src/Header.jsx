@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button, Badge, Typography, Divider, Chip, keyframes, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
+import API_ENDPOINTS from './config.js';
 import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
 import PsychologyIcon from '@mui/icons-material/Psychology';
