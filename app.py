@@ -29,10 +29,11 @@ app = Flask(__name__, static_folder='static')
 
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['SESSION_COOKIE_SECURE'] = False  # Render'da HTTPS sorunları
-app.config['SESSION_COOKIE_HTTPONLY'] = False  # JavaScript erişimi için
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Cross-site için
-app.config['SESSION_COOKIE_PATH'] = '/'  # Tüm path'ler için
+app.config['SESSION_COOKIE_SECURE'] = False
+app.config['SESSION_COOKIE_HTTPONLY'] = False
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+app.config['SESSION_COOKIE_PATH'] = '/'
+app.config['SESSION_COOKIE_DOMAIN'] = None
 
 # CORS configuration for production
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
@@ -337,8 +338,11 @@ genai.configure(api_key=GEMINI_API_KEY)
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
+        print(f"DEBUG: Session check - Session: {dict(session)}")
         if 'username' not in session:
+            print(f"DEBUG: No username in session")
             return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+        print(f"DEBUG: Login check passed for user: {session['username']}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -1347,7 +1351,15 @@ def change_password():
 
 @app.route('/')
 def home():
-            return jsonify({'message': 'CodeMateTR API is running!'})
+    return jsonify({'message': 'CodeMateTR API is running!'})
+
+@app.route('/test-session')
+def test_session():
+    return jsonify({
+        'session': dict(session),
+        'has_username': 'username' in session,
+        'username': session.get('username', None)
+    })
 
 
 
