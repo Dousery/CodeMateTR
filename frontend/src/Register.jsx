@@ -21,6 +21,13 @@ export default function Register({ setIsLoggedIn }) {
       return;
     }
     
+    // Şifre gücü kontrolü
+    if (form.password.length < 5) {
+      setError('Şifre en az 5 karakter olmalıdır.');
+      setLoading(false);
+      return;
+    }
+    
     if (!form.interest) {
       setError('Lütfen bir ilgi alanı seçin.');
       setLoading(false);

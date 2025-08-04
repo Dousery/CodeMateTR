@@ -41,8 +41,7 @@ import {
   Tag as TagIcon,
   Person as PersonIcon,
   Forum as ForumIcon,
-  Notifications as NotificationsIcon,
-  NotificationsActive as NotificationsActiveIcon,
+
   EmojiEvents as EmojiEventsIcon,
   TrendingUp as TrendingUpIcon,
   CheckCircle as CheckCircleIcon,
@@ -65,12 +64,10 @@ const Forum = () => {
     title: '',
     content: '',
     post_type: 'discussion',
-    tags: [],
-    is_anonymous: false
+    tags: []
   });
   const [newComment, setNewComment] = useState({
-    content: '',
-    is_anonymous: false
+    content: ''
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -79,9 +76,6 @@ const Forum = () => {
   const [postTypeFilter, setPostTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('latest');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
-  const [notifications, setNotifications] = useState([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
-  const [showNotifications, setShowNotifications] = useState(false);
   const [leaderboard, setLeaderboard] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
@@ -114,28 +108,10 @@ const Forum = () => {
   useEffect(() => {
     fetchPosts();
     fetchStats();
-    fetchNotifications();
     fetchLeaderboard();
   }, [currentPage, searchTerm, postTypeFilter, sortBy]);
 
-  const fetchNotifications = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/forum/notifications', {
-        credentials: 'include'
-      });
 
-      if (response.ok) {
-        const data = await response.json();
-        setNotifications(data.notifications);
-        setUnreadNotifications(data.notifications.filter(n => !n.is_read).length);
-      } else if (response.status === 401) {
-        // Session hatası - sessizce işlemi durdur
-        return;
-      }
-    } catch (err) {
-      console.error('Bildirimler yüklenemedi:', err);
-    }
-  };
 
   const fetchLeaderboard = async () => {
     try {
@@ -174,21 +150,7 @@ const Forum = () => {
     }
   };
 
-  const markNotificationsRead = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/forum/notifications/mark-read', {
-        method: 'POST',
-        credentials: 'include'
-      });
 
-      if (response.ok) {
-        setUnreadNotifications(0);
-        fetchNotifications();
-      }
-    } catch (err) {
-      console.error('Bildirimler işaretlenemedi:', err);
-    }
-  };
 
   // Yeni fonksiyonlar ekle
   const handleLikeComment = async (commentId) => {
@@ -375,8 +337,7 @@ const Forum = () => {
         title: '',
         content: '',
         post_type: 'discussion',
-        tags: [],
-        is_anonymous: false
+        tags: []
       });
       fetchPosts();
       fetchStats();
@@ -452,8 +413,7 @@ const Forum = () => {
 
       setOpenCommentDialog(false);
       setNewComment({
-        content: '',
-        is_anonymous: false
+        content: ''
       });
       
       // Gönderiyi yeniden yükle
@@ -589,77 +549,13 @@ const Forum = () => {
               </IconButton>
             </Tooltip>
             
-            <Tooltip title="Bildirimler">
-              <IconButton
-                onClick={() => {
-                  setShowNotifications(!showNotifications);
-                  if (unreadNotifications > 0) {
-                    markNotificationsRead();
-                  }
-                }}
-                sx={{
-                  color: 'white',
-                  bgcolor: 'rgba(255,255,255,0.1)',
-                  '&:hover': { bgcolor: 'rgba(255,255,255,0.2)' }
-                }}
-              >
-                <Badge badgeContent={unreadNotifications} color="error">
-                  {unreadNotifications > 0 ? <NotificationsActiveIcon /> : <NotificationsIcon />}
-                </Badge>
-              </IconButton>
-            </Tooltip>
+
           </Box>
         </Box>
         </motion.div>
       )}
 
-            {/* Notifications Panel */}
-      <Card sx={{ 
-        mb: 3, 
-        bgcolor: 'rgba(255,255,255,0.05)', 
-        maxHeight: showNotifications ? 400 : 0,
-        overflow: 'hidden',
-        transition: 'max-height 0.3s ease-in-out',
-        opacity: showNotifications ? 1 : 0,
-        position: 'relative',
-        zIndex: 1
-      }}>
-        {showNotifications && (
-          <CardContent>
-            <Typography variant="h6" sx={{ color: 'white', mb: 2 }}>
-              Bildirimler ({notifications.length})
-            </Typography>
-            {notifications.length === 0 ? (
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', textAlign: 'center' }}>
-                Henüz bildiriminiz yok.
-              </Typography>
-            ) : (
-              <List>
-                {notifications.map((notification) => (
-                  <ListItem key={notification.id} sx={{ 
-                    borderBottom: '1px solid rgba(255,255,255,0.1)',
-                    bgcolor: notification.is_read ? 'transparent' : 'rgba(79, 70, 229, 0.1)'
-                  }}>
-                    <ListItemText
-                      primary={notification.title}
-                      secondary={
-                        <Box>
-                          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                            {notification.message}
-                          </Typography>
-                          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                            {formatDate(notification.created_at)}
-                          </Typography>
-                        </Box>
-                      }
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            )}
-          </CardContent>
-        )}
-      </Card>
+
 
       {/* Leaderboard Panel */}
       {showLeaderboard && (

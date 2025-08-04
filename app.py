@@ -21,9 +21,10 @@ from utils.code_formatter import code_indenter
 from flask_sqlalchemy import SQLAlchemy
 import threading
 import json
+from functools import wraps
 
 app = Flask(__name__, static_folder='static')
-app.secret_key = 'supersecretkey'  # Geliştirme için, prod'da değiştirilmeli
+app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')  # .env'den al, fallback için
 
 # CORS ayarlarını daha spesifik yapimage.png
 CORS(app, 
@@ -45,9 +46,11 @@ ALLOWED_EXTENSIONS = {'pdf', 'doc', 'docx'}
 
 # Session ayarları
 app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
-app.config['SESSION_COOKIE_SECURE'] = False  # Development için
+app.config['SESSION_COOKIE_SECURE'] = False  # Development için (production'da True olmalı)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_MAX_AGE'] = 3600  # 1 saat
+app.config['SESSION_REFRESH_EACH_REQUEST'] = True  # Her istekte session'ı yenile
 
 # Tek bir db instance oluştur
 db = SQLAlchemy(app)
@@ -78,8 +81,6 @@ class ForumPost(db.Model):
     views = db.Column(db.Integer, default=0)
     likes_count = db.Column(db.Integer, default=0)
     comments_count = db.Column(db.Integer, default=0)
-    is_pinned = db.Column(db.Boolean, default=False)
-    is_anonymous = db.Column(db.Boolean, default=False)
     is_solved = db.Column(db.Boolean, default=False)  # Soru çözüldü mü?
     solved_by = db.Column(db.String(80), nullable=True)  # Kim çözdü?
     solved_at = db.Column(db.DateTime, nullable=True)
@@ -94,7 +95,6 @@ class ForumComment(db.Model):
     content = db.Column(db.Text, nullable=False)
     parent_comment_id = db.Column(db.Integer, db.ForeignKey('forum_comment.id'), nullable=True)  # Nested comments
     likes_count = db.Column(db.Integer, default=0)
-    is_anonymous = db.Column(db.Boolean, default=False)
     is_solution = db.Column(db.Boolean, default=False)  # Bu yorum çözüm mü?
     is_accepted = db.Column(db.Boolean, default=False)  # Çözüm kabul edildi mi?
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -288,6 +288,14 @@ GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 genai.configure(api_key=GEMINI_API_KEY)
 
+# Güvenlik dekoratörü
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return jsonify({'error': 'Giriş yapmalısınız.'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/register', methods=['POST'])
 def register():
@@ -299,6 +307,11 @@ def register():
         return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
     if not interest:
         return jsonify({'error': 'İlgi alanı gerekli.'}), 400
+    
+    # Şifre gücü kontrolü
+    if len(password) < 5:
+        return jsonify({'error': 'Şifre en az 5 karakter olmalıdır.'}), 400
+    
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Kullanıcı zaten mevcut.'}), 400
     user = User(username=username, interest=interest)
@@ -317,10 +330,12 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
     
-    
-    # Kullanıcı login olduğunda eski session'larını temizle (artık sadece test session'ları)
-    
+    # Session'ı yenile ve güvenli hale getir
+    session.clear()  # Eski session verilerini temizle
     session['username'] = username
+    session['login_time'] = datetime.utcnow().isoformat()
+    session.permanent = True  # Session'ı kalıcı yap
+    
     return jsonify({'message': 'Giriş başarılı.'})
 
 @app.route('/logout', methods=['POST'])
@@ -329,9 +344,8 @@ def logout():
     return jsonify({'message': 'Çıkış başarılı.'})
 
 @app.route('/set_interest', methods=['POST'])
+@login_required
 def set_interest():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     data = request.json
     interest = data.get('interest')
     if not interest:
@@ -342,10 +356,8 @@ def set_interest():
     return jsonify({'message': 'İlgi alanı kaydedildi.'})
 
 @app.route('/profile', methods=['GET'])
+@login_required
 def profile():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     try:
         user = User.query.filter_by(username=session['username']).first()
         if not user:
@@ -522,9 +534,8 @@ def profile():
         return jsonify({'error': 'Sunucu hatası. Lütfen daha sonra tekrar deneyin.'}), 500
 
 @app.route('/test_your_skill', methods=['POST'])
+@login_required
 def test_your_skill():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -584,10 +595,8 @@ def test_your_skill():
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
 
 @app.route('/upload_cv', methods=['POST'])
+@login_required
 def upload_cv():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     if 'cv_file' not in request.files:
         return jsonify({'error': 'CV dosyası seçilmemiş.'}), 400
     
@@ -621,10 +630,8 @@ def upload_cv():
         return jsonify({'error': 'Geçersiz dosya formatı. PDF, DOC veya DOCX dosyası yükleyiniz.'}), 400
 
 @app.route('/interview_cv_based_question', methods=['POST'])
+@login_required
 def interview_cv_based_question():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.cv_analysis:
         return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
@@ -643,10 +650,8 @@ def interview_cv_based_question():
         return jsonify({'error': f'Soru oluşturma hatası: {str(e)}'}), 500
 
 @app.route('/interview_personalized_questions', methods=['POST'])
+@login_required
 def interview_personalized_questions():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.cv_analysis:
         return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
@@ -668,9 +673,8 @@ def interview_personalized_questions():
         return jsonify({'error': f'Sorular oluşturma hatası: {str(e)}'}), 500
 
 @app.route('/interview_speech_question', methods=['POST'])
+@login_required
 def interview_speech_question():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -709,10 +713,8 @@ def interview_speech_question():
         return jsonify({'error': f'Sesli soru oluşturma hatası: {str(e)}'}), 500
 
 @app.route('/interview_cv_speech_question', methods=['POST'])
+@login_required
 def interview_cv_speech_question():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.cv_analysis:
         return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
@@ -749,10 +751,8 @@ def interview_cv_speech_question():
         return jsonify({'error': f'CV tabanlı sesli soru hatası: {str(e)}'}), 500
 
 @app.route('/interview_speech_evaluation', methods=['POST'])
+@login_required
 def interview_speech_evaluation():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -860,9 +860,8 @@ def interview_speech_evaluation():
             return jsonify({'error': f'Sesli değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/interview_simulation', methods=['POST'])
+@login_required
 def interview_simulation():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -877,9 +876,8 @@ def interview_simulation():
     })
 
 @app.route('/code_room', methods=['POST'])
+@login_required
 def code_room():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -909,10 +907,8 @@ def code_room():
     })
 
 @app.route('/code_room/generate_solution', methods=['POST'])
+@login_required
 def code_room_generate_solution():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -935,10 +931,8 @@ def code_room_generate_solution():
         return jsonify({'error': f'Çözüm oluşturma hatası: {str(e)}'}), 500
 
 @app.route('/user_test_stats', methods=['GET'])
+@login_required
 def user_test_stats():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     username = session['username']
     
     # Son test performansları
@@ -1006,9 +1000,8 @@ def user_test_stats():
 
 # Test çözümü kaydı
 @app.route('/test_your_skill/evaluate', methods=['POST'])
+@login_required
 def test_your_skill_evaluate():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1090,11 +1083,9 @@ def test_your_skill_evaluate():
 
 # Code Room çözümü kaydı
 @app.route('/code_room/evaluate', methods=['POST'])
+@login_required
 def code_room_evaluate():
     """Kodu değerlendirir ve puan verir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1142,11 +1133,9 @@ def code_room_evaluate():
         return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/code_room/evaluate_advanced', methods=['POST'])
+@login_required
 def code_room_evaluate_advanced():
     """Gelişmiş kod değerlendirme - çalıştırır ve detaylı analiz yapar"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1250,11 +1239,9 @@ def code_room_evaluate_advanced():
         return jsonify({'error': f'Gelişmiş değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/code_room/run', methods=['POST'])
+@login_required
 def code_room_run():
     """Sadece kodu çalıştırır, değerlendirmez"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1277,11 +1264,9 @@ def code_room_run():
         return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
 
 @app.route('/code_room/run_simple', methods=['POST'])
+@login_required
 def code_room_run_simple():
     """Basit kod çalıştırma - sadece çalıştırır, analiz yapmaz"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1327,11 +1312,9 @@ def code_room_run_simple():
         return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
 
 @app.route('/code_room/run_advanced', methods=['POST'])
+@login_required
 def code_room_run_advanced():
     """Gelişmiş kod çalıştırma - yeni CodeAIAgent özelliklerini kullanır"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1414,11 +1397,9 @@ def code_room_run_advanced():
         return jsonify({'error': f'Gelişmiş kod çalıştırma hatası: {str(e)}'}), 500
 
 @app.route('/code_room/debug', methods=['POST'])
+@login_required
 def code_room_debug():
     """Hatalı kodu debug eder"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1441,11 +1422,9 @@ def code_room_debug():
         return jsonify({'error': f'Debug hatası: {str(e)}'}), 500
 
 @app.route('/code_room/analyze_complexity', methods=['POST'])
+@login_required
 def code_room_analyze_complexity():
     """Kod karmaşıklığını analiz eder"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1468,11 +1447,9 @@ def code_room_analyze_complexity():
         return jsonify({'error': f'Karmaşıklık analizi hatası: {str(e)}'}), 500
 
 @app.route('/code_room/suggest_resources', methods=['POST'])
+@login_required
 def code_room_suggest_resources():
     """Konuya göre kaynak önerileri"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1496,6 +1473,7 @@ def code_room_suggest_resources():
         return jsonify({'error': f'Kaynak önerisi hatası: {str(e)}'}), 500
 
 @app.route('/code_room/format_code', methods=['POST'])
+@login_required
 def code_room_format_code():
     """Kodu gelişmiş formatter ile formatlar"""
     # Session kontrolünü kaldır - formatlama için gerekli değil
@@ -1533,11 +1511,9 @@ def code_room_format_code():
         return jsonify({'error': f'Kod formatlanamadı: {str(e)}'}), 500
 
 @app.route('/code_room/evaluate_with_execution', methods=['POST'])
+@login_required
 def code_room_evaluate_with_execution():
     """Kodu çalıştırarak değerlendirir ve puan verir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1562,11 +1538,9 @@ def code_room_evaluate_with_execution():
         return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
 
 @app.route('/code_room/solve_math', methods=['POST'])
+@login_required
 def code_room_solve_math():
     """Matematik problemlerini çözer"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1590,11 +1564,9 @@ def code_room_solve_math():
         return jsonify({'error': f'Matematik problemi çözme hatası: {str(e)}'}), 500
 
 @app.route('/code_room/analyze_data', methods=['POST'])
+@login_required
 def code_room_analyze_data():
     """Veri analizi yapar"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1619,11 +1591,9 @@ def code_room_analyze_data():
         return jsonify({'error': f'Veri analizi hatası: {str(e)}'}), 500
 
 @app.route('/code_room/execute_complex', methods=['POST'])
+@login_required
 def code_room_execute_complex():
     """Karmaşık kod çalıştırma"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1648,9 +1618,8 @@ def code_room_execute_complex():
 
 # Case Study çözümü kaydı
 @app.route('/case_study_room/evaluate', methods=['POST'])
+@login_required
 def case_study_room_evaluate():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1667,9 +1636,8 @@ def case_study_room_evaluate():
     return jsonify({'evaluation': evaluation})
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
+@login_required
 def interview_simulation_evaluate():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1698,14 +1666,18 @@ def interview_simulation_evaluate():
     })
 
 @app.route('/change_password', methods=['POST'])
+@login_required
 def change_password():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
     data = request.json
     old_password = data.get('old_password')
     new_password = data.get('new_password')
     if not old_password or not new_password:
         return jsonify({'error': 'Mevcut ve yeni şifre gerekli.'}), 400
+    
+    # Şifre gücü kontrolü
+    if len(new_password) < 5:
+        return jsonify({'error': 'Yeni şifre en az 5 karakter olmalıdır.'}), 400
+    
     user = User.query.filter_by(username=session['username']).first()
     if not user or not user.check_password(old_password):
         return jsonify({'error': 'Mevcut şifre yanlış.'}), 400
@@ -1714,6 +1686,7 @@ def change_password():
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
 
 @app.route('/debug/session/<session_id>', methods=['GET'])
+@login_required
 def debug_session(session_id):
     if session_id not in active_case_sessions:
         return jsonify({'error': 'Session bulunamadı'})
@@ -1731,6 +1704,7 @@ def debug_session(session_id):
     })
 
 @app.route('/debug/queue', methods=['GET'])
+@login_required
 def debug_queue():
     return jsonify({
         'case_study_queue': case_study_queue,
@@ -1738,6 +1712,7 @@ def debug_queue():
     })
 
 @app.route('/debug/force_match', methods=['POST'])
+@login_required
 def force_match():
     data = request.json
     interest = data.get('interest', 'Data Science')
@@ -1777,6 +1752,7 @@ def force_match():
     return jsonify({'status': 'error', 'message': 'Eşleştirilecek kullanıcı yok'})
 
 @app.route('/debug/clear_sessions', methods=['POST'])
+@login_required
 def clear_sessions():
     global active_case_sessions, case_study_queue
     active_case_sessions.clear()
@@ -1786,10 +1762,8 @@ def clear_sessions():
 
 
 @app.route('/case_study_room/leave_queue', methods=['POST'])
+@login_required
 def leave_queue():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     username = session['username']
     user = User.query.filter_by(username=username).first()
     interest = user.interest
@@ -1809,6 +1783,7 @@ def leave_queue():
     return jsonify({'message': 'Tüm session\'lardan çıkarıldınız.'})
 
 @app.route('/debug/test_case_generation', methods=['POST'])
+@login_required
 def test_case_generation():
     data = request.json
     interest = data.get('interest', 'Data Science')
@@ -1833,10 +1808,8 @@ def home():
             return jsonify({'message': 'CodeMateTR API is running!'})
 
 @app.route('/debug/clear_user_sessions', methods=['POST'])
+@login_required
 def clear_user_sessions():
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     username = session['username']
     
     # Kullanıcıyı tüm kuyruklardan çıkar
@@ -1855,11 +1828,9 @@ def clear_user_sessions():
     return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
 @app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
+@login_required
 def clear_auto_interview_sessions():
     """Kullanıcının otomatik mülakat oturumlarını temizler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     username = session['username']
     
     try:
@@ -1886,11 +1857,9 @@ def clear_auto_interview_sessions():
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
 @app.route('/auto_interview/start', methods=['POST'])
+@login_required
 def start_auto_interview():
     """Otomatik mülakat başlatır"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -1963,11 +1932,9 @@ def start_auto_interview():
         return jsonify({'error': f'Mülakat başlatma hatası: {str(e)}'}), 500
 
 @app.route('/auto_interview/submit_answer', methods=['POST'])
+@login_required
 def submit_auto_interview_answer():
     """Otomatik mülakat cevabını gönder ve sonraki soruyu al"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     # Hem JSON hem de form data formatını destekle
     if request.is_json:
         data = request.json
@@ -2105,11 +2072,9 @@ def submit_auto_interview_answer():
         return jsonify({'error': f'Cevap gönderme hatası: {str(e)}'}), 500
 
 @app.route('/auto_interview/complete', methods=['POST'])
+@login_required
 def complete_auto_interview():
     """Mülakatı tamamlar ve final değerlendirme üretir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     data = request.json
     session_id = data.get('session_id')
     
@@ -2157,11 +2122,9 @@ def complete_auto_interview():
         return jsonify({'error': f'Mülakat tamamlama hatası: {str(e)}'}), 500
 
 @app.route('/auto_interview/status', methods=['GET'])
+@login_required
 def get_auto_interview_status():
     """Aktif mülakat oturumunun durumunu döndürür"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     try:
         interview_session = AutoInterviewSession.query.filter_by(
             username=session['username'],
@@ -2190,11 +2153,9 @@ def get_auto_interview_status():
 # ==================== FORUM SİSTEMİ ====================
 
 @app.route('/forum/posts', methods=['GET'])
+@login_required
 def get_forum_posts():
     """İlgi alanına göre forum gönderilerini getirir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     try:
         user = User.query.filter_by(username=session['username']).first()
         if not user:
@@ -2259,13 +2220,12 @@ def get_forum_posts():
             'id': post.id,
             'title': post.title,
             'content': post.content[:200] + '...' if len(post.content) > 200 else post.content,
-            'author': 'Anonim' if post.is_anonymous else post.author_username,
+            'author': post.author_username,
             'post_type': post.post_type,
             'tags': json.loads(post.tags) if post.tags else [],
             'views': post.views,
             'likes_count': post.likes_count,
             'comments_count': post.comments_count,
-            'is_pinned': post.is_pinned,
             'is_solved': post.is_solved,
             'solved_by': post.solved_by,
             'solved_at': post.solved_at.strftime('%Y-%m-%d %H:%M') if post.solved_at else None,
@@ -2287,11 +2247,9 @@ def get_forum_posts():
     })
 
 @app.route('/forum/posts', methods=['POST'])
+@login_required
 def create_forum_post():
     """Yeni forum gönderisi oluşturur"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user:
         return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
@@ -2304,7 +2262,6 @@ def create_forum_post():
     content = data.get('content')
     post_type = data.get('post_type', 'discussion')
     tags = data.get('tags', [])
-    is_anonymous = data.get('is_anonymous', False)
     
     if not title or not content:
         return jsonify({'error': 'Başlık ve içerik gerekli.'}), 400
@@ -2323,8 +2280,7 @@ def create_forum_post():
             author_username=session['username'],
             interest=user.interest,
             post_type=post_type,
-            tags=json.dumps(tags),
-            is_anonymous=is_anonymous
+            tags=json.dumps(tags)
         )
         
         db.session.add(new_post)
@@ -2340,11 +2296,9 @@ def create_forum_post():
         return jsonify({'error': f'Gönderi oluşturma hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>', methods=['GET'])
+@login_required
 def get_forum_post(post_id):
     """Tekil forum gönderisini getirir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     post = ForumPost.query.get_or_404(post_id)
     
     # Görüntüleme sayısını artır
@@ -2386,7 +2340,7 @@ def get_forum_post(post_id):
             replies_data.append({
                 'id': reply.id,
                 'content': reply.content,
-                'author': 'Anonim' if reply.is_anonymous else reply.author_username,
+                'author': reply.author_username,
                 'likes_count': reply.likes_count,
                 'user_liked': user_liked_reply,
                 'created_at': reply.created_at.strftime('%Y-%m-%d %H:%M')
@@ -2395,7 +2349,7 @@ def get_forum_post(post_id):
         comments_data.append({
             'id': comment.id,
             'content': comment.content,
-            'author': 'Anonim' if comment.is_anonymous else comment.author_username,
+            'author': comment.author_username,
             'likes_count': comment.likes_count,
             'user_liked': user_liked_comment,
             'is_solution': comment.is_solution,
@@ -2409,7 +2363,7 @@ def get_forum_post(post_id):
             'id': post.id,
             'title': post.title,
             'content': post.content,
-            'author': 'Anonim' if post.is_anonymous else post.author_username,
+            'author': post.author_username,
             'author_username': post.author_username,
             'interest': post.interest,
             'post_type': post.post_type,
@@ -2417,7 +2371,6 @@ def get_forum_post(post_id):
             'views': post.views,
             'likes_count': post.likes_count,
             'comments_count': post.comments_count,
-            'is_pinned': post.is_pinned,
             'is_solved': post.is_solved,
             'solved_by': post.solved_by,
             'solved_at': post.solved_at.strftime('%Y-%m-%d %H:%M') if post.solved_at else None,
@@ -2429,11 +2382,9 @@ def get_forum_post(post_id):
     })
 
 @app.route('/forum/posts/<int:post_id>', methods=['PUT'])
+@login_required
 def update_forum_post(post_id):
     """Forum gönderisini günceller"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     post = ForumPost.query.get_or_404(post_id)
     
     # Sadece yazar düzenleyebilir
@@ -2463,11 +2414,9 @@ def update_forum_post(post_id):
         return jsonify({'error': f'Güncelleme hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>', methods=['DELETE'])
+@login_required
 def delete_forum_post(post_id):
     """Forum gönderisini siler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     post = ForumPost.query.get_or_404(post_id)
     
     # Sadece yazar silebilir
@@ -2490,17 +2439,14 @@ def delete_forum_post(post_id):
         return jsonify({'error': f'Silme hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>/comments', methods=['POST'])
+@login_required
 def create_forum_comment(post_id):
     """Forum gönderisine yorum ekler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     post = ForumPost.query.get_or_404(post_id)
     
     data = request.json
     content = data.get('content')
     parent_comment_id = data.get('parent_comment_id')
-    is_anonymous = data.get('is_anonymous', False)
     
     if not content:
         return jsonify({'error': 'Yorum içeriği gerekli.'}), 400
@@ -2519,14 +2465,28 @@ def create_forum_comment(post_id):
             post_id=post_id,
             author_username=session['username'],
             content=content,
-            parent_comment_id=parent_comment_id,
-            is_anonymous=is_anonymous
+            parent_comment_id=parent_comment_id
         )
         
         db.session.add(new_comment)
         
         # Post'un yorum sayısını artır
         post.comments_count += 1
+        
+        # Yorum notification'ı gönder (kendine gönderme)
+        if post.author_username != session['username']:
+            try:
+                notification = ForumNotification(
+                    username=post.author_username,
+                    notification_type='comment',
+                    title='Gönderinize yorum yapıldı!',
+                    message=f'"{post.title}" gönderinize yeni bir yorum yapıldı.',
+                    related_post_id=post_id,
+                    related_comment_id=new_comment.id
+                )
+                db.session.add(notification)
+            except Exception as e:
+                print(f"Comment notification error: {e}")
         
         db.session.commit()
         
@@ -2540,11 +2500,9 @@ def create_forum_comment(post_id):
         return jsonify({'error': f'Yorum ekleme hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>/like', methods=['POST'])
+@login_required
 def like_forum_post(post_id):
     """Forum gönderisini beğenir/beğenmekten vazgeçer"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     post = ForumPost.query.get_or_404(post_id)
     
     existing_like = ForumLike.query.filter_by(
@@ -2567,6 +2525,20 @@ def like_forum_post(post_id):
             db.session.add(new_like)
             post.likes_count += 1
             action = 'liked'
+            
+            # Beğeni notification'ı gönder (kendine gönderme)
+            if post.author_username != session['username']:
+                try:
+                    notification = ForumNotification(
+                        username=post.author_username,
+                        notification_type='like',
+                        title='Gönderiniz beğenildi!',
+                        message=f'"{post.title}" gönderiniz beğenildi.',
+                        related_post_id=post_id
+                    )
+                    db.session.add(notification)
+                except Exception as e:
+                    print(f"Like notification error: {e}")
         
         db.session.commit()
         
@@ -2581,11 +2553,9 @@ def like_forum_post(post_id):
         return jsonify({'error': f'Beğeni işlemi hatası: {str(e)}'}), 500
 
 @app.route('/forum/comments/<int:comment_id>/like', methods=['POST'])
+@login_required
 def like_forum_comment(comment_id):
     """Forum yorumunu beğenir/beğenmekten vazgeçer"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     comment = ForumComment.query.get_or_404(comment_id)
     
     existing_like = ForumLike.query.filter_by(
@@ -2608,6 +2578,20 @@ def like_forum_comment(comment_id):
             db.session.add(new_like)
             comment.likes_count += 1
             action = 'liked'
+            
+            # Beğeni notification'ı gönder (kendine gönderme)
+            if comment.author_username != session['username']:
+                try:
+                    notification = ForumNotification(
+                        username=comment.author_username,
+                        notification_type='like',
+                        title='Yorumunuz beğenildi!',
+                        message=f'Yorumunuz beğenildi.',
+                        related_comment_id=comment_id
+                    )
+                    db.session.add(notification)
+                except Exception as e:
+                    print(f"Comment like notification error: {e}")
         
         db.session.commit()
         
@@ -2622,11 +2606,9 @@ def like_forum_comment(comment_id):
         return jsonify({'error': f'Beğeni işlemi hatası: {str(e)}'}), 500
 
 @app.route('/forum/stats', methods=['GET'])
+@login_required
 def get_forum_stats():
     """Forum istatistiklerini getirir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user:
         return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
@@ -2682,11 +2664,9 @@ def get_forum_stats():
 # ==================== GELİŞMİŞ FORUM ÖZELLİKLERİ ====================
 
 @app.route('/forum/notifications', methods=['GET'])
+@login_required
 def get_notifications():
     """Kullanıcının bildirimlerini getirir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     try:
         notifications = ForumNotification.query.filter_by(
             username=session['username']
@@ -2711,29 +2691,46 @@ def get_notifications():
         return jsonify({'error': f'Bildirim hatası: {str(e)}'}), 500
 
 @app.route('/forum/notifications/mark-read', methods=['POST'])
+@login_required
 def mark_notifications_read():
-    """Bildirimleri okundu olarak işaretler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
+    """Tüm bildirimleri siler (geçmişi temizler)"""
     try:
+        # Kullanıcının tüm bildirimlerini sil
         ForumNotification.query.filter_by(
-            username=session['username'],
-            is_read=False
-        ).update({'is_read': True})
+            username=session['username']
+        ).delete()
         
         db.session.commit()
-        return jsonify({'message': 'Bildirimler okundu olarak işaretlendi.'})
+        return jsonify({'message': 'Tüm bildirimler temizlendi.'})
+        
+    except Exception as e:
+        return jsonify({'error': f'İşlem hatası: {str(e)}'}), 500
+
+@app.route('/forum/notifications/<int:notification_id>', methods=['DELETE'])
+@login_required
+def delete_notification(notification_id):
+    """Tek bir bildirimi siler"""
+    try:
+        notification = ForumNotification.query.filter_by(
+            id=notification_id,
+            username=session['username']
+        ).first()
+        
+        if not notification:
+            return jsonify({'error': 'Bildirim bulunamadı.'}), 404
+        
+        db.session.delete(notification)
+        db.session.commit()
+        
+        return jsonify({'message': 'Bildirim silindi.'})
         
     except Exception as e:
         return jsonify({'error': f'İşlem hatası: {str(e)}'}), 500
 
 @app.route('/forum/report', methods=['POST'])
+@login_required
 def report_content():
     """İçerik raporlar"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     data = request.json
     reported_username = data.get('reported_username')
     post_id = data.get('post_id')
@@ -2763,6 +2760,7 @@ def report_content():
         return jsonify({'error': f'Rapor hatası: {str(e)}'}), 500
 
 @app.route('/forum/badges/<username>', methods=['GET'])
+@login_required
 def get_user_badges(username):
     """Kullanıcının rozetlerini getirir"""
     try:
@@ -2784,6 +2782,7 @@ def get_user_badges(username):
         return jsonify({'error': f'Rozet hatası: {str(e)}'}), 500
 
 @app.route('/forum/tags', methods=['GET'])
+@login_required
 def get_popular_tags():
     """Popüler etiketleri getirir"""
     try:
@@ -2804,11 +2803,9 @@ def get_popular_tags():
         return jsonify({'error': f'Etiket hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>/solve', methods=['POST'])
+@login_required
 def mark_post_solved(post_id):
     """Gönderiyi çözüldü olarak işaretler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     data = request.json
     solved_by = data.get('solved_by')
     comment_id = data.get('comment_id')
@@ -2834,17 +2831,22 @@ def mark_post_solved(post_id):
         db.session.commit()
         
         # Bildirim gönder
-        if solved_by:
-            notification = ForumNotification(
-                username=solved_by,
-                notification_type='solution_accepted',
-                title='Çözümünüz kabul edildi!',
-                message=f'"{post.title}" gönderisindeki çözümünüz kabul edildi.',
-                related_post_id=post_id,
-                related_comment_id=comment_id
-            )
-            db.session.add(notification)
-            db.session.commit()
+        if solved_by and solved_by != session['username']:  # Kendine notification gönderme
+            try:
+                notification = ForumNotification(
+                    username=solved_by,
+                    notification_type='solution_accepted',
+                    title='Çözümünüz kabul edildi!',
+                    message=f'"{post.title}" gönderisindeki çözümünüz kabul edildi.',
+                    related_post_id=post_id,
+                    related_comment_id=comment_id
+                )
+                db.session.add(notification)
+                db.session.commit()
+                print(f"Notification sent to {solved_by} for solution acceptance")
+            except Exception as e:
+                print(f"Notification error: {e}")
+                db.session.rollback()
         
         return jsonify({'message': 'Gönderi çözüldü olarak işaretlendi.'})
         
@@ -2852,11 +2854,9 @@ def mark_post_solved(post_id):
         return jsonify({'error': f'İşlem hatası: {str(e)}'}), 500
 
 @app.route('/forum/posts/<int:post_id>/bounty', methods=['POST'])
+@login_required
 def add_bounty(post_id):
     """Gönderiye ödül puanı ekler"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     data = request.json
     points = data.get('points', 0)
     
@@ -2879,6 +2879,7 @@ def add_bounty(post_id):
         return jsonify({'error': f'İşlem hatası: {str(e)}'}), 500
 
 @app.route('/forum/activity/<username>', methods=['GET'])
+@login_required
 def get_user_activity(username):
     """Kullanıcının aktivite geçmişini getirir"""
     try:
@@ -2902,6 +2903,7 @@ def get_user_activity(username):
         return jsonify({'error': f'Aktivite hatası: {str(e)}'}), 500
 
 @app.route('/forum/leaderboard', methods=['GET'])
+@login_required
 def get_leaderboard():
     """Liderlik tablosunu getirir - En iyi çözüm seçilen 3 kullanıcı"""
     try:
@@ -2940,11 +2942,9 @@ def get_leaderboard():
         return jsonify({'error': f'Liderlik tablosu hatası: {str(e)}'}), 500
 
 @app.route('/forum/search/advanced', methods=['GET'])
+@login_required
 def advanced_search():
     """Gelişmiş arama"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -3058,11 +3058,9 @@ def advanced_search():
         return jsonify({'error': f'Arama hatası: {str(e)}'}), 500
 
 @app.route('/forum/analytics', methods=['GET'])
+@login_required
 def get_forum_analytics():
     """Forum analitiklerini getirir"""
-    if 'username' not in session:
-        return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-    
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
@@ -3139,6 +3137,7 @@ def get_forum_analytics():
 # ============================================
 
 @app.route('/api/analyze-cv', methods=['POST'])
+@login_required
 def analyze_cv():
     """CV'yi Gemini AI ile analiz eder"""
     try:
@@ -3203,6 +3202,7 @@ def analyze_cv():
         return jsonify({'error': 'Beklenmedik hata oluştu'}), 500
 
 @app.route('/api/search-jobs', methods=['POST'])
+@login_required
 def search_jobs():
     """CV analizine göre iş ilanları arar ve eşleştirir"""
     try:
@@ -3265,6 +3265,7 @@ def search_jobs():
         return jsonify({'error': f'İş arama sırasında hata: {str(e)}'}), 500
 
 @app.route('/api/job-application-tips', methods=['POST'])
+@login_required
 def get_job_application_tips():
     """Belirli bir iş için başvuru önerileri verir"""
     try:

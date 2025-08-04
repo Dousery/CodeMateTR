@@ -768,7 +768,7 @@ ${config.name === 'Python' ? 'def solution():\n    # Kodunuz buraya\n    pass\n\
     const config = languageConfigs[selectedLanguage];
     
     return (
-      <Box sx={{ minHeight: '100vh', width: '100vw', py: 4 }}>
+      <Box sx={{ minHeight: '100vh', width: '100vw', py: 4, pt: 12 }}>
         <Paper 
           component={motion.div} 
           initial={{ opacity: 0, y: 40 }} 

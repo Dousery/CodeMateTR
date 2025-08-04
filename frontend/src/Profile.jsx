@@ -5,6 +5,7 @@ import {
   ListItemIcon, Divider, Badge
 } from '@mui/material';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from './App';
 import QuizIcon from '@mui/icons-material/Quiz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -25,6 +26,7 @@ const alanlar = {
 
 export default function Profile({ setIsLoggedIn }) {
   const { setIsLoggedIn: setAuthLoggedIn } = useAuth();
+  const navigate = useNavigate();
   const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const username = localStorage.getItem('username');
@@ -47,11 +49,30 @@ export default function Profile({ setIsLoggedIn }) {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    try {
+      // Backend'e logout isteği gönder
+      await fetch('http://localhost:5000/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    
+    // Local storage'ı temizle
     localStorage.removeItem('username');
     localStorage.removeItem('interest');
+    
+    // Login state'ini güncelle
     setIsLoggedIn(false);
     setAuthLoggedIn(false);
+    
+    // localStorage değişikliğini tetikle
+    window.dispatchEvent(new Event('localStorageChange'));
+    
+    // Ana sayfaya yönlendir
+    navigate('/', { replace: true });
   };
 
   const getSkillColor = (level) => {
