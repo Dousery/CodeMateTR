@@ -29,9 +29,10 @@ app = Flask(__name__, static_folder='static')
 
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['SESSION_COOKIE_SECURE'] = False  # Render'da HTTPS sorunları
+app.config['SESSION_COOKIE_HTTPONLY'] = False  # JavaScript erişimi için
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Cross-site için
+app.config['SESSION_COOKIE_PATH'] = '/'  # Tüm path'ler için
 
 # CORS configuration for production
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
@@ -374,13 +375,18 @@ def login():
     if not user or not user.check_password(password):
         return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
     
-    # Session'ı yenile ve güvenli hale getir
-    session.clear()  # Eski session verilerini temizle
+    # Session'ı basit tut
     session['username'] = username
-    session['login_time'] = datetime.utcnow().isoformat()
-    session.permanent = True  # Session'ı kalıcı yap
+    session['user_id'] = user.id
     
-    return jsonify({'message': 'Giriş başarılı.'})
+    # Debug için session bilgilerini logla
+    print(f"Login successful for user: {username}, session: {dict(session)}")
+    
+    return jsonify({
+        'message': 'Giriş başarılı.',
+        'username': username,
+        'interest': user.interest
+    })
 
 @app.route('/logout', methods=['POST'])
 def logout():
