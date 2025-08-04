@@ -671,6 +671,16 @@ def code_page():
         'has_user_id': 'user_id' in session
     })
 
+@app.route('/auto-interview', methods=['GET'])
+def auto_interview_page():
+    """Otomatik mülakat odası sayfası için basit endpoint"""
+    return jsonify({
+        'message': 'Otomatik mülakat odası erişilebilir',
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session
+    })
+
 @app.route('/test_your_skill', methods=['POST'])
 @login_required
 def test_your_skill():
@@ -1477,8 +1487,16 @@ def test_session():
 @login_required
 def start_auto_interview():
     """Otomatik mülakat başlatır"""
+    print(f"DEBUG: start_auto_interview called by user: {session.get('username')}")
+    print(f"DEBUG: Session data: {dict(session)}")
+    
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        print(f"DEBUG: User not found in database: {session.get('username')}")
+        return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
+    
     if not user.interest:
+        print(f"DEBUG: User has no interest: {session.get('username')}")
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     try:
@@ -1552,6 +1570,7 @@ def start_auto_interview():
 @login_required
 def submit_auto_interview_answer():
     """Otomatik mülakat cevabını gönder ve sonraki soruyu al"""
+    print(f"DEBUG: submit_auto_interview_answer called by user: {session.get('username')}")
     # Hem JSON hem de form data formatını destekle
     if request.is_json:
         data = request.json
@@ -1691,6 +1710,7 @@ def submit_auto_interview_answer():
 @app.route('/auto_interview/complete', methods=['POST'])
 @login_required
 def complete_auto_interview():
+    print(f"DEBUG: complete_auto_interview called by user: {session.get('username')}")
     """Mülakatı tamamlar ve final değerlendirme üretir"""
     data = request.json
     session_id = data.get('session_id')
@@ -1741,6 +1761,7 @@ def complete_auto_interview():
 @app.route('/auto_interview/status', methods=['GET'])
 @login_required
 def get_auto_interview_status():
+    print(f"DEBUG: get_auto_interview_status called by user: {session.get('username')}")
     """Aktif mülakat oturumunun durumunu döndürür"""
     try:
         interview_session = AutoInterviewSession.query.filter_by(

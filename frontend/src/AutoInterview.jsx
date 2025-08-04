@@ -30,6 +30,31 @@ export default function AutoInterview() {
   const [sessionInfo, setSessionInfo] = useState(null);
   const [showFinalDialog, setShowFinalDialog] = useState(false);
 
+  // Component mount olduğunda session kontrolü yap
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        console.log('Checking session status for auto interview...');
+        const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Session status:', sessionRes.data);
+        
+        // Auto interview endpoint'ini de kontrol et
+        const autoInterviewRes = await axios.get(API_ENDPOINTS.AUTO_INTERVIEW_PAGE, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Auto interview page status:', autoInterviewRes.data);
+      } catch (err) {
+        console.error('Session check failed for auto interview:', err);
+      }
+    };
+    
+    checkSession();
+  }, []);
+
   // Ses fonksiyonları
   const playAudio = (url) => {
     const audio = new Audio(url);
@@ -71,8 +96,11 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
+      console.log('Starting auto interview with:', API_ENDPOINTS.AUTO_INTERVIEW_START);
+      
       const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_START, {}, { 
-        withCredentials: true 
+        withCredentials: true,
+        timeout: 20000
       });
       
       setSessionId(res.data.session_id);
@@ -90,11 +118,20 @@ export default function AutoInterview() {
       
       setStep('interviewing');
     } catch (err) {
-      if (err.response?.data?.error === 'Aktif bir mülakat oturumunuz zaten var.') {
+      console.error('Error starting auto interview:', err);
+      console.error('Error response:', err.response);
+      
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        setStep('starting');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+        setStep('starting');
+      } else if (err.response?.data?.error === 'Aktif bir mülakat oturumunuz zaten var.') {
         // Aktif oturum varsa kullanıcıya seçenek sun
         setStep('session_choice');
       } else {
-        setError(err.response?.data?.error || 'Otomatik mülakat başlatılamadı.');
+        setError(err.response?.data?.error || 'Otomatik mülakat başlatılamadı. Lütfen tekrar deneyin.');
         setStep('starting');
       }
     } finally {
@@ -107,14 +144,25 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
+      console.log('Clearing active session with:', API_ENDPOINTS.DEBUG_CLEAR_SESSIONS);
+      
       await axios.post(API_ENDPOINTS.DEBUG_CLEAR_SESSIONS, {}, { 
-        withCredentials: true 
+        withCredentials: true,
+        timeout: 10000
       });
       
       // Temizleme başarılı olduktan sonra yeni mülakat başlat
       await startAutoInterview();
     } catch (err) {
-      setError('Oturum temizlenemedi. Lütfen tekrar deneyin.');
+      console.error('Error clearing active session:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError('Oturum temizlenemedi. Lütfen tekrar deneyin.');
+      }
       setStep('starting');
     } finally {
       setLoading(false);
@@ -131,11 +179,21 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
+      console.log('Submitting answer with:', API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT);
+      console.log('Answer data:', { 
+        session_id: sessionId, 
+        answer_length: userAnswer.length,
+        voice_name: 'Kore'
+      });
+      
       const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT, {
         session_id: sessionId,
         answer: userAnswer,
         voice_name: 'Kore'
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 25000
+      });
       
       console.log('DEBUG: Response data:', res.data);
       
@@ -173,7 +231,15 @@ export default function AutoInterview() {
       }
       
     } catch (err) {
-      setError(err.response?.data?.error || 'Cevap gönderilemedi.');
+      console.error('Error submitting answer:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Cevap gönderilemedi. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -184,9 +250,15 @@ export default function AutoInterview() {
     setLoading(true);
     setError('');
     try {
+      console.log('Completing interview with:', API_ENDPOINTS.AUTO_INTERVIEW_COMPLETE);
+      console.log('Complete data:', { session_id: sessionId });
+      
       const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_COMPLETE, {
         session_id: sessionId
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 30000
+      });
       
       setFinalEvaluation(res.data.final_evaluation);
       setSessionInfo({
@@ -197,7 +269,15 @@ export default function AutoInterview() {
       setStep('completed');
       setShowFinalDialog(true);
     } catch (err) {
-      setError(err.response?.data?.error || 'Mülakat tamamlanamadı.');
+      console.error('Error completing interview:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Mülakat tamamlanamadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -206,9 +286,14 @@ export default function AutoInterview() {
   // Aktif oturum kontrolü - basitleştirilmiş
   const checkActiveSession = async () => {
     try {
+      console.log('Checking active session with:', API_ENDPOINTS.AUTO_INTERVIEW_STATUS);
+      
       const res = await axios.get(API_ENDPOINTS.AUTO_INTERVIEW_STATUS, { 
-        withCredentials: true 
+        withCredentials: true,
+        timeout: 10000
       });
+      
+      console.log('Active session response:', res.data);
       
       if (res.data.has_active_session) {
         // Aktif session varsa kullanıcıya seçenek sun
@@ -217,6 +302,8 @@ export default function AutoInterview() {
         setStep('starting');
       }
     } catch (err) {
+      console.error('Error checking active session:', err);
+      console.error('Error response:', err.response);
       // Hata durumunda direkt starting adımına geç
       setStep('starting');
     }
@@ -240,9 +327,17 @@ export default function AutoInterview() {
     formData.append('voice_name', 'Kore');
     
     try {
+      console.log('Submitting voice answer with:', API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT);
+      console.log('Voice answer data:', { 
+        session_id: sessionId, 
+        audio_size: recordedAudio.size,
+        voice_name: 'Kore'
+      });
+      
       const res = await axios.post(API_ENDPOINTS.AUTO_INTERVIEW_SUBMIT, formData, {
         withCredentials: true,
-        headers: { 'Content-Type': 'multipart/form-data' }
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 30000
       });
       
       console.log('DEBUG: Voice response data:', res.data);
@@ -284,7 +379,15 @@ export default function AutoInterview() {
       }
       
     } catch (err) {
-      setError(err.response?.data?.error || 'Sesli cevap gönderilemedi.');
+      console.error('Error submitting voice answer:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Sesli cevap gönderilemedi. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }

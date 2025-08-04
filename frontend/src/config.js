@@ -25,6 +25,9 @@ export const API_ENDPOINTS = {
   // Code endpoints
   CODE_PAGE: `${API_BASE_URL}/code`,
 
+  // Auto Interview endpoints
+  AUTO_INTERVIEW_PAGE: `${API_BASE_URL}/auto-interview`,
+
   // Interview endpoints
   INTERVIEW_SIMULATION: `${API_BASE_URL}/interview_simulation`,
   INTERVIEW_EVALUATE: `${API_BASE_URL}/interview_simulation/evaluate`,
