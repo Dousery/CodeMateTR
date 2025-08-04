@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2 }}>
+          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2, maxWidth: '1000px', mx: 'auto' }}>
             {modules.map((mod, i) => (
               <Grid item xs={12} sm={6} md={3} key={mod.title}>
                 <Card
@@ -267,9 +267,11 @@ export default function Dashboard() {
                   transition={{ delay: i * 0.1, duration: 0.6 }}
                   elevation={6}
                   className="glass-card"
+                  onClick={() => navigate(mod.path)}
                   sx={{ 
                     borderRadius: 4, 
                     minHeight: 260, 
+                    maxWidth: 240,
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
@@ -320,7 +322,7 @@ export default function Dashboard() {
                       variant="contained" 
                       color="primary" 
                       size="large" 
-                      href={mod.path}
+                      onClick={() => navigate(mod.path)}
                       sx={{
                         background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
                         borderRadius: '25px',
