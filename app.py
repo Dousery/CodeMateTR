@@ -188,9 +188,6 @@ class TestPerformance(db.Model):
     strong_areas = db.Column(db.Text, nullable=True)  # JSON string
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-with app.app_context():
-    db.create_all()
-
 # Geçici bellek içi veri saklama
 users = {}  # username: {password_hash, interest}
 
@@ -282,6 +279,14 @@ def get_file_mimetype(filename):
 # Uygulama context'i oluşturulduktan sonra test session'larını temizle
 def init_app():
     with app.app_context():
+        try:
+            # Veritabanı tablolarını güvenli bir şekilde oluştur
+            db.create_all()
+            print("Veritabanı tabloları başarıyla oluşturuldu.")
+        except Exception as e:
+            print(f"Veritabanı tabloları zaten mevcut veya oluşturulamadı: {e}")
+            # Hata durumunda devam et
+            pass
         # Veritabanı tablolarını oluştur (eğer yoksa)
         try:
             db.create_all()
@@ -2788,3 +2793,6 @@ def extract_text_from_pdf(file_path):
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
     app.run(debug=True)
+else:
+    # Production ortamında (Render) sadece veritabanını başlat
+    init_app()
