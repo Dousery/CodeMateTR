@@ -16,7 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from './App';
 
 const menuItems = [
-  { icon: <QuizIcon />, label: 'Test', route: '/test' },
+  { icon: <QuizIcon />, label: 'Test Çöz', route: '/test' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
   { icon: <WorkIcon />, label: 'Akıllı İş Bulma', route: '/smart-job-finder' },
@@ -253,6 +253,9 @@ export default function Header() {
                       mx: 0.5,
                       background: 'rgba(255,255,255,0.05)',
                       border: '1px solid rgba(255,255,255,0.1)',
+                      width: 45,
+                      height: 45,
+                      p: 1,
                       '&:hover': {
                         bgcolor: 'rgba(255,255,255,0.1)',
                         color: 'white',
@@ -260,8 +263,11 @@ export default function Header() {
                         border: '1px solid rgba(255,255,255,0.2)',
                         boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
                       },
+                      '& .MuiSvgIcon-root': {
+                        fontSize: '1.3rem'
+                      }
                     }}
-                    size="large"
+                    size="medium"
                   >
                     {item.icon}
                   </IconButton>
@@ -347,10 +353,10 @@ export default function Header() {
                 onClose={handleNotificationClose}
                 PaperProps={{
                   sx: {
-                    background: 'rgba(15,15,15,0.95)',
-                    backdropFilter: 'blur(25px)',
-                    border: '1px solid rgba(255,255,255,0.08)',
-                    boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+                    background: 'rgba(255,255,255,0.05)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                     maxHeight: 450,
                     width: 320,
                     mt: 1,
@@ -583,6 +589,8 @@ export default function Header() {
                     backdropFilter: 'blur(20px)',
                     border: '1px solid rgba(255,255,255,0.1)',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
                     '& .MuiMenuItem-root': {
                       color: 'white',
                       '&:hover': {

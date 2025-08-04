@@ -465,10 +465,11 @@ def profile():
             date_str = date.strftime('%Y-%m-%d')
             
             # O günkü test sayısı
-            daily_tests = TestPerformance.query.filter(
-                TestPerformance.username == user.username,
-                TestPerformance.created_at >= date.replace(hour=0, minute=0, second=0),
-                TestPerformance.created_at < date.replace(hour=23, minute=59, second=59)
+            daily_tests = UserActivity.query.filter(
+                UserActivity.username == user.username,
+                UserActivity.activity_type == 'test_completed',
+                UserActivity.created_at >= date.replace(hour=0, minute=0, second=0),
+                UserActivity.created_at < date.replace(hour=23, minute=59, second=59)
             ).count()
             
             # O günkü forum aktivitesi
@@ -1063,6 +1064,14 @@ def test_your_skill_evaluate():
     detail = (f"{summary['correct_answers']}/{summary['total_questions']} doğru "
              f"({summary['success_rate']}%) - Seviye: {summary['skill_level']} - "
              f"Süre: {int(time_taken//60)}dk {int(time_taken%60)}sn")
+    
+    # Test aktivitesi kaydet
+    activity = UserActivity(
+        username=user.username,
+        activity_type='test_completed',
+        points_earned=20
+    )
+    db.session.add(activity)
     
     # Test session'ını tamamlandı olarak işaretle
     test_session.status = 'completed'
@@ -2286,6 +2295,16 @@ def create_forum_post():
         db.session.add(new_post)
         db.session.commit()
         
+        # Forum post aktivitesi kaydet
+        activity = UserActivity(
+            username=session['username'],
+            activity_type='forum_post',
+            points_earned=5,
+            related_post_id=new_post.id
+        )
+        db.session.add(activity)
+        db.session.commit()
+        
         return jsonify({
             'message': 'Gönderi başarıyla oluşturuldu.',
             'post_id': new_post.id
@@ -2472,6 +2491,16 @@ def create_forum_comment(post_id):
         
         # Post'un yorum sayısını artır
         post.comments_count += 1
+        
+        # Forum comment aktivitesi kaydet
+        activity = UserActivity(
+            username=session['username'],
+            activity_type='forum_comment',
+            points_earned=3,
+            related_post_id=post_id,
+            related_comment_id=new_comment.id
+        )
+        db.session.add(activity)
         
         # Yorum notification'ı gönder (kendine gönderme)
         if post.author_username != session['username']:
@@ -3162,7 +3191,7 @@ def analyze_cv():
         # CV'yi kaydet
         filename = secure_filename(cv_file.filename)
         timestamp = int(time.time())
-        unique_filename = f"cv_{user_id}_{timestamp}.{filename.split('.')[-1]}"
+        unique_filename = f"cv_{session['username']}_{timestamp}.{filename.split('.')[-1]}"
         cv_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
         cv_file.save(cv_path)
         
@@ -3175,8 +3204,17 @@ def analyze_cv():
             job_agent = IntelligentJobAgent()
             
             # CV'yi direkt PDF bytes ile analiz et (Yeni yöntem!)
-            print(f"CV PDF analiz ediliyor - Kullanıcı: {user_id}")
+            print(f"CV PDF analiz ediliyor - Kullanıcı: {session['username']}")
             cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
+            
+            # CV analiz sonucunu veritabanına kaydet
+            user = User.query.filter_by(username=session['username']).first()
+            if user:
+                user.cv_analysis = json.dumps(cv_analysis)
+                db.session.commit()
+                print(f"CV analiz sonucu veritabanına kaydedildi - Kullanıcı: {user.username}")
+            else:
+                print(f"Kullanıcı bulunamadı: {session['username']}")
             
             # Sonucu döndür
             return jsonify({

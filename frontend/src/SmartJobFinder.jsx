@@ -23,7 +23,8 @@ import {
   ListItemIcon,
   Grid,
   Rating,
-  Divider
+  Divider,
+  Tooltip
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import {
@@ -237,19 +238,24 @@ const SmartJobFinder = () => {
                     Staj: {cvAnalysis.staj_deneyimi}
                   </Typography>
                 )}
-                <Chip 
-                  label={cvAnalysis.deneyim_seviyesi || 'entry'} 
-                  sx={{ 
-                    mt: 1,
-                    backgroundColor: 
-                      cvAnalysis.deneyim_seviyesi === 'senior' ? '#90EE90' :
-                      cvAnalysis.deneyim_seviyesi === 'mid' ? '#FFB347' :
-                      cvAnalysis.deneyim_seviyesi === 'junior' ? '#87CEEB' : '#E0E0E0',
-                    color: '#000',
-                    fontWeight: 'bold'
-                  }}
-                  size="small"
-                />
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 1, gap: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 'bold' }}>
+                    Aday seviyesi:
+                  </Typography>
+                  <Tooltip title="Deneyim seviyesi: Entry Level (Başlangıç Seviyesi) - 0-2 yıl profesyonel deneyim. Yeni mezun, stajyer veya ilk iş deneyimi olan kişiler için uygun pozisyonlar." arrow>
+                    <Chip 
+                      label={cvAnalysis.deneyim_seviyesi || 'entry'} 
+                      sx={{ 
+                        backgroundColor: 'rgba(255,255,255,0.2)',
+                        color: 'white',
+                        borderColor: 'rgba(255,255,255,0.3)',
+                        fontWeight: 'bold'
+                      }}
+                      size="small"
+                      variant="outlined"
+                    />
+                  </Tooltip>
+                </Box>
               </Box>
             </Grid>
             
@@ -267,18 +273,19 @@ const SmartJobFinder = () => {
                 <Typography variant="subtitle2" sx={{ color: '#E6E6FA', fontWeight: 'bold' }}>
                   CV Kalitesi
                 </Typography>
-                <Chip 
-                  label={cvAnalysis.cv_kalitesi || 'orta'} 
-                  sx={{
-                    backgroundColor: 
-                      cvAnalysis.cv_kalitesi === 'mükemmel' ? '#90EE90' :
-                      cvAnalysis.cv_kalitesi === 'iyi' ? '#87CEEB' :
-                      cvAnalysis.cv_kalitesi === 'orta' ? '#FFB347' : '#FF6B6B',
-                    color: '#000',
-                    fontWeight: 'bold'
-                  }}
-                  size="small"
-                />
+                <Tooltip title="CV'nizin genel kalite değerlendirmesi" arrow>
+                  <Chip 
+                    label={cvAnalysis.cv_kalitesi || 'orta'} 
+                    sx={{
+                      backgroundColor: 'rgba(255,255,255,0.2)',
+                      color: 'white',
+                      borderColor: 'rgba(255,255,255,0.3)',
+                      fontWeight: 'bold'
+                    }}
+                    size="small"
+                    variant="outlined"
+                  />
+                </Tooltip>
               </Box>
             </Grid>
             
@@ -565,8 +572,8 @@ const SmartJobFinder = () => {
           '& .MuiStepIcon-root.Mui-active': { color: '#E6E6FA' },
           '& .MuiStepIcon-root.Mui-completed': { color: '#98FB98' }
         }}>
-          {steps.map((label) => (
-            <Step key={label}>
+          {steps.map((label, index) => (
+            <Step key={label} completed={activeStep > index}>
               <StepLabel>{label}</StepLabel>
             </Step>
           ))}
