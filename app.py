@@ -29,10 +29,9 @@ app = Flask(__name__, static_folder='static')
 
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
-app.config['SESSION_COOKIE_SECURE'] = False  # Render'da HTTPS sorunları olabilir
+app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') == 'production'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'  # Cross-site için gerekli
-app.config['SESSION_COOKIE_DOMAIN'] = None  # Tüm domain'ler için
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
 # CORS configuration for production
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
@@ -338,17 +337,7 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if 'username' not in session:
-            print(f"DEBUG: No username in session. Session: {dict(session)}")
             return jsonify({'error': 'Giriş yapmalısınız.'}), 401
-        
-        # Kullanıcının veritabanında var olup olmadığını kontrol et
-        user = User.query.filter_by(username=session['username']).first()
-        if not user:
-            print(f"DEBUG: User not found in database: {session['username']}")
-            session.clear()
-            return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
-        
-        print(f"DEBUG: Login check passed for user: {session['username']}")
         return f(*args, **kwargs)
     return decorated_function
 
@@ -388,18 +377,10 @@ def login():
     # Session'ı yenile ve güvenli hale getir
     session.clear()  # Eski session verilerini temizle
     session['username'] = username
-    session['user_id'] = user.id
     session['login_time'] = datetime.utcnow().isoformat()
     session.permanent = True  # Session'ı kalıcı yap
     
-    # Debug için session bilgilerini logla
-    print(f"Login successful for user: {username}, session: {dict(session)}")
-    
-    return jsonify({
-        'message': 'Giriş başarılı.',
-        'username': username,
-        'interest': user.interest
-    })
+    return jsonify({'message': 'Giriş başarılı.'})
 
 @app.route('/logout', methods=['POST'])
 def logout():
