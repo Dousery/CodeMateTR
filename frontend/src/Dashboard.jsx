@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={5} justifyContent="center" sx={{ mt: 2, maxWidth: '1100px', mx: 'auto' }}>
+          <Grid container spacing={6} justifyContent="center" sx={{ mt: 2, maxWidth: '1200px', mx: 'auto' }}>
             {modules.map((mod, i) => (
               <Grid item xs={12} sm={6} md={3} key={mod.title}>
                 <Card
@@ -270,8 +270,8 @@ export default function Dashboard() {
                   onClick={() => navigate(mod.path)}
                   sx={{ 
                     borderRadius: 4, 
-                    height: 300, 
-                    maxWidth: 260,
+                    height: 340, 
+                    maxWidth: 290,
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
