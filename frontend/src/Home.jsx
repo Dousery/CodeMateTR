@@ -130,7 +130,7 @@ export default function Home() {
               textShadow: '0 2px 10px rgba(0,0,0,0.2)'
             }}
           >
-            Testler, case study'ler, kodlama ve mülakat simülasyonları ile kendini geliştir. Modern, şık ve interaktif bir deneyim seni bekliyor!
+            Testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Modern, şık ve interaktif bir deneyim seni bekliyor!
           </Typography>
         </motion.div>
         

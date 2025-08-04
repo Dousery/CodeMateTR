@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button, Badge, Typography, Divider, Chip, keyframes } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button, Badge, Typography, Divider, Chip, keyframes, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
 import QuizIcon from '@mui/icons-material/Quiz';
 import WorkIcon from '@mui/icons-material/Work';
 import PsychologyIcon from '@mui/icons-material/Psychology';
@@ -12,6 +12,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ThumbUpIcon from '@mui/icons-material/ThumbUp';
 import CommentIcon from '@mui/icons-material/Comment';
 import CloseIcon from '@mui/icons-material/Close';
+import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './App';
 
@@ -47,6 +48,13 @@ export default function Header() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
   const [showNotificationPulse, setShowNotificationPulse] = useState(false);
+  const [passwordChangeDialogOpen, setPasswordChangeDialogOpen] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordChangeError, setPasswordChangeError] = useState('');
+  const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
+  const [isPasswordChanging, setIsPasswordChanging] = useState(false);
+
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
   const username = isLoggedIn ? localStorage.getItem('username') : null;
@@ -83,6 +91,62 @@ export default function Header() {
   const handleProfile = () => {
     handleClose();
     navigate('/profile');
+  };
+
+  const handlePasswordChangeDialogOpen = () => {
+    setPasswordChangeDialogOpen(true);
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+    setIsPasswordChanging(false);
+  };
+
+  const handlePasswordChangeDialogClose = () => {
+    setPasswordChangeDialogOpen(false);
+  };
+
+  const handlePasswordChange = async () => {
+    if (newPassword !== confirmNewPassword) {
+      setPasswordChangeError('Şifreler eşleşmiyor.');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordChangeError('Şifre en az 6 karakter olmalıdır.');
+      return;
+    }
+
+    setIsPasswordChanging(true);
+    setPasswordChangeError('');
+    setPasswordChangeSuccess('');
+
+    try {
+      const response = await fetch('http://localhost:5000/change_password', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ new_password: newPassword }),
+      });
+
+      if (response.ok) {
+        setPasswordChangeSuccess('Şifreniz başarıyla değiştirildi.');
+        // 2 saniye sonra modal'ı kapat
+        setTimeout(() => {
+          handlePasswordChangeDialogClose();
+        }, 2000);
+      } else {
+        const errorData = await response.json();
+        setPasswordChangeError(errorData.error || 'Şifre değiştirme hatası.');
+      }
+    } catch (error) {
+      console.error('Password change error:', error);
+      setPasswordChangeError('Şifre değiştirme sırasında bir hata oluştu.');
+    } finally {
+      setIsPasswordChanging(false);
+    }
   };
 
   // Notification fonksiyonları
@@ -602,8 +666,197 @@ export default function Header() {
               >
                 <MenuItem disabled sx={{ color: 'rgba(255,255,255,0.6)' }}>Profil: <b style={{ marginLeft: 8, color: 'white' }}>{username}</b></MenuItem>
                 <MenuItem onClick={handleProfile}>Profilimi Gör</MenuItem>
-                <MenuItem onClick={handleLogout}>Çıkış Yap</MenuItem>
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mx: 1 }} />
+                <MenuItem onClick={handlePasswordChangeDialogOpen} sx={{ 
+                  '&:hover': {
+                    background: 'rgba(255,255,255,0.1)',
+                  }
+                }}>
+                  Şifre Değiştir
+                </MenuItem>
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', mx: 1 }} />
+                <MenuItem onClick={handleLogout} sx={{ 
+                  color: 'rgba(255,255,255,0.8)',
+                  '&:hover': {
+                    background: 'rgba(255, 71, 87, 0.1)',
+                    color: '#ff6b6b'
+                  }
+                }}>
+                  Çıkış Yap
+                </MenuItem>
               </Menu>
+
+              {/* Password Change Dialog */}
+              <Dialog 
+                open={passwordChangeDialogOpen} 
+                onClose={handlePasswordChangeDialogClose}
+                PaperProps={{
+                  sx: {
+                    background: 'rgba(255,255,255,0.05)',
+                    backdropFilter: 'blur(20px)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    minWidth: 400,
+                    '& .MuiDialogTitle-root': {
+                      background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(255,255,255,0.01) 100%)',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      color: 'white',
+                      fontWeight: 600,
+                      fontSize: '1.2rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      py: 2.5,
+                      px: 3
+                    },
+                    '& .MuiDialogContent-root': {
+                      p: 3,
+                      color: 'white'
+                    },
+                    '& .MuiDialogActions-root': {
+                      p: 2.5,
+                      pt: 0,
+                      gap: 1
+                    }
+                  }
+                }}
+              >
+                <DialogTitle>
+                  <LockIcon sx={{ fontSize: '1.4rem', color: 'rgba(255,255,255,0.8)' }} />
+                  Şifre Değiştir
+                </DialogTitle>
+                <DialogContent>
+                  {passwordChangeError && (
+                    <Alert severity="error" sx={{ 
+                      mb: 2,
+                      background: 'rgba(244, 67, 54, 0.1)',
+                      border: '1px solid rgba(244, 67, 54, 0.3)',
+                      color: '#ff6b6b',
+                      '& .MuiAlert-icon': {
+                        color: '#ff6b6b'
+                      }
+                    }}>
+                      {passwordChangeError}
+                    </Alert>
+                  )}
+                  {passwordChangeSuccess && (
+                    <Alert severity="success" sx={{ 
+                      mb: 2,
+                      background: 'rgba(76, 175, 80, 0.1)',
+                      border: '1px solid rgba(76, 175, 80, 0.3)',
+                      color: '#4ade80',
+                      '& .MuiAlert-icon': {
+                        color: '#4ade80'
+                      }
+                    }}>
+                      {passwordChangeSuccess}
+                    </Alert>
+                  )}
+                  <TextField
+                    label="Yeni Şifre"
+                    type="password"
+                    fullWidth
+                    margin="normal"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255,255,255,0.7)',
+                        '&.Mui-focused': {
+                          color: 'rgba(255,255,255,0.9)'
+                        }
+                      },
+                      '& .MuiInput-root': {
+                        color: 'white',
+                        '&::before': { borderBottomColor: 'rgba(255,255,255,0.3)' },
+                        '&::after': { borderBottomColor: 'rgba(255,255,255,0.7)' },
+                        '&:hover::before': { borderBottomColor: 'rgba(255,255,255,0.5)' },
+                        '&.Mui-focused::before': { borderBottomColor: 'rgba(255,255,255,0.7)' },
+                      },
+                      '& .MuiInputBase-input': {
+                        '&::placeholder': {
+                          color: 'rgba(255,255,255,0.5)',
+                          opacity: 1
+                        }
+                      }
+                    }}
+                  />
+                  <TextField
+                    label="Yeni Şifreyi Tekrar Girin"
+                    type="password"
+                    fullWidth
+                    margin="normal"
+                    value={confirmNewPassword}
+                    onChange={(e) => setConfirmNewPassword(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        handlePasswordChange();
+                      }
+                    }}
+                    sx={{
+                      '& .MuiInputLabel-root': {
+                        color: 'rgba(255,255,255,0.7)',
+                        '&.Mui-focused': {
+                          color: 'rgba(255,255,255,0.9)'
+                        }
+                      },
+                      '& .MuiInput-root': {
+                        color: 'white',
+                        '&::before': { borderBottomColor: 'rgba(255,255,255,0.3)' },
+                        '&::after': { borderBottomColor: 'rgba(255,255,255,0.7)' },
+                        '&:hover::before': { borderBottomColor: 'rgba(255,255,255,0.5)' },
+                        '&.Mui-focused::before': { borderBottomColor: 'rgba(255,255,255,0.7)' },
+                      },
+                      '& .MuiInputBase-input': {
+                        '&::placeholder': {
+                          color: 'rgba(255,255,255,0.5)',
+                          opacity: 1
+                        }
+                      }
+                    }}
+                  />
+                </DialogContent>
+                <DialogActions>
+                  <Button 
+                    onClick={handlePasswordChangeDialogClose} 
+                    sx={{ 
+                      color: 'rgba(255,255,255,0.7)',
+                      '&:hover': {
+                        background: 'rgba(255,255,255,0.1)',
+                        color: 'white'
+                      }
+                    }}
+                  >
+                    İptal
+                  </Button>
+                  <Button 
+                    onClick={handlePasswordChange} 
+                    variant="contained" 
+                    disabled={isPasswordChanging}
+                    sx={{ 
+                      background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                      color: 'white',
+                      fontWeight: 600,
+                      px: 3,
+                      py: 1,
+                      borderRadius: '8px',
+                      textTransform: 'none',
+                      '&:hover': {
+                        background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                        boxShadow: '0 4px 12px rgba(79, 70, 229, 0.4)'
+                      },
+                      '&:disabled': {
+                        background: 'rgba(255,255,255,0.1)',
+                        color: 'rgba(255,255,255,0.5)'
+                      }
+                    }}
+                  >
+                    {isPasswordChanging ? 'Değiştiriliyor...' : 'Şifre Değiştir'}
+                  </Button>
+                </DialogActions>
+              </Dialog>
             </>
           ) : (
             <Stack direction="row" spacing={2}>

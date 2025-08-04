@@ -14,7 +14,6 @@ import pdfplumber
 from datetime import datetime, timedelta
 from agents.test_agent import TestAIAgent
 from agents.interview_agent import InterviewAIAgent
-from agents.case_study_agent import CaseStudyAIAgent
 from agents.code_agent import CodeAIAgent
 from agents.intelligent_job_agent import IntelligentJobAgent
 from utils.code_formatter import code_indenter
@@ -931,73 +930,7 @@ def code_room_generate_solution():
     except Exception as e:
         return jsonify({'error': f'Çözüm oluşturma hatası: {str(e)}'}), 500
 
-@app.route('/user_test_stats', methods=['GET'])
-@login_required
-def user_test_stats():
-    username = session['username']
-    
-    # Son test performansları
-    recent_tests = TestPerformance.query.filter_by(username=username)\
-        .order_by(TestPerformance.created_at.desc()).limit(10).all()
-    
-    # Genel istatistikler
-    all_tests = TestPerformance.query.filter_by(username=username).all()
-    
-    if not all_tests:
-        return jsonify({
-            'total_tests': 0,
-            'average_score': 0,
-            'best_score': 0,
-            'current_level': 'Henüz test alınmadı',
-            'improvement_trend': 'Veri yok',
-            'recent_tests': []
-        })
-    
-    # İstatistikleri hesapla
-    total_tests = len(all_tests)
-    average_score = sum(test.success_rate for test in all_tests) / total_tests
-    best_score = max(test.success_rate for test in all_tests)
-    current_level = recent_tests[0].skill_level if recent_tests else 'Bilinmiyor'
-    
-    # Gelişim trendi (son 5 test)
-    if len(recent_tests) >= 2:
-        recent_scores = [test.success_rate for test in recent_tests[:5]]
-        recent_scores.reverse()  # Chronological order
-        
-        if len(recent_scores) >= 2:
-            trend_diff = recent_scores[-1] - recent_scores[0]
-            if trend_diff > 5:
-                improvement_trend = 'Yükseliş'
-            elif trend_diff < -5:
-                improvement_trend = 'Düşüş'
-            else:
-                improvement_trend = 'Stabil'
-        else:
-            improvement_trend = 'Yeterli veri yok'
-    else:
-        improvement_trend = 'Yeterli veri yok'
-    
-    # Son testleri formatla
-    recent_tests_data = []
-    for test in recent_tests:
-        recent_tests_data.append({
-            'date': test.created_at.strftime('%Y-%m-%d %H:%M'),
-            'score': test.success_rate,
-            'level': test.skill_level,
-            'questions': f"{test.correct_answers}/{test.total_questions}",
-            'time': f"{test.time_taken // 60}dk {test.time_taken % 60}sn",
-            'difficulty': test.difficulty,
-            'interest': test.interest
-        })
-    
-    return jsonify({
-        'total_tests': total_tests,
-        'average_score': round(average_score, 1),
-        'best_score': round(best_score, 1),
-        'current_level': current_level,
-        'improvement_trend': improvement_trend,
-        'recent_tests': recent_tests_data
-    })
+
 
 # Test çözümü kaydı
 @app.route('/test_your_skill/evaluate', methods=['POST'])
@@ -1141,111 +1074,7 @@ def code_room_evaluate():
     except Exception as e:
         return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
 
-@app.route('/code_room/evaluate_advanced', methods=['POST'])
-@login_required
-def code_room_evaluate_advanced():
-    """Gelişmiş kod değerlendirme - çalıştırır ve detaylı analiz yapar"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    question = data.get('question', '')
-    user_code = data.get('user_code')
-    language = data.get('language', 'python')
-    
-    if not user_code:
-        return jsonify({'error': 'Kod gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        
-        # Gelişmiş değerlendirme için özel prompt
-        evaluation_prompt = f"""
-        Bu kodu çalıştır, değerlendir ve detaylı analiz yap:
-        
-        Soru: {question}
-        
-        Kod:
-        ```{language}
-        {user_code}
-        ```
-        
-        Lütfen şunları yap:
-        1. Kodu çalıştır
-        2. Çıktıyı göster
-        3. Kodu detaylı değerlendir (doğruluk, kalite, verimlilik)
-        4. Puan ver (0-100)
-        5. İyileştirme önerileri ver
-        6. Kod analizi yap
-        """
-        
-        # execute_complex_code metodunu kullan
-        result = agent.execute_complex_code(evaluation_prompt, language)
-        
-        # Sonucu analiz et ve formatla
-        analysis_result = {
-            'success': result['success'],
-            'evaluation': '',
-            'execution_output': '',
-            'code_suggestions': '',
-            'has_errors': False,
-            'corrected_code': '',
-            'score': 0,
-            'feedback': '',
-            'code_analysis': '',
-            'suggestions': ''
-        }
-        
-        if result['success']:
-            # Çalıştırma çıktısını ayarla
-            if result['code']:
-                analysis_result['execution_output'] += f"Çalıştırılan Kod:\n{result['code']}\n\n"
-            if result['output']:
-                analysis_result['execution_output'] += f"Çıktı:\n{result['output']}\n"
-            if result['error']:
-                analysis_result['execution_output'] += f"Hata:\n{result['error']}\n"
-                analysis_result['has_errors'] = True
-            
-            # Analiz metnini ayarla
-            if result['output']:
-                analysis_result['evaluation'] = result['output']
-                analysis_result['feedback'] = result['output']
-                
-                # Puan çıkarmaya çalış
-                import re
-                score_match = re.search(r'puan[:\s]*(\d+)', result['output'].lower())
-                if score_match:
-                    analysis_result['score'] = int(score_match.group(1))
-                else:
-                    # Puan bulunamazsa tahmin et
-                    if any(word in result['output'].lower() for word in ['doğru', 'correct', 'başarılı']):
-                        analysis_result['score'] = 85
-                    elif any(word in result['output'].lower() for word in ['kısmen', 'partial']):
-                        analysis_result['score'] = 60
-                    else:
-                        analysis_result['score'] = 30
-                
-                # Kod analizi ve öneriler
-                analysis_result['code_analysis'] = "Kod çalıştırıldı ve analiz edildi."
-                analysis_result['suggestions'] = "Detaylı değerlendirme sonuçları yukarıda gösterilmektedir."
-        
-        # Kodlama değerlendirme aktivitesi kaydet
-        activity = UserActivity(
-            username=user.username,
-            activity_type='code_evaluation',
-            points_earned=15
-        )
-        db.session.add(activity)
-        db.session.commit()
-        
-        return jsonify({
-            'success': True,
-            'result': analysis_result
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Gelişmiş değerlendirme hatası: {str(e)}'}), 500
+
 
 @app.route('/code_room/run', methods=['POST'])
 @login_required
@@ -1320,140 +1149,11 @@ def code_room_run_simple():
     except Exception as e:
         return jsonify({'error': f'Kod çalıştırma hatası: {str(e)}'}), 500
 
-@app.route('/code_room/run_advanced', methods=['POST'])
-@login_required
-def code_room_run_advanced():
-    """Gelişmiş kod çalıştırma - yeni CodeAIAgent özelliklerini kullanır"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    user_code = data.get('user_code')
-    language = data.get('language', 'python')
-    context = data.get('context', 'Kod çalıştırma')
-    
-    if not user_code:
-        return jsonify({'error': 'Kod gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        
-        # Gelişmiş kod çalıştırma için özel prompt oluştur
-        enhanced_prompt = f"""
-        Bu kodu çalıştır ve detaylı analiz yap:
-        
-        Bağlam: {context}
-        
-        Kod:
-        ```{language}
-        {user_code}
-        ```
-        
-        Lütfen şunları yap:
-        1. Kodu çalıştır
-        2. Çıktıyı göster
-        3. Varsa hataları tespit et
-        4. Kod kalitesi hakkında kısa analiz yap
-        5. İyileştirme önerileri ver
-        """
-        
-        # Yeni execute_complex_code metodunu kullan
-        result = agent.execute_complex_code(enhanced_prompt, language)
-        
-        # Sonucu gelişmiş formatta döndür
-        enhanced_result = {
-            'success': result['success'],
-            'code': result['code'],
-            'output': result['output'],
-            'error': result['error'],
-            'execution_time': 'N/A',  # Gerçek execution time için ayrı implementation gerek
-            'memory_usage': 'N/A',
-            'code_analysis': '',
-            'suggestions': ''
-        }
-        
-        # Eğer başarılıysa, kod analizi ve öneriler ekle
-        if result['success'] and result['output']:
-            try:
-                # Kod analizi için ayrı bir çağrı
-                analysis_prompt = f"""
-                Bu kodun kalitesini analiz et:
-                
-                ```{language}
-                {user_code}
-                ```
-                
-                Çıktı: {result['output']}
-                
-                Kısa bir analiz yap ve iyileştirme önerileri ver.
-                """
-                
-                analysis_result = agent.execute_complex_code(analysis_prompt, language)
-                if analysis_result['success'] and analysis_result['output']:
-                    enhanced_result['code_analysis'] = analysis_result['output']
-                    enhanced_result['suggestions'] = "Kod başarıyla çalıştı. Daha fazla iyileştirme için analiz sonuçlarını inceleyin."
-            except:
-                # Analiz başarısız olursa, basit öneri ver
-                enhanced_result['suggestions'] = "Kod başarıyla çalıştı. Performans için daha fazla optimizasyon yapılabilir."
-        
-        return jsonify({
-            'success': True,
-            'result': enhanced_result
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Gelişmiş kod çalıştırma hatası: {str(e)}'}), 500
 
-@app.route('/code_room/debug', methods=['POST'])
-@login_required
-def code_room_debug():
-    """Hatalı kodu debug eder"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    code_with_error = data.get('code')
-    language = data.get('language', 'python')
-    
-    if not code_with_error:
-        return jsonify({'error': 'Hatalı kod gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        debug_result = agent.debug_code(code_with_error)
-        return jsonify({
-            'success': True,
-            'debug_result': debug_result
-        })
-    except Exception as e:
-        return jsonify({'error': f'Debug hatası: {str(e)}'}), 500
 
-@app.route('/code_room/analyze_complexity', methods=['POST'])
-@login_required
-def code_room_analyze_complexity():
-    """Kod karmaşıklığını analiz eder"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    code = data.get('code')
-    language = data.get('language', 'python')
-    
-    if not code:
-        return jsonify({'error': 'Analiz edilecek kod gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        analysis = agent.analyze_algorithm_complexity(code)
-        return jsonify({
-            'success': True,
-            'analysis': analysis
-        })
-    except Exception as e:
-        return jsonify({'error': f'Karmaşıklık analizi hatası: {str(e)}'}), 500
+
+
+
 
 @app.route('/code_room/suggest_resources', methods=['POST'])
 @login_required
@@ -1519,130 +1219,16 @@ def code_room_format_code():
     except Exception as e:
         return jsonify({'error': f'Kod formatlanamadı: {str(e)}'}), 500
 
-@app.route('/code_room/evaluate_with_execution', methods=['POST'])
-@login_required
-def code_room_evaluate_with_execution():
-    """Kodu çalıştırarak değerlendirir ve puan verir"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    user_code = data.get('user_code')
-    question = data.get('question')
-    language = data.get('language', 'python')
-    
-    if not user_code or not question:
-        return jsonify({'error': 'Kod ve soru gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        result = agent.evaluate_code_with_execution(user_code, question)
-        
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-    except Exception as e:
-        return jsonify({'error': f'Değerlendirme hatası: {str(e)}'}), 500
 
-@app.route('/code_room/solve_math', methods=['POST'])
-@login_required
-def code_room_solve_math():
-    """Matematik problemlerini çözer"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    problem = data.get('problem')
-    language = data.get('language', 'python')
-    
-    if not problem:
-        return jsonify({'error': 'Problem gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        result = agent.solve_math_problem(problem)
-        
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-    except Exception as e:
-        return jsonify({'error': f'Matematik problemi çözme hatası: {str(e)}'}), 500
 
-@app.route('/code_room/analyze_data', methods=['POST'])
-@login_required
-def code_room_analyze_data():
-    """Veri analizi yapar"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    data_description = data.get('data_description')
-    analysis_type = data.get('analysis_type', 'basic')
-    language = data.get('language', 'python')
-    
-    if not data_description:
-        return jsonify({'error': 'Veri açıklaması gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        result = agent.analyze_data(data_description, analysis_type)
-        
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-    except Exception as e:
-        return jsonify({'error': f'Veri analizi hatası: {str(e)}'}), 500
 
-@app.route('/code_room/execute_complex', methods=['POST'])
-@login_required
-def code_room_execute_complex():
-    """Karmaşık kod çalıştırma"""
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    
-    data = request.json
-    prompt = data.get('prompt')
-    language = data.get('language', 'python')
-    
-    if not prompt:
-        return jsonify({'error': 'Görev açıklaması gerekli.'}), 400
-    
-    try:
-        agent = CodeAIAgent(user.interest, language)
-        result = agent.execute_complex_code(prompt, language)
-        
-        return jsonify({
-            'success': True,
-            'result': result
-        })
-    except Exception as e:
-        return jsonify({'error': f'Karmaşık kod çalıştırma hatası: {str(e)}'}), 500
+
+
+
+
 
 # Case Study çözümü kaydı
-@app.route('/case_study_room/evaluate', methods=['POST'])
-@login_required
-def case_study_room_evaluate():
-    user = User.query.filter_by(username=session['username']).first()
-    if not user.interest:
-        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
-    data = request.json
-    case = data.get('case')
-    user_solution = data.get('user_solution')
-    if not case or not user_solution:
-        return jsonify({'error': 'Case ve çözüm gerekli.'}), 400
-    agent = CaseStudyAIAgent(user.interest)
-    try:
-        evaluation = agent.evaluate_case_solution(case, user_solution)
-    except Exception as e:
-        return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
-    return jsonify({'evaluation': evaluation})
+
 # Interview çözümü kaydı
 @app.route('/interview_simulation/evaluate', methods=['POST'])
 @login_required
@@ -1678,190 +1264,43 @@ def interview_simulation_evaluate():
 @login_required
 def change_password():
     data = request.json
-    old_password = data.get('old_password')
     new_password = data.get('new_password')
-    if not old_password or not new_password:
-        return jsonify({'error': 'Mevcut ve yeni şifre gerekli.'}), 400
+    if not new_password:
+        return jsonify({'error': 'Yeni şifre gerekli.'}), 400
     
     # Şifre gücü kontrolü
-    if len(new_password) < 5:
-        return jsonify({'error': 'Yeni şifre en az 5 karakter olmalıdır.'}), 400
+    if len(new_password) < 6:
+        return jsonify({'error': 'Yeni şifre en az 6 karakter olmalıdır.'}), 400
     
     user = User.query.filter_by(username=session['username']).first()
-    if not user or not user.check_password(old_password):
-        return jsonify({'error': 'Mevcut şifre yanlış.'}), 400
+    if not user:
+        return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
+    
     user.set_password(new_password)
     db.session.commit()
     return jsonify({'message': 'Şifre başarıyla değiştirildi.'})
 
-@app.route('/debug/session/<session_id>', methods=['GET'])
-@login_required
-def debug_session(session_id):
-    if session_id not in active_case_sessions:
-        return jsonify({'error': 'Session bulunamadı'})
-    
-    session_data = active_case_sessions[session_id]
-    return jsonify({
-        'session_id': session_id,
-        'users': session_data['users'],
-        'status': session_data['status'],
-        'messages_count': len(session_data['messages']),
-        'audio_messages_count': len(session_data['audio_messages']),
-        'has_evaluations': 'evaluations' in session_data,
-        'evaluations': session_data.get('evaluations', {}),
-        'case': session_data['case']
-    })
-
-@app.route('/debug/queue', methods=['GET'])
-@login_required
-def debug_queue():
-    return jsonify({
-        'case_study_queue': case_study_queue,
-        'active_sessions': {k: {'users': v['users'], 'status': v['status']} for k, v in active_case_sessions.items()}
-    })
-
-@app.route('/debug/force_match', methods=['POST'])
-@login_required
-def force_match():
-    data = request.json
-    interest = data.get('interest', 'Data Science')
-
-    if interest in case_study_queue and len(case_study_queue[interest]) >= 2:
-        user1, user2 = case_study_queue[interest][:2]
-        case_study_queue[interest] = case_study_queue[interest][2:]
-
-        # Basit case study oluştur (API olmadan)
-        case = {
-            "title": f"{interest} Case Study",
-            "description": f"Bu bir {interest} alanında test case study'sidir. Lütfen bu senaryoyu çözün.",
-            "requirements": ["Çözümü tamamlayın"],
-            "constraints": ["30 dakika süre"],
-            "evaluation_criteria": ["Çözüm kalitesi", "Analiz derinliği"],
-            "interest": interest
-        }
-
-        session_id = f"case_{int(time.time())}"
-        active_case_sessions[session_id] = {
-            'users': [user1, user2],
-            'case': case,
-            'start_time': datetime.now(),
-            'duration': 30,
-            'solutions': {},
-            'messages': [],
-            'audio_messages': [],
-            'status': 'active'
-        }
-
-        return jsonify({
-            'status': 'success',
-            'message': f'{user1} ve {user2} eşleştirildi',
-            'session_id': session_id
-        })
-
-    return jsonify({'status': 'error', 'message': 'Eşleştirilecek kullanıcı yok'})
-
-@app.route('/debug/clear_sessions', methods=['POST'])
-@login_required
-def clear_sessions():
-    global active_case_sessions, case_study_queue
-    active_case_sessions.clear()
-    case_study_queue.clear()
-    return jsonify({'status': 'success', 'message': 'Tüm sessionlar temizlendi'})
 
 
 
-@app.route('/case_study_room/leave_queue', methods=['POST'])
-@login_required
-def leave_queue():
-    username = session['username']
-    user = User.query.filter_by(username=username).first()
-    interest = user.interest
-    
-    # Kullanıcıyı kuyruktan çıkar
-    if interest in case_study_queue and username in case_study_queue[interest]:
-        case_study_queue[interest].remove(username)
-    
-    # Kullanıcıyı aktif session'lardan çıkar
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users']:
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
-    
-    return jsonify({'message': 'Tüm session\'lardan çıkarıldınız.'})
 
-@app.route('/debug/test_case_generation', methods=['POST'])
-@login_required
-def test_case_generation():
-    data = request.json
-    interest = data.get('interest', 'Data Science')
-    
-    try:
-        agent = CaseStudyAIAgent(interest)
-        case = agent.generate_case()
-        return jsonify({
-            'status': 'success',
-            'case': case,
-            'message': 'Case generation başarılı'
-        })
-    except Exception as e:
-        return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'message': 'Case generation hatası'
-        })
+
+
+
+
+
+
+
+
+
 
 @app.route('/')
 def home():
             return jsonify({'message': 'CodeMateTR API is running!'})
 
-@app.route('/debug/clear_user_sessions', methods=['POST'])
-@login_required
-def clear_user_sessions():
-    username = session['username']
-    
-    # Kullanıcıyı tüm kuyruklardan çıkar
-    for interest in case_study_queue:
-        if username in case_study_queue[interest]:
-            case_study_queue[interest].remove(username)
-    
-    # Kullanıcıyı tüm session'lardan çıkar
-    for session_id, session_data in list(active_case_sessions.items()):
-        if username in session_data['users']:
-            session_data['users'].remove(username)
-            # Eğer session'da başka kullanıcı kalmadıysa session'ı sil
-            if not session_data['users']:
-                del active_case_sessions[session_id]
-    
-    return jsonify({'message': f'{username} kullanıcısının tüm session\'ları temizlendi.'})
 
-@app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
-@login_required
-def clear_auto_interview_sessions():
-    """Kullanıcının otomatik mülakat oturumlarını temizler"""
-    username = session['username']
-    
-    try:
-        # Kullanıcının tüm aktif otomatik mülakat oturumlarını bul ve sil
-        active_sessions = AutoInterviewSession.query.filter_by(
-            username=username,
-            status='active'
-        ).all()
-        
-        for interview_session in active_sessions:
-            interview_session.status = 'cancelled'
-            interview_session.end_time = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': f'{username} kullanıcısının {len(active_sessions)} aktif otomatik mülakat oturumu temizlendi.'
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Oturum temizleme hatası: {str(e)}'}), 500
+
+
 
 # ==================== OTOMATİK MÜLAKAT SİSTEMİ ====================
 
@@ -2400,37 +1839,7 @@ def get_forum_post(post_id):
         'comments': comments_data
     })
 
-@app.route('/forum/posts/<int:post_id>', methods=['PUT'])
-@login_required
-def update_forum_post(post_id):
-    """Forum gönderisini günceller"""
-    post = ForumPost.query.get_or_404(post_id)
-    
-    # Sadece yazar düzenleyebilir
-    if post.author_username != session['username']:
-        return jsonify({'error': 'Bu gönderiyi düzenleme yetkiniz yok.'}), 403
-    
-    data = request.json
-    title = data.get('title')
-    content = data.get('content')
-    tags = data.get('tags', [])
-    
-    if not title or not content:
-        return jsonify({'error': 'Başlık ve içerik gerekli.'}), 400
-    
-    try:
-        post.title = title
-        post.content = content
-        post.tags = json.dumps(tags)
-        post.updated_at = datetime.utcnow()
-        
-        db.session.commit()
-        
-        return jsonify({'message': 'Gönderi başarıyla güncellendi.'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Güncelleme hatası: {str(e)}'}), 500
+
 
 @app.route('/forum/posts/<int:post_id>', methods=['DELETE'])
 @login_required
