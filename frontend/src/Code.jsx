@@ -55,9 +55,32 @@ export default function Code() {
     setCopyNotification(false);
   };
 
-  // Component mount olduğunda state'leri sıfırla
+  // Component mount olduğunda state'leri sıfırla ve session kontrolü yap
   useEffect(() => {
     resetAllStates();
+    
+    // Session durumunu kontrol et
+    const checkSession = async () => {
+      try {
+        console.log('Checking session status for code room...');
+        const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Session status:', sessionRes.data);
+        
+        // Code endpoint'ini de kontrol et
+        const codeRes = await axios.get(API_ENDPOINTS.CODE_PAGE, { 
+          withCredentials: true,
+          timeout: 5000
+        });
+        console.log('Code page status:', codeRes.data);
+      } catch (err) {
+        console.error('Session check failed for code room:', err);
+      }
+    };
+    
+    checkSession();
   }, []); // Sadece component mount olduğunda çalışır
 
   // Dil konfigürasyonları
@@ -332,11 +355,18 @@ export default function Code() {
     if (!userCode.trim()) return;
     
     setLoading(true);
+    setError('');
     try {
+      console.log('Formatting code with:', API_ENDPOINTS.CODE_FORMAT);
+      console.log('Format data:', { language: selectedLanguage, code_length: userCode.length });
+      
       const res = await axios.post(API_ENDPOINTS.CODE_FORMAT, {
         code: userCode,
         language: selectedLanguage
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 10000
+      });
       
       if (res.data.success) {
         setUserCode(res.data.formatted_code);
@@ -346,7 +376,15 @@ export default function Code() {
         }, 3000);
       }
     } catch (err) {
-      setError('❌ Kod formatlanamadı: ' + (err.response?.data?.error || err.message));
+      console.error('Error formatting code:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError('❌ Kod formatlanamadı: ' + (err.response?.data?.error || err.message));
+      }
     } finally {
       setLoading(false);
     }
@@ -360,13 +398,17 @@ export default function Code() {
       const res = await axios.post(API_ENDPOINTS.CODE_FORMAT, {
         code: code,
         language: language
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 10000
+      });
       
       if (res.data.success) {
         return res.data.formatted_code;
       }
     } catch (err) {
       console.error('AI çözümü formatlanamadı:', err);
+      console.error('Error response:', err.response);
     }
     
     // Fallback: Basit formatlama
@@ -401,14 +443,30 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      console.log('Fetching coding question from:', API_ENDPOINTS.CODE_ROOM);
+      console.log('Request data:', { difficulty: difficulty, language: selectedLanguage });
+      
       const res = await axios.post(API_ENDPOINTS.CODE_ROOM, {
         difficulty: difficulty,
         language: selectedLanguage
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 15000
+      });
+      
+      console.log('Coding question response:', res.data);
       setQuestion(res.data.coding_question);
       setStep('coding');
     } catch (err) {
-      setError(err.response?.data?.error || 'Soru alınamadı.');
+      console.error('Error fetching coding question:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Kodlama sorusu alınamadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -426,11 +484,17 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      console.log('Running code with:', API_ENDPOINTS.CODE_RUN_SIMPLE);
+      console.log('Code data:', { language: selectedLanguage, code_length: userCode.length });
+      
       // Sadece kod çalıştırma - analiz yok
       const res = await axios.post(API_ENDPOINTS.CODE_RUN_SIMPLE, {
         user_code: userCode,
         language: selectedLanguage
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 20000
+      });
       
       if (res.data.success) {
         const result = res.data.result;
@@ -467,16 +531,29 @@ export default function Code() {
         setError(res.data.error || 'Kod çalıştırma başarısız.');
       }
     } catch (err) {
-      // Fallback: Eski API'yi dene
-      try {
-        console.log('🔄 Yeni API başarısız, eski API deneniyor...');
-        const fallbackRes = await axios.post(API_ENDPOINTS.CODE_RUN, {
-          user_code: userCode,
-          language: selectedLanguage
-        }, { withCredentials: true });
-        setExecutionOutput(fallbackRes.data.result);
-      } catch (fallbackErr) {
-        setError(err.response?.data?.error || fallbackErr.response?.data?.error || 'Kod çalıştırma başarısız.');
+      console.error('Error running code:', err);
+      console.error('Error response:', err.response);
+      
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        // Fallback: Eski API'yi dene
+        try {
+          console.log('🔄 Yeni API başarısız, eski API deneniyor...');
+          const fallbackRes = await axios.post(API_ENDPOINTS.CODE_RUN, {
+            user_code: userCode,
+            language: selectedLanguage
+          }, { 
+            withCredentials: true,
+            timeout: 20000
+          });
+          setExecutionOutput(fallbackRes.data.result);
+        } catch (fallbackErr) {
+          console.error('Fallback API also failed:', fallbackErr);
+          setError(err.response?.data?.error || fallbackErr.response?.data?.error || 'Kod çalıştırma başarısız. Lütfen tekrar deneyin.');
+        }
       }
     } finally {
       setLoading(false);
@@ -493,13 +570,23 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      console.log('Evaluating code with:', API_ENDPOINTS.CODE_EVALUATE);
+      console.log('Evaluation data:', { 
+        question_length: question.length, 
+        code_length: userCode.length, 
+        language: selectedLanguage 
+      });
+      
       // Mevcut code odası evaluate fonksiyonunu kullan
       const res = await axios.post(API_ENDPOINTS.CODE_EVALUATE, {
         question: question,
         user_code: userCode,
         use_execution: true, // Çalıştır ve analiz et
         language: selectedLanguage
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 30000
+      });
       
       // Sonucu formatla
       const evaluationResult = {
@@ -516,7 +603,15 @@ export default function Code() {
       setResult(evaluationResult);
       setStep('result');
     } catch (err) {
-      setError(err.response?.data?.error || 'Değerlendirme başarısız.');
+      console.error('Error evaluating code:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Değerlendirme başarısız. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -526,10 +621,16 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      console.log('Generating solution with:', API_ENDPOINTS.CODE_GENERATE);
+      console.log('Solution data:', { question_length: question.length, language: selectedLanguage });
+      
       const res = await axios.post(API_ENDPOINTS.CODE_GENERATE, {
         question: question,
         language: selectedLanguage
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 25000
+      });
       
       console.log('AI Response:', res.data); // Debug için
       
@@ -564,7 +665,15 @@ export default function Code() {
         setError('❌ AI çözümünde kod bulunamadı!');
       }
     } catch (err) {
-      setError(err.response?.data?.error || 'Çözüm üretilemedi.');
+      console.error('Error generating solution:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Çözüm üretilemedi. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }
@@ -574,20 +683,36 @@ export default function Code() {
     setLoading(true);
     setError('');
     try {
+      console.log('Getting resources with:', API_ENDPOINTS.CODE_SUGGEST);
+      
       const config = languageConfigs[selectedLanguage];
       const searchTopic = question 
         ? `${config.name} programlama ${question.slice(0, 100)}` 
         : `${config.name} programlama başlangıç orta seviye`;
+      
+      console.log('Search topic:', searchTopic);
         
       const res = await axios.post(API_ENDPOINTS.CODE_SUGGEST, {
         topic: searchTopic,
         num_resources: 5
-      }, { withCredentials: true });
+      }, { 
+        withCredentials: true,
+        timeout: 15000
+      });
       
-            setResources(res.data);
+      console.log('Resources response:', res.data);
+      setResources(res.data);
       // setActiveTab(3); // Kaynaklar sekmesine geç
     } catch (err) {
-      setError(err.response?.data?.error || 'Kaynaklar alınamadı.');
+      console.error('Error getting resources:', err);
+      console.error('Error response:', err.response);
+      if (err.response?.status === 401) {
+        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+      } else if (err.code === 'ECONNABORTED') {
+        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+      } else {
+        setError(err.response?.data?.error || 'Kaynaklar alınamadı. Lütfen tekrar deneyin.');
+      }
     } finally {
       setLoading(false);
     }

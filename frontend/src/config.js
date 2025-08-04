@@ -22,6 +22,9 @@ export const API_ENDPOINTS = {
   TEST_SKILL: `${API_BASE_URL}/test_your_skill`,
   TEST_EVALUATE: `${API_BASE_URL}/test_your_skill/evaluate`,
 
+  // Code endpoints
+  CODE_PAGE: `${API_BASE_URL}/code`,
+
   // Interview endpoints
   INTERVIEW_SIMULATION: `${API_BASE_URL}/interview_simulation`,
   INTERVIEW_EVALUATE: `${API_BASE_URL}/interview_simulation/evaluate`,

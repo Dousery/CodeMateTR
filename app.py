@@ -661,6 +661,16 @@ def test_page():
         'has_user_id': 'user_id' in session
     })
 
+@app.route('/code', methods=['GET'])
+def code_page():
+    """Kodlama odası sayfası için basit endpoint"""
+    return jsonify({
+        'message': 'Kodlama odası erişilebilir',
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session
+    })
+
 @app.route('/test_your_skill', methods=['POST'])
 @login_required
 def test_your_skill():
@@ -1014,8 +1024,16 @@ def interview_simulation():
 @app.route('/code_room', methods=['POST'])
 @login_required
 def code_room():
+    print(f"DEBUG: code_room called by user: {session.get('username')}")
+    print(f"DEBUG: Session data: {dict(session)}")
+    
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        print(f"DEBUG: User not found in database: {session.get('username')}")
+        return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
+    
     if not user.interest:
+        print(f"DEBUG: User has no interest: {session.get('username')}")
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     data = request.json
@@ -1045,8 +1063,15 @@ def code_room():
 @app.route('/code_room/generate_solution', methods=['POST'])
 @login_required
 def code_room_generate_solution():
+    print(f"DEBUG: code_room_generate_solution called by user: {session.get('username')}")
+    
     user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        print(f"DEBUG: User not found in database: {session.get('username')}")
+        return jsonify({'error': 'Kullanıcı bulunamadı. Lütfen tekrar giriş yapın.'}), 401
+    
     if not user.interest:
+        print(f"DEBUG: User has no interest: {session.get('username')}")
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     data = request.json
