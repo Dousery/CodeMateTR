@@ -1,6 +1,6 @@
 # BTK Project - AI-Powered Learning Platform
 
-Bu proje, yapay zeka destekli bir öğrenme platformudur. React frontend ve Flask backend kullanılarak geliştirilmiştir.
+Bu proje, yapay zeka destekli bir öğrenme platformudur. React frontend ve Flask backend kullanılarak geliştirilmiştir..
 
 ## 🚀 Özellikler
 
