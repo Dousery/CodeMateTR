@@ -256,9 +256,9 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2, maxWidth: '1000px', mx: 'auto' }}>
+          <Grid container spacing={3} justifyContent="center" sx={{ mt: 2, maxWidth: '1200px', mx: 'auto' }}>
             {modules.map((mod, i) => (
-              <Grid item xs={12} sm={6} md={3} key={mod.title}>
+              <Grid item xs={12} sm={6} md={4} key={mod.title}>
                 <Card
                   component={motion.div}
                   whileHover={{ scale: 1.02, y: -8 }}
@@ -270,8 +270,8 @@ export default function Dashboard() {
                   onClick={() => navigate(mod.path)}
                   sx={{ 
                     borderRadius: 4, 
-                    minHeight: 260, 
-                    maxWidth: 240,
+                    minHeight: 220, 
+                    maxWidth: 260,
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
@@ -283,14 +283,14 @@ export default function Dashboard() {
                       bgcolor: 'rgba(255,255,255,0.1)', 
                       mx: 'auto', 
                       mb: 2, 
-                      width: 64, 
-                      height: 64, 
+                      width: 58, 
+                      height: 58, 
                       boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
                       border: '1px solid rgba(255,255,255,0.2)'
                     }}>
                       {mod.icon}
                     </Avatar>
-                    <Typography variant="h5" fontWeight={600} mb={1} color="white">
+                    <Typography variant="h6" fontWeight={600} mb={1} color="white">
                       {mod.title}
                     </Typography>
                     <Typography color="rgba(255,255,255,0.8)" mb={2}>{mod.desc}</Typography>
@@ -326,10 +326,11 @@ export default function Dashboard() {
                       sx={{
                         background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
                         borderRadius: '25px',
-                        px: 4,
-                        py: 1.5,
+                        px: 3,
+                        py: 1,
                         textTransform: 'none',
                         fontWeight: 600,
+                        fontSize: '0.8rem',
                         boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
                         '&:hover': {
                           background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
