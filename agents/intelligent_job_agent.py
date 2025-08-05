@@ -406,8 +406,7 @@ class IntelligentJobAgent:
             'Yazılım Geliştirme, Makine Öğrenmesi': 'Machine Learning Engineer',
             'Yazılım Geliştirme, AI': 'AI Developer',
             'Yazılım Geliştirme, AI, Machine Learning': 'AI Developer',
-            'Yazılım Geliştirme, Yapay Zeka in Turkey': 'AI Developer',
-            'Yazılım Geliştirme, Yapay Zeka, Makine Öğrenmesi in Turkey': 'AI Developer'
+
         }
         
         lang_mapping = {
@@ -440,11 +439,11 @@ class IntelligentJobAgent:
             # Format: "Junior AI Developer"
             search_terms.append(f"{english_level} {english_expertise}")
             
-            # Format: "AI Developer jobs in Turkey"
-            search_terms.append(f"{english_expertise} jobs in Turkey")
+            # Format: "AI Developer jobs"
+            search_terms.append(f"{english_expertise} jobs")
             
-            # Format: "Machine Learning Engineer in Turkey"
-            search_terms.append(f"{english_expertise} in Turkey")
+            # Format: "Machine Learning Engineer"
+            search_terms.append(f"{english_expertise}")
         
         # 2. Uygun iş alanlarından terim oluştur (en çok 3 tane)
         for area in suitable_job_areas[:3]:
@@ -459,11 +458,11 @@ class IntelligentJobAgent:
                 # Format: "Junior Frontend Developer"
                 search_terms.append(f"{english_level} {english_area}")
                 
-                # Format: "Frontend Developer jobs in Turkey"
-                search_terms.append(f"{english_area} jobs in Turkey")
+                # Format: "Frontend Developer jobs"
+                search_terms.append(f"{english_area} jobs")
                 
-                # Format: "Frontend Developer in Turkey"
-                search_terms.append(f"{english_area} in Turkey")
+                # Format: "Frontend Developer"
+                search_terms.append(f"{english_area}")
         
         # 3. Programlama dillerinden terim oluştur (en çok 3 tane)
         for lang in programming_languages[:3]:
@@ -473,11 +472,11 @@ class IntelligentJobAgent:
                 # Format: "Junior Python Developer"
                 search_terms.append(f"{english_level} {english_lang} Developer")
                 
-                # Format: "Python Developer jobs in Turkey"
-                search_terms.append(f"{english_lang} Developer jobs in Turkey")
+                # Format: "Python Developer jobs"
+                search_terms.append(f"{english_lang} Developer jobs")
                 
-                # Format: "Python Developer in Turkey"
-                search_terms.append(f"{english_lang} Developer in Turkey")
+                # Format: "Python Developer"
+                search_terms.append(f"{english_lang} Developer")
         
         # 4. Teknik becerilerden terim oluştur (en çok 2 tane)
         for skill in technical_skills[:2]:
@@ -487,20 +486,20 @@ class IntelligentJobAgent:
                 # Format: "Junior React Developer"
                 search_terms.append(f"{english_level} {english_skill} Developer")
                 
-                # Format: "React Developer jobs in Turkey"
-                search_terms.append(f"{english_skill} Developer jobs in Turkey")
+                # Format: "React Developer jobs"
+                search_terms.append(f"{english_skill} Developer jobs")
         
         # Eğer hiç terim oluşturulamadıysa varsayılan terimler
         if not search_terms:
             search_terms = [
                 "Junior Software Developer",
-                "Software Developer jobs in Turkey",
-                "Web Developer jobs in Turkey",
+                "Software Developer jobs",
+                "Web Developer jobs",
                 "Junior Web Developer",
-                "Frontend Developer jobs in Turkey",
-                "Backend Developer jobs in Turkey",
-                "Full Stack Developer jobs in Turkey",
-                "JavaScript Developer jobs in Turkey"
+                "Frontend Developer jobs",
+                "Backend Developer jobs",
+                "Full Stack Developer jobs",
+                "JavaScript Developer jobs"
             ]
         
         # Benzersiz terimleri döndür (ilk 8'i)
