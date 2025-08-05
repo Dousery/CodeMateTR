@@ -280,7 +280,6 @@ class IntelligentJobAgent:
                     "query": term,
                     "page": "1",
                     "num_pages": "1",
-                    "country": "tr",  # Türkiye için
                     "date_posted": "all"
                 }
                 
