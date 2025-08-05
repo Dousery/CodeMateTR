@@ -19,7 +19,6 @@ from agents.code_agent import CodeAIAgent
 from agents.intelligent_job_agent import IntelligentJobAgent
 from utils.code_formatter import code_indenter
 from flask_sqlalchemy import SQLAlchemy
-import threading
 import json
 from functools import wraps
 

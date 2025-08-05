@@ -10,18 +10,18 @@ import json
 import time
 import re
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Set
 import requests
 import google.generativeai as genai
 from google import genai as google_genai
 from google.genai import types
-import httpx
 from dotenv import load_dotenv
 from functools import lru_cache
-from collections import defaultdict
 from dataclasses import dataclass
 import pathlib
+import io
+import PyPDF2
 
 
 
@@ -339,8 +339,6 @@ class IntelligentJobAgent:
             # PDF'den metin çıkarmayı dene
             try:
                 print("PDF'den metin çıkarma deneniyor...")
-                import io
-                import PyPDF2
                 
                 pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
                 cv_text = ""

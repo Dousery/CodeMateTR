@@ -1,6 +1,6 @@
 import os
 import json
-import traceback
+
 import re
 from dotenv import load_dotenv
 from google import genai

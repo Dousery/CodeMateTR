@@ -2,8 +2,8 @@ import google.generativeai as genai
 import json
 import re
 import requests
-from urllib.parse import quote_plus, urljoin
-from bs4 import BeautifulSoup
+from urllib.parse import quote_plus
+
 import time
 from .topic_analysis_agent import TopicAnalysisAgent
 
