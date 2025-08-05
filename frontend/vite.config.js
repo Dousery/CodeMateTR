@@ -7,13 +7,22 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+          ui: ['@mui/material', '@mui/icons-material'],
+        },
       },
     },
+    chunkSizeWarningLimit: 1000,
+    sourcemap: false,
     outDir: 'dist',
   },
   server: {
     historyApiFallback: true,
   },
   publicDir: 'public',
+  define: {
+    'process.env.NODE_ENV': '"production"',
+  },
 })
