@@ -10,8 +10,10 @@ export default defineConfig({
         manualChunks: undefined,
       },
     },
+    outDir: 'dist',
   },
   server: {
     historyApiFallback: true,
   },
+  publicDir: 'public',
 })
