@@ -111,8 +111,8 @@ const SmartJobFinder = () => {
     formData.append('cv_file', file);
 
     try {
-      // Yeni entegrasyon: Tek seferde CV analizi ve Google Jobs iş arama
-      console.log('Processing CV with Google Jobs integration:', API_ENDPOINTS.PROCESS_CV_FILE);
+      // Yeni entegrasyon: Tek seferde CV analizi ve JSearch API iş arama
+      console.log('Processing CV with JSearch API integration:', API_ENDPOINTS.PROCESS_CV_FILE);
       console.log('CV file data:', { 
         filename: file.name,
         size: file.size,
@@ -132,18 +132,20 @@ const SmartJobFinder = () => {
         setCvAnalysis(data.cv_analysis);
         setJobs(data.jobs || []);
         setStats(data.stats || {});
-        setSearchSource(data.stats?.search_method || 'Google Jobs');
+        setSearchSource(data.stats?.search_method || 'JSearch API');
         setActiveStep(3); // Direkt sonuçlar adımına geç
         
-        console.log(`✅ CV analizi ve Google Jobs iş arama tamamlandı: ${data.jobs?.length || 0} iş bulundu`);
-        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'Google Jobs'})`);
+        console.log(`✅ CV analizi ve JSearch API iş arama tamamlandı: ${data.jobs?.length || 0} iş bulundu`);
+        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'JSearch API'})`);
       } else {
         setError(data.error || 'CV işleme başarısız');
         setSearchStatus('❌ CV işleme başarısız');
       }
-    } catch (error) {
-      console.error('CV işleme hatası:', error);
-      console.error('Error response:', error.response);
+          } catch (error) {
+        console.error('CV işleme hatası:', error);
+        console.error('Error response:', error.response);
+        console.error('Error status:', error.response?.status);
+        console.error('Error data:', error.response?.data);
       
       // Fallback: Eski yöntemi dene
       try {

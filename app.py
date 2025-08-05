@@ -456,7 +456,9 @@ def health_check():
         'timestamp': datetime.utcnow().isoformat(),
         'pid': os.getpid(),
         'flask_env': os.getenv('FLASK_ENV'),
-        'database_connected': db.engine.pool.checkedin() > 0
+        'database_connected': db.engine.pool.checkedin() > 0,
+        'gemini_api_key': bool(os.getenv('GEMINI_API_KEY')),
+        'jsearch_api_key': bool(os.getenv('JSEARCH_API_KEY'))
     })
 
 @app.route('/set_interest', methods=['POST'])
@@ -2816,7 +2818,11 @@ def analyze_cv():
             
             # CV'yi direkt PDF bytes ile analiz et (Yeni yöntem!)
             print(f"CV PDF analiz ediliyor - Kullanıcı: {session['username']}")
-            cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
+            print(f"PDF boyutu: {len(pdf_bytes)} bytes")
+            print(f"Gemini API key mevcut: {bool(os.getenv('GEMINI_API_KEY'))}")
+            
+            cv_analysis = job_agent.analyze_cv_from_pdf(pdf_bytes)
+            print(f"CV analizi sonucu: {cv_analysis}")
             
             # CV analiz sonucunu veritabanına kaydet
             user = User.query.filter_by(username=session['username']).first()
