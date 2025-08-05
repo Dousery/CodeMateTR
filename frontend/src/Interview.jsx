@@ -610,9 +610,52 @@ export default function Interview() {
             <Card sx={{ mb: 3, backgroundColor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
               <CardContent>
                 <Typography variant="h6" color="white" mb={1}>📊 CV Analizi</Typography>
-                <Typography variant="body2" color="rgba(255,255,255,0.8)" sx={{ whiteSpace: 'pre-wrap', maxHeight: 200, overflow: 'auto' }}>
-                  {cvAnalysis}
-                </Typography>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="white" mb={1}>👤 Kişisel Bilgiler</Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Ad Soyad: {cvAnalysis.kişisel_bilgiler?.ad_soyad || 'Belirtilmemiş'}
+                    </Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Email: {cvAnalysis.kişisel_bilgiler?.email || 'Belirtilmemiş'}
+                    </Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Telefon: {cvAnalysis.kişisel_bilgiler?.telefon || 'Belirtilmemiş'}
+                    </Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Lokasyon: {cvAnalysis.kişisel_bilgiler?.lokasyon || 'Belirtilmemiş'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="white" mb={1}>💼 Deneyim</Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Deneyim: <strong>{cvAnalysis.deneyim_yılı || 0} yıl</strong>
+                    </Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Seviye: <strong>{cvAnalysis.deneyim_seviyesi || 'entry'}</strong>
+                    </Typography>
+                    <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                      Uzmanlık: {cvAnalysis.ana_uzmanlık_alanı || 'Belirtilmemiş'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="white" mb={1}>🛠️ Teknik Beceriler</Typography>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                      {(cvAnalysis.teknik_beceriler || []).slice(0, 6).map((skill, index) => (
+                        <Chip
+                          key={index}
+                          label={skill}
+                          size="small"
+                          sx={{ 
+                            backgroundColor: 'rgba(255,255,255,0.2)',
+                            color: 'white',
+                            '&:hover': { backgroundColor: 'rgba(255,255,255,0.3)' }
+                          }}
+                        />
+                      ))}
+                    </Box>
+                  </Grid>
+                </Grid>
               </CardContent>
             </Card>
           )}
