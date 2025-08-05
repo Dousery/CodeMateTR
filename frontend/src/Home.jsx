@@ -35,17 +35,15 @@ const TypingAnimation = () => {
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Typography 
         variant="h1" 
-        fontWeight={900} 
+        fontWeight={800} 
         sx={{ 
           fontSize: { xs: '2.5rem', md: '4rem', lg: '5rem' },
           fontFamily: 'monospace',
-          background: 'linear-gradient(45deg, #fff 0%, #e0e0e0 50%, #fff 100%)',
-          backgroundClip: 'text',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          color: '#ffffff',
+          textShadow: '0 4px 20px rgba(0,0,0,0.4)',
           letterSpacing: '0.1em',
           position: 'relative',
+          mb: 1,
         }}
       >
         {text}
@@ -56,7 +54,7 @@ const TypingAnimation = () => {
             display: 'inline-block',
             width: '3px',
             height: '1em',
-            background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+            background: '#4f46e5',
             marginLeft: '2px',
             borderRadius: '2px',
             boxShadow: '0 0 10px rgba(79, 70, 229, 0.8)',
@@ -166,47 +164,56 @@ export default function Home() {
           <TypingAnimation />
         </motion.div>
         
-        {/* Developer Eğitim Platformu - Moved down */}
+        {/* Developer Eğitim Platformu - Simplified subtitle */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.8, delay: 1.5 }}
         >
           <Typography 
-            variant="h2" 
-            fontWeight={700} 
+            variant="h3" 
+            fontWeight={400} 
             textAlign="center" 
             gutterBottom 
             sx={{ 
-              fontSize: { xs: '1.8rem', md: '2.8rem' },
-              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
-              background: 'linear-gradient(45deg, #fff, #e0e0e0)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              opacity: 0.9,
+              fontSize: { xs: '1.4rem', md: '2rem' },
+              color: 'rgba(255,255,255,0.85)',
+              textShadow: '0 2px 8px rgba(0,0,0,0.2)',
+              fontStyle: 'italic',
+              letterSpacing: '0.05em',
+              mb: 2,
             }}
           >
             Developer Eğitim Platformu
           </Typography>
         </motion.div>
         
+        {/* Description - More readable and distinct */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 2.2 }}
         >
           <Typography 
-            variant="h5" 
+            variant="body1" 
             textAlign="center" 
-            maxWidth={700}
+            maxWidth={800}
             sx={{ 
-              color: 'rgba(255,255,255,0.9)',
-              textShadow: '0 2px 10px rgba(0,0,0,0.2)',
-              lineHeight: 1.6
+              color: 'rgba(255,255,255,0.75)',
+              textShadow: '0 1px 4px rgba(0,0,0,0.1)',
+              lineHeight: 1.8,
+              fontSize: { xs: '1rem', md: '1.1rem' },
+              fontWeight: 300,
+              px: 2,
             }}
           >
-            AI destekli testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Akıllı iş bulma sistemi ile hayalindeki kariyere adım at. Modern, şık ve interaktif bir deneyim seni bekliyor!
+            AI destekli testler, kodlama ve mülakat simülasyonları ile kendini geliştir. 
+            <br />
+            Akıllı iş bulma sistemi ile hayalindeki kariyere adım at.
+            <br />
+            <span style={{ fontWeight: 500, color: 'rgba(255,255,255,0.9)' }}>
+              Modern, şık ve interaktif bir deneyim seni bekliyor!
+            </span>
           </Typography>
         </motion.div>
         
