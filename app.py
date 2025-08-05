@@ -772,56 +772,26 @@ def upload_cv():
     
     if file and allowed_file(file.filename):
         try:
-            # CV'yi kaydet
-            filename = secure_filename(file.filename)
-            timestamp = int(time.time())
-            unique_filename = f"cv_{session['username']}_{timestamp}.{filename.split('.')[-1]}"
-            cv_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
-            file.save(cv_path)
+            # Dosyayı bellekte oku
+            cv_data = file.read()
+            mime_type = get_file_mimetype(file.filename)
             
-            try:
-                # PDF'den metin çıkarmak yerine direkt PDF bytes'ını gönder
-                with open(cv_path, 'rb') as file:
-                    pdf_bytes = file.read()
-                
-                # Akıllı Job Agent'ı başlat
-                job_agent = IntelligentJobAgent()
-                
-                # CV'yi direkt PDF bytes ile analiz et
-                print(f"CV PDF analiz ediliyor - Kullanıcı: {session['username']}")
-                print(f"PDF boyutu: {len(pdf_bytes)} bytes")
-                cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
-                print(f"CV analiz sonucu: {cv_analysis}")
-                
-                # CV analiz sonucunu veritabanına kaydet
-                user = User.query.filter_by(username=session['username']).first()
-                if user:
-                    user.cv_analysis = json.dumps(cv_analysis)
-                    db.session.commit()
-                    print(f"CV analiz sonucu veritabanına kaydedildi - Kullanıcı: {user.username}")
-                else:
-                    print(f"Kullanıcı bulunamadı: {session['username']}")
-                
-                # Sonucu döndür
-                return jsonify({
-                    'message': 'CV başarıyla yüklendi ve analiz edildi.',
-                    'analysis': cv_analysis
-                })
-                
-            except Exception as e:
-                print(f"CV analiz hatası: {e}")
-                return jsonify({'error': f'CV analizi sırasında hata: {str(e)}'}), 500
+            # CV'yi analiz et
+            user = User.query.filter_by(username=session['username']).first()
+            agent = InterviewAIAgent(user.interest)
+            cv_analysis = agent.analyze_cv(cv_data, mime_type)
             
-            finally:
-                # Geçici dosyayı temizle
-                try:
-                    if os.path.exists(cv_path):
-                        os.remove(cv_path)
-                except:
-                    pass
-                    
+            # Analizi veritabanına kaydet
+            user.cv_analysis = cv_analysis
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'CV başarıyla yüklendi ve analiz edildi.',
+                'analysis': cv_analysis
+            })
+            
         except Exception as e:
-            return jsonify({'error': f'CV yükleme sırasında hata: {str(e)}'}), 500
+            return jsonify({'error': f'CV analizi sırasında hata: {str(e)}'}), 500
     else:
         return jsonify({'error': 'Geçersiz dosya formatı. PDF, DOC veya DOCX dosyası yükleyiniz.'}), 400
 

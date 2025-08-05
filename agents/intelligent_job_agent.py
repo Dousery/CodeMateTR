@@ -162,7 +162,6 @@ class IntelligentJobAgent:
         """
         
         try:
-            print(f"Gemini API'ye PDF gönderiliyor...")
             # Yeni Gemini PDF API kullan
             response = self.genai_client.models.generate_content(
                 model="gemini-1.5-flash",
@@ -174,7 +173,6 @@ class IntelligentJobAgent:
                     prompt
                 ]
             )
-            print(f"Gemini API yanıtı alındı: {response.text[:200]}...")
             
             # JSON'u temizle ve parse et
             json_text = response.text.strip()
@@ -195,32 +193,6 @@ class IntelligentJobAgent:
             
         except Exception as e:
             print(f"PDF CV analizi hatası: {e}")
-            print(f"Hata detayı: {type(e).__name__}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
-            
-            # PDF'den metin çıkarmayı dene
-            try:
-                print("PDF'den metin çıkarma deneniyor...")
-                import io
-                import PyPDF2
-                
-                pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
-                cv_text = ""
-                for page in pdf_reader.pages:
-                    cv_text += page.extract_text() + "\n"
-                
-                print(f"PDF'den çıkarılan metin uzunluğu: {len(cv_text)}")
-                if len(cv_text.strip()) > 50:  # Yeterli metin varsa
-                    print("Text-based CV analizi yapılıyor...")
-                    text_analysis = self.analyze_cv_with_gemini(cv_text)
-                    self._cache_analysis(cv_hash, text_analysis)
-                    return text_analysis
-                else:
-                    print("PDF'den yeterli metin çıkarılamadı")
-            except Exception as text_error:
-                print(f"PDF metin çıkarma hatası: {text_error}")
-            
             # Fallback analiz
             fallback = self._fallback_cv_analysis("")
             self._cache_analysis(cv_hash, fallback)
