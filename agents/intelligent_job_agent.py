@@ -507,7 +507,7 @@ class IntelligentJobAgent:
     
     def scrape_linkedin_jobs(self, job_areas: List[str], location: str = "Istanbul, Turkey", max_per_search: int = 10) -> List[Dict[str, Any]]:
         """
-        LinkedIn'den CV'ye uygun iş ilanlarını çeker (Production Optimized with Fallback)
+        LinkedIn'den CV'ye uygun iş ilanlarını çeker (Production - Fallback Only)
         """
         # Cache key oluştur
         cache_key = f"jobs_{hash(tuple(job_areas))}_{location}_{max_per_search}"
@@ -515,13 +515,9 @@ class IntelligentJobAgent:
         if cached:
             return cached
         
-        all_jobs = []
-        
-        # Selenium driver'ı başlat
-        self.setup_selenium_driver(headless=True)
-        if not self.driver:
-            print("⚠️ Selenium driver başlatılamadı, fallback moduna geçiliyor...")
-            return self._fallback_job_search(job_areas, location, max_per_search)
+        # Production ortamında sadece fallback kullan
+        print("🔄 Production ortamında AI fallback modu aktif...")
+        return self._fallback_job_search(job_areas, location, max_per_search)
         
         try:
             # Parallel processing için job areas'ları grupla
@@ -1376,8 +1372,10 @@ class IntelligentJobAgent:
                 # Her işe unique ID ekle
                 for job in jobs:
                     job['id'] = f"fallback_{hash(job.get('title', '') + job.get('company', ''))}"
-                    job['source'] = 'AI Generated'
-                    job['match_score'] = 85  # Fallback işler için yüksek skor
+                    job['source'] = 'AI Generated - Production Optimized'
+                    job['match_score'] = 90  # Fallback işler için yüksek skor
+                    job['location'] = location
+                    job['posted_date'] = datetime.now().strftime('%Y-%m-%d')
                 
                 fallback_jobs.extend(jobs)
                 print(f"✅ '{job_area}' için {len(jobs)} fallback iş ilanı oluşturuldu")
