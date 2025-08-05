@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { Button, Box, Typography, Stack } from '@mui/material';
+import { Button, Box, Typography, Stack, Card, CardContent, Grid, Chip } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import QuizIcon from '@mui/icons-material/Quiz';
+import CodeIcon from '@mui/icons-material/Code';
+import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import WorkIcon from '@mui/icons-material/Work';
+import PsychologyIcon from '@mui/icons-material/Psychology';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+
+// CSS for pulse animation
+const pulseAnimation = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+`;
+
+// Add CSS to document head
+if (typeof document !== 'undefined') {
+  const style = document.createElement('style');
+  style.textContent = pulseAnimation;
+  document.head.appendChild(style);
+}
 
 // Typing animation component for CodeMateTR
 const TypingAnimation = () => {
@@ -39,13 +60,14 @@ const TypingAnimation = () => {
         sx={{ 
           fontSize: { xs: '2.5rem', md: '4rem', lg: '5rem' },
           fontFamily: 'monospace',
-          background: 'linear-gradient(45deg, #fff 0%, #e0e0e0 50%, #fff 100%)',
+          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 25%, #06b6d4 50%, #10b981 75%, #f59e0b 100%)',
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           textShadow: '0 4px 20px rgba(0,0,0,0.3)',
           letterSpacing: '0.1em',
           position: 'relative',
+          filter: 'drop-shadow(0 0 20px rgba(79, 70, 229, 0.3))',
         }}
       >
         {text}
@@ -56,14 +78,134 @@ const TypingAnimation = () => {
             display: 'inline-block',
             width: '3px',
             height: '1em',
-            background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+            background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #06b6d4 100%)',
             marginLeft: '2px',
             borderRadius: '2px',
-            boxShadow: '0 0 10px rgba(79, 70, 229, 0.8)',
+            boxShadow: '0 0 15px rgba(79, 70, 229, 0.9)',
+            animation: 'pulse 2s infinite',
           }}
         />
       </Typography>
     </Box>
+  );
+};
+
+// Feature cards component
+const FeatureCards = () => {
+  const features = [
+    {
+      icon: <QuizIcon sx={{ fontSize: 40, color: '#4f46e5' }} />,
+      title: 'AI Test Sistemi',
+      description: 'Kişiselleştirilmiş testler ve akıllı değerlendirmeler ile bilgini ölç',
+      tags: ['Adaptif Öğrenme', 'Anlık Geri Bildirim']
+    },
+    {
+      icon: <CodeIcon sx={{ fontSize: 40, color: '#10b981' }} />,
+      title: 'Kodlama Odası',
+      description: 'AI destekli kod yazma ve gerçek zamanlı kod değerlendirme',
+      tags: ['AI Asistan', 'Kod Analizi']
+    },
+    {
+      icon: <RecordVoiceOverIcon sx={{ fontSize: 40, color: '#f59e0b' }} />,
+      title: 'Otomatik Mülakat',
+      description: 'Sesli ve metin tabanlı AI mülakat simülasyonu',
+      tags: ['Sesli Mülakat', 'Gerçek Zamanlı']
+    },
+    {
+      icon: <WorkIcon sx={{ fontSize: 40, color: '#ef4444' }} />,
+      title: 'Akıllı İş Bulma',
+      description: 'CV analizi ve kariyer önerileri ile ideal işini bul',
+      tags: ['CV Analizi', 'Kariyer Önerileri']
+    },
+    {
+      icon: <PsychologyIcon sx={{ fontSize: 40, color: '#8b5cf6' }} />,
+      title: 'Mülakat Simülasyonu',
+      description: 'Gerçek mülakat deneyimi ile kendini hazırla',
+      tags: ['Simülasyon', 'Pratik']
+    },
+    {
+      icon: <AutoAwesomeIcon sx={{ fontSize: 40, color: '#06b6d4' }} />,
+      title: 'AI Destekli Öğrenme',
+      description: 'Yapay zeka ile kişiselleştirilmiş öğrenme deneyimi',
+      tags: ['Kişiselleştirme', 'AI']
+    }
+  ];
+
+  return (
+    <Grid container spacing={3} sx={{ maxWidth: 1200, mx: 'auto', px: 2 }}>
+      {features.map((feature, index) => (
+        <Grid item xs={12} sm={6} md={4} key={index}>
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: index * 0.1 }}
+            whileHover={{ y: -8 }}
+          >
+            <Card
+              sx={{
+                background: 'rgba(255, 255, 255, 0.1)',
+                backdropFilter: 'blur(20px)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                borderRadius: 3,
+                height: '100%',
+                transition: 'all 0.3s ease',
+                '&:hover': {
+                  background: 'rgba(255, 255, 255, 0.15)',
+                  border: '1px solid rgba(255, 255, 255, 0.3)',
+                  boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+                }
+              }}
+            >
+              <CardContent sx={{ p: 3, textAlign: 'center' }}>
+                <Box sx={{ mb: 2 }}>
+                  {feature.icon}
+                </Box>
+                <Typography
+                  variant="h6"
+                  sx={{
+                    color: 'white',
+                    fontWeight: 600,
+                    mb: 1,
+                    fontSize: { xs: '1.1rem', md: '1.2rem' }
+                  }}
+                >
+                  {feature.title}
+                </Typography>
+                <Typography
+                  variant="body2"
+                  sx={{
+                    color: 'rgba(255, 255, 255, 0.8)',
+                    mb: 2,
+                    lineHeight: 1.5,
+                    fontSize: { xs: '0.9rem', md: '1rem' }
+                  }}
+                >
+                  {feature.description}
+                </Typography>
+                <Stack direction="row" spacing={1} justifyContent="center" flexWrap="wrap">
+                  {feature.tags.map((tag, tagIndex) => (
+                    <Chip
+                      key={tagIndex}
+                      label={tag}
+                      size="small"
+                      sx={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'rgba(255, 255, 255, 0.9)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        fontSize: '0.75rem',
+                        '&:hover': {
+                          background: 'rgba(255, 255, 255, 0.2)',
+                        }
+                      }}
+                    />
+                  ))}
+                </Stack>
+              </CardContent>
+            </Card>
+          </motion.div>
+        </Grid>
+      ))}
+    </Grid>
   );
 };
 
@@ -131,32 +273,36 @@ export default function Home() {
   
   return (
     <Box sx={{ 
-      position: 'fixed', 
-      top: '64px', 
-      left: 0, 
-      width: '100vw', 
-      height: 'calc(100vh - 64px)', 
-      overflow: 'hidden',
+      position: 'relative',
+      minHeight: '100vh',
+      overflow: 'auto',
     }}>
       <AnimatedGradient />
       <FloatingParticles />
       
-      <Stack
-        component={motion.div}
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 1 }}
-        spacing={6}
-        alignItems="center"
-        justifyContent="center"
-        sx={{
-          position: 'relative',
-          zIndex: 2,
-          minHeight: 'calc(100vh - 64px)',
-          width: '100vw',
-          color: 'white',
-        }}
-      >
+      {/* Hero Section */}
+      <Box sx={{ 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        zIndex: 2,
+      }}>
+        <Stack
+          component={motion.div}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1 }}
+          spacing={6}
+          alignItems="center"
+          justifyContent="center"
+          sx={{
+            width: '100%',
+            color: 'white',
+            px: 2,
+          }}
+        >
         {/* CodeMateTR Typing Animation */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
@@ -276,6 +422,38 @@ export default function Home() {
           </Stack>
         </motion.div>
       </Stack>
+      </Box>
+      
+      {/* Features Section */}
+      <Box sx={{ 
+        py: 8,
+        position: 'relative',
+        zIndex: 2,
+        background: 'rgba(0, 0, 0, 0.1)',
+      }}>
+        <motion.div
+          initial={{ opacity: 0, y: 40 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          viewport={{ once: true }}
+        >
+          <Typography
+            variant="h3"
+            textAlign="center"
+            sx={{
+              color: 'white',
+              fontWeight: 700,
+              mb: 6,
+              fontSize: { xs: '2rem', md: '2.5rem' },
+              textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+            }}
+          >
+            Platform Özellikleri
+          </Typography>
+        </motion.div>
+        
+        <FeatureCards />
+      </Box>
     </Box>
   );
 } 
