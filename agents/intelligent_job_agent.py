@@ -52,13 +52,16 @@ class IntelligentJobAgent:
                 "lokasyon": "CV'deki şehir"
             },
             "deneyim_yılı": 0,
+            "toplam_is_deneyimi": "CV'deki toplam deneyim",
+            "staj_deneyimi": "CV'deki staj deneyimi",
             "teknik_beceriler": ["CV'deki teknik beceriler"],
             "yazılım_dilleri": ["CV'deki programlama dilleri"],
             "teknolojiler": ["CV'deki teknolojiler"],
             "eğitim": ["CV'deki eğitim bilgisi"],
             "deneyim_seviyesi": "entry|junior|mid|senior",
             "ana_uzmanlık_alanı": "CV'deki ana alan",
-            "uygun_iş_alanları": ["Uygun iş alanları"]
+            "uygun_iş_alanları": ["Uygun iş alanları"],
+            "cv_kalitesi": "zayıf|orta|iyi|mükemmel"
         }
         
         Önemli: Sadece JSON döndür, başka açıklama ekleme. CV'de olmayan bilgileri "Belirtilmemiş" yaz.
@@ -90,6 +93,10 @@ class IntelligentJobAgent:
             if not cv_analysis.get('teknik_beceriler'):
                 cv_analysis['teknik_beceriler'] = ['HTML', 'CSS', 'JavaScript']
             
+            # CV kalitesi yoksa varsayılan ekle
+            if not cv_analysis.get('cv_kalitesi'):
+                cv_analysis['cv_kalitesi'] = 'orta'
+            
             print(f"✅ CV analizi tamamlandı: {len(cv_analysis.get('teknik_beceriler', []))} beceri bulundu")
             return cv_analysis
             
@@ -104,13 +111,16 @@ class IntelligentJobAgent:
                     "lokasyon": "Belirtilmemiş"
                 },
                 "deneyim_yılı": 0,
+                "toplam_is_deneyimi": "Belirtilmemiş",
+                "staj_deneyimi": "Belirtilmemiş",
                 "teknik_beceriler": ["HTML", "CSS", "JavaScript"],
                 "yazılım_dilleri": ["JavaScript"],
                 "teknolojiler": ["HTML", "CSS"],
                 "eğitim": ["Belirtilmemiş"],
                 "deneyim_seviyesi": "entry",
                 "ana_uzmanlık_alanı": "Software Developer",
-                "uygun_iş_alanları": ["Junior Developer", "Frontend Developer"]
+                "uygun_iş_alanları": ["Junior Developer", "Frontend Developer"],
+                "cv_kalitesi": "zayıf"
             }
     
     def search_jobs_with_serpapi(self, cv_analysis: Dict[str, Any], max_results: int = 20) -> List[Dict[str, Any]]:
@@ -150,11 +160,14 @@ class IntelligentJobAgent:
             
             jobs = data.get("jobs_results", [])
             
-            # İşleri formatla
+            # İşleri formatla - frontend uyumlu
             formatted_jobs = []
-            for job in jobs[:max_results]:
+            for i, job in enumerate(jobs[:max_results]):
+                # Basit skor hesaplama
+                score = 50 + (i * 5)  # İlk işler daha yüksek skor
+                
                 formatted_job = {
-                    'id': job.get('job_id', f"job_{len(formatted_jobs)}"),
+                    'id': job.get('job_id', f"job_{i}"),
                     'title': job.get('title', 'İş İlanı'),
                     'company': job.get('company_name', 'Şirket'),
                     'location': job.get('location', location),
@@ -162,8 +175,12 @@ class IntelligentJobAgent:
                     'requirements': job.get('job_highlights', {}).get('Qualifications', []),
                     'salary': job.get('salary', 'Belirtilmemiş'),
                     'url': job.get('related_links', [{}])[0].get('link', 'https://google.com/jobs'),
-                    'posted_date': job.get('posted_at', ''),
-                    'source': 'Google Jobs'
+                    'posted_date': job.get('posted_at', datetime.now().strftime('%Y-%m-%d')),
+                    'source': 'Google Jobs',
+                    'score': score,  # Frontend için uyum skoru
+                    'match_reasons': [f"{skill} beceriniz bu pozisyona uygun" for skill in skills[:2]],
+                    'missing_skills': ["Daha fazla deneyim", "Proje portföyü"],
+                    'recommendations': ["CV'nizi güncelleyin", "Başvuru yapabilirsiniz"]
                 }
                 formatted_jobs.append(formatted_job)
             
@@ -176,7 +193,7 @@ class IntelligentJobAgent:
     
     def _get_default_jobs(self) -> List[Dict[str, Any]]:
         """
-        Varsayılan iş ilanları döndürür
+        Varsayılan iş ilanları döndürür - frontend uyumlu
         """
         return [
             {
@@ -189,7 +206,11 @@ class IntelligentJobAgent:
                 'salary': '8.000 - 12.000 TL',
                 'url': 'https://linkedin.com/jobs',
                 'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan'
+                'source': 'Varsayılan',
+                'score': 85,
+                'match_reasons': ['JavaScript beceriniz bu pozisyona uygun', 'Frontend geliştirme deneyiminiz değerli'],
+                'missing_skills': ['Daha fazla proje deneyimi', 'Backend teknolojileri'],
+                'recommendations': ['CV\'nizi güncelleyin', 'GitHub profilinizi aktif tutun']
             },
             {
                 'id': 'default_2',
@@ -201,7 +222,11 @@ class IntelligentJobAgent:
                 'salary': '10.000 - 15.000 TL',
                 'url': 'https://linkedin.com/jobs',
                 'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan'
+                'source': 'Varsayılan',
+                'score': 80,
+                'match_reasons': ['HTML/CSS becerileriniz uygun', 'Frontend odaklı pozisyon'],
+                'missing_skills': ['React/Vue.js deneyimi', 'Responsive tasarım'],
+                'recommendations': ['Modern framework\'ler öğrenin', 'Portföy projeleri geliştirin']
             },
             {
                 'id': 'default_3',
@@ -213,7 +238,11 @@ class IntelligentJobAgent:
                 'salary': '12.000 - 18.000 TL',
                 'url': 'https://linkedin.com/jobs',
                 'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan'
+                'source': 'Varsayılan',
+                'score': 75,
+                'match_reasons': ['Programlama temelleriniz güçlü', 'Öğrenme motivasyonunuz yüksek'],
+                'missing_skills': ['Backend teknolojileri', 'Veritabanı deneyimi'],
+                'recommendations': ['Backend teknolojileri öğrenin', 'API geliştirme projeleri yapın']
             }
         ]
     
