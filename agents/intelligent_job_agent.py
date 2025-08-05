@@ -78,16 +78,14 @@ class IntelligentJobAgent:
             print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
             
             # Gemini PDF API kullan
-            response = self.genai_client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=[
-                    types.Part.from_bytes(
-                        data=pdf_bytes,
-                        mime_type='application/pdf',
-                    ),
-                    prompt
-                ]
-            )
+            model = self.genai_client.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content([
+                types.Part.from_bytes(
+                    data=pdf_bytes,
+                    mime_type='application/pdf',
+                ),
+                prompt
+            ])
             
             print(f"🔍 Gemini API response alındı: {response.text[:200]}...")
             
@@ -176,16 +174,14 @@ class IntelligentJobAgent:
             print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
             
             # Gemini PDF API kullan
-            response = self.genai_client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=[
-                    types.Part.from_bytes(
-                        data=pdf_bytes,
-                        mime_type='application/pdf',
-                    ),
-                    prompt
-                ]
-            )
+            model = self.genai_client.GenerativeModel("gemini-1.5-flash")
+            response = model.generate_content([
+                types.Part.from_bytes(
+                    data=pdf_bytes,
+                    mime_type='application/pdf',
+                ),
+                prompt
+            ])
             
             print(f"🔍 Gemini API response alındı: {response.text[:200]}...")
             
