@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={6} justifyContent="flex-start" sx={{ mt: -1, maxWidth: '1400px', mx: 'auto', pl: 7 }}>
+          <Grid container spacing={6} justifyContent="center" sx={{ mt: -1, maxWidth: '1400px', mx: 'auto' }}>
             {modules.map((mod, i) => (
               <Grid item xs={12} sm={6} md={3} key={mod.title}>
                 <Card
