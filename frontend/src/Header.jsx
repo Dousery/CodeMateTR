@@ -402,6 +402,8 @@ export default function Header() {
                           background: 'linear-gradient(45deg, #ff4757 0%, #ff3742 100%)',
                           boxShadow: '0 2px 8px rgba(255, 71, 87, 0.4)',
                           border: '1px solid rgba(255,255,255,0.2)',
+                          top: '2px',
+                          right: '2px',
                         }
                       }}
                     >

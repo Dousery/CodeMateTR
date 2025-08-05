@@ -1,7 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button, Box, Typography, Stack } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+
+// Typing animation component for CodeMateTR
+const TypingAnimation = () => {
+  const [text, setText] = useState('');
+  const [showCursor, setShowCursor] = useState(true);
+  const fullText = 'CodeMateTR';
+  
+  useEffect(() => {
+    let currentIndex = 0;
+    const interval = setInterval(() => {
+      if (currentIndex <= fullText.length) {
+        setText(fullText.slice(0, currentIndex));
+        currentIndex++;
+      } else {
+        clearInterval(interval);
+      }
+    }, 150);
+    
+    return () => clearInterval(interval);
+  }, []);
+  
+  useEffect(() => {
+    const cursorInterval = setInterval(() => {
+      setShowCursor(prev => !prev);
+    }, 500);
+    
+    return () => clearInterval(cursorInterval);
+  }, []);
+
+  return (
+    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Typography 
+        variant="h1" 
+        fontWeight={900} 
+        sx={{ 
+          fontSize: { xs: '2.5rem', md: '4rem', lg: '5rem' },
+          fontFamily: 'monospace',
+          background: 'linear-gradient(45deg, #fff 0%, #e0e0e0 50%, #fff 100%)',
+          backgroundClip: 'text',
+          WebkitBackgroundClip: 'text',
+          WebkitTextFillColor: 'transparent',
+          textShadow: '0 4px 20px rgba(0,0,0,0.3)',
+          letterSpacing: '0.1em',
+          position: 'relative',
+        }}
+      >
+        {text}
+        <motion.span
+          animate={{ opacity: showCursor ? 1 : 0 }}
+          transition={{ duration: 0.1 }}
+          style={{
+            display: 'inline-block',
+            width: '3px',
+            height: '1em',
+            background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+            marginLeft: '2px',
+            borderRadius: '2px',
+            boxShadow: '0 0 10px rgba(79, 70, 229, 0.8)',
+          }}
+        />
+      </Typography>
+    </Box>
+  );
+};
 
 // Floating particles component
 const FloatingParticles = () => (
@@ -82,7 +146,7 @@ export default function Home() {
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1 }}
-        spacing={4}
+        spacing={6}
         alignItems="center"
         justifyContent="center"
         sx={{
@@ -93,10 +157,20 @@ export default function Home() {
           color: 'white',
         }}
       >
+        {/* CodeMateTR Typing Animation */}
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ duration: 0.8, delay: 0.2 }}
+        >
+          <TypingAnimation />
+        </motion.div>
+        
+        {/* Developer Eğitim Platformu - Moved down */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.8, delay: 1.5 }}
         >
           <Typography 
             variant="h2" 
@@ -104,12 +178,13 @@ export default function Home() {
             textAlign="center" 
             gutterBottom 
             sx={{ 
-              fontSize: { xs: '2.2rem', md: '3.5rem' },
+              fontSize: { xs: '1.8rem', md: '2.8rem' },
               textShadow: '0 4px 20px rgba(0,0,0,0.3)',
               background: 'linear-gradient(45deg, #fff, #e0e0e0)',
               backgroundClip: 'text',
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
+              opacity: 0.9,
             }}
           >
             Developer Eğitim Platformu
@@ -119,25 +194,26 @@ export default function Home() {
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.5 }}
+          transition={{ duration: 0.8, delay: 2.2 }}
         >
           <Typography 
             variant="h5" 
             textAlign="center" 
-            maxWidth={600}
+            maxWidth={700}
             sx={{ 
               color: 'rgba(255,255,255,0.9)',
-              textShadow: '0 2px 10px rgba(0,0,0,0.2)'
+              textShadow: '0 2px 10px rgba(0,0,0,0.2)',
+              lineHeight: 1.6
             }}
           >
-            Testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Modern, şık ve interaktif bir deneyim seni bekliyor!
+            AI destekli testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Akıllı iş bulma sistemi ile hayalindeki kariyere adım at. Modern, şık ve interaktif bir deneyim seni bekliyor!
           </Typography>
         </motion.div>
         
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.8 }}
+          transition={{ duration: 0.8, delay: 2.8 }}
         >
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={3}>
             <motion.div
