@@ -42,23 +42,11 @@ const theme = createTheme({
 
 // Context ile login durumunu paylaş
 const AuthContext = createContext();
-export function useAuth() { 
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-}
+export function useAuth() { return useContext(AuthContext); }
 
 function ProtectedRoute({ children }) {
-  const { isLoggedIn, isLoading } = useAuth();
-  
-  // Loading sırasında veya giriş yapmamış kullanıcıları ana sayfaya yönlendir
-  if (isLoading) {
-    return <Navigate to="/" replace />;
-  }
-  
-  return isLoggedIn ? children : <Navigate to="/" replace />;
+  const { isLoggedIn } = useAuth();
+  return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
 function App() {
@@ -119,13 +107,7 @@ function App() {
 
     // localStorage değişikliklerini dinle
     const handleStorageChange = () => {
-      const username = localStorage.getItem('username');
-      setIsLoggedIn(Boolean(username));
-      
-      // Eğer username kaldırıldıysa, kullanıcıyı ana sayfaya yönlendir
-      if (!username) {
-        window.location.href = '/';
-      }
+      setIsLoggedIn(Boolean(localStorage.getItem('username')));
     };
     
     window.addEventListener('localStorageChange', handleStorageChange);
@@ -140,7 +122,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn, isLoading }}>
+      <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn }}>
         <Router>
           <Header mode={mode} toggleTheme={toggleTheme} />
           <Box className="main-content" sx={{ 

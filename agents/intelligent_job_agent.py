@@ -162,6 +162,7 @@ class IntelligentJobAgent:
         """
         
         try:
+            print(f"Gemini API'ye PDF gönderiliyor...")
             # Yeni Gemini PDF API kullan
             response = self.genai_client.models.generate_content(
                 model="gemini-1.5-flash",
@@ -173,6 +174,7 @@ class IntelligentJobAgent:
                     prompt
                 ]
             )
+            print(f"Gemini API yanıtı alındı: {response.text[:200]}...")
             
             # JSON'u temizle ve parse et
             json_text = response.text.strip()
@@ -193,6 +195,32 @@ class IntelligentJobAgent:
             
         except Exception as e:
             print(f"PDF CV analizi hatası: {e}")
+            print(f"Hata detayı: {type(e).__name__}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            
+            # PDF'den metin çıkarmayı dene
+            try:
+                print("PDF'den metin çıkarma deneniyor...")
+                import io
+                import PyPDF2
+                
+                pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_bytes))
+                cv_text = ""
+                for page in pdf_reader.pages:
+                    cv_text += page.extract_text() + "\n"
+                
+                print(f"PDF'den çıkarılan metin uzunluğu: {len(cv_text)}")
+                if len(cv_text.strip()) > 50:  # Yeterli metin varsa
+                    print("Text-based CV analizi yapılıyor...")
+                    text_analysis = self.analyze_cv_with_gemini(cv_text)
+                    self._cache_analysis(cv_hash, text_analysis)
+                    return text_analysis
+                else:
+                    print("PDF'den yeterli metin çıkarılamadı")
+            except Exception as text_error:
+                print(f"PDF metin çıkarma hatası: {text_error}")
+            
             # Fallback analiz
             fallback = self._fallback_cv_analysis("")
             self._cache_analysis(cv_hash, fallback)
@@ -410,7 +438,7 @@ class IntelligentJobAgent:
             chrome_options.add_argument("--media-cache-size=1")
             chrome_options.add_argument("--disk-cache-dir=/dev/null")
             
-            # Production specific settings - Memory optimized
+            # Production specific settings
             chrome_options.add_argument("--remote-debugging-port=9222")
             chrome_options.add_argument("--disable-setuid-sandbox")
             chrome_options.add_argument("--disable-software-rasterizer")
@@ -437,34 +465,6 @@ class IntelligentJobAgent:
             chrome_options.add_argument("--disable-dev-shm-usage")
             chrome_options.add_argument("--no-sandbox")
             
-            # Memory optimization settings
-            chrome_options.add_argument("--memory-pressure-off")
-            chrome_options.add_argument("--max_old_space_size=512")
-            chrome_options.add_argument("--single-process")
-            chrome_options.add_argument("--disable-background-timer-throttling")
-            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-            chrome_options.add_argument("--disable-renderer-backgrounding")
-            chrome_options.add_argument("--disable-features=TranslateUI,BlinkGenPropertyTrees")
-            chrome_options.add_argument("--disable-ipc-flooding-protection")
-            chrome_options.add_argument("--disable-hang-monitor")
-            chrome_options.add_argument("--disable-prompt-on-repost")
-            chrome_options.add_argument("--disable-domain-reliability")
-            chrome_options.add_argument("--disable-component-extensions-with-background-pages")
-            chrome_options.add_argument("--disable-background-mode")
-            chrome_options.add_argument("--disable-client-side-phishing-detection")
-            chrome_options.add_argument("--disable-default-apps")
-            chrome_options.add_argument("--disable-sync")
-            chrome_options.add_argument("--metrics-recording-only")
-            chrome_options.add_argument("--no-first-run")
-            chrome_options.add_argument("--safebrowsing-disable-auto-update")
-            chrome_options.add_argument("--disable-software-rasterizer")
-            chrome_options.add_argument("--disable-background-networking")
-            chrome_options.add_argument("--disable-setuid-sandbox")
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--no-sandbox")
-            
             try:
                 print("Chrome driver başlatılıyor...")
                 service = Service(ChromeDriverManager().install())
@@ -479,7 +479,7 @@ class IntelligentJobAgent:
     
     def scrape_linkedin_jobs(self, job_areas: List[str], location: str = "Istanbul, Turkey", max_per_search: int = 10) -> List[Dict[str, Any]]:
         """
-        LinkedIn'den CV'ye uygun iş ilanlarını çeker (Production - Fallback Only)
+        LinkedIn'den CV'ye uygun iş ilanlarını çeker (Production Optimized with Fallback)
         """
         # Cache key oluştur
         cache_key = f"jobs_{hash(tuple(job_areas))}_{location}_{max_per_search}"
@@ -487,9 +487,13 @@ class IntelligentJobAgent:
         if cached:
             return cached
         
-        # Production ortamında sadece fallback kullan
-        print("🔄 Production ortamında AI fallback modu aktif...")
-        return self._fallback_job_search(job_areas, location, max_per_search)
+        all_jobs = []
+        
+        # Selenium driver'ı başlat
+        self.setup_selenium_driver(headless=True)
+        if not self.driver:
+            print("⚠️ Selenium driver başlatılamadı, fallback moduna geçiliyor...")
+            return self._fallback_job_search(job_areas, location, max_per_search)
         
         try:
             # Parallel processing için job areas'ları grupla
@@ -1344,10 +1348,8 @@ class IntelligentJobAgent:
                 # Her işe unique ID ekle
                 for job in jobs:
                     job['id'] = f"fallback_{hash(job.get('title', '') + job.get('company', ''))}"
-                    job['source'] = 'AI Generated - Production Optimized'
-                    job['match_score'] = 90  # Fallback işler için yüksek skor
-                    job['location'] = location
-                    job['posted_date'] = datetime.now().strftime('%Y-%m-%d')
+                    job['source'] = 'AI Generated'
+                    job['match_score'] = 85  # Fallback işler için yüksek skor
                 
                 fallback_jobs.extend(jobs)
                 print(f"✅ '{job_area}' için {len(jobs)} fallback iş ilanı oluşturuldu")
