@@ -117,7 +117,13 @@ export default function Dashboard() {
 
 
   return (
-    <Box sx={{ minHeight: '100vh', width: '100vw', py: 18 }}>
+    <Box sx={{ 
+      minHeight: '100vh', 
+      width: '100%', 
+      py: { xs: 12, sm: 16, md: 18 },
+      px: { xs: 1, sm: 2, md: 3 },
+      overflow: 'hidden'
+    }}>
       <Dialog 
         open={open} 
         disableEscapeKeyDown 
@@ -256,9 +262,15 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2, maxWidth: '1200px', mx: 'auto' }}>
+          <Grid container spacing={3} justifyContent="center" sx={{ 
+            mt: 2, 
+            maxWidth: '1400px', 
+            mx: 'auto',
+            px: { xs: 2, sm: 3, md: 4 },
+            width: '100%'
+          }}>
             {modules.map((mod, i) => (
-              <Grid item xs={12} sm={6} md={3} key={mod.title}>
+              <Grid item xs={12} sm={6} lg={3} md={4} key={mod.title}>
                 <Card
                   component={motion.div}
                   whileHover={{ scale: 1.02, y: -8 }}
@@ -270,7 +282,8 @@ export default function Dashboard() {
                   sx={{ 
                     borderRadius: 4, 
                     minHeight: 260, 
-                    maxWidth: 280,
+                    width: '100%',
+                    maxWidth: { xs: '100%', sm: 320, md: 300 },
                     display: 'flex', 
                     flexDirection: 'column', 
                     justifyContent: 'space-between',
@@ -353,8 +366,8 @@ export default function Dashboard() {
             transition={{ delay: 0.8, duration: 0.6 }}
             sx={{
               position: 'fixed',
-              bottom: 20,
-              right: 20,
+              bottom: { xs: 16, sm: 20 },
+              right: { xs: 16, sm: 20 },
               zIndex: 1000,
             }}
           >
