@@ -48,29 +48,36 @@ class IntelligentJobAgent:
         print("🤖 CV analizi başlatılıyor...")
         
         prompt = """
-        Bu CV'yi analiz et ve aşağıdaki JSON formatında sonuç döndür:
+        Analyze this CV and return the result in the following JSON format:
         
         {
             "kişisel_bilgiler": {
-                "ad_soyad": "CV'deki tam isim",
-                "email": "CV'deki email",
-                "telefon": "CV'deki telefon",
-                "lokasyon": "CV'deki şehir"
+                "ad_soyad": "Full name from CV",
+                "email": "Email from CV",
+                "telefon": "Phone from CV", 
+                "lokasyon": "City from CV"
             },
             "deneyim_yılı": 0,
-            "toplam_is_deneyimi": "CV'deki toplam deneyim",
-            "staj_deneyimi": "CV'deki staj deneyimi",
-            "teknik_beceriler": ["CV'deki teknik beceriler"],
-            "yazılım_dilleri": ["CV'deki programlama dilleri"],
-            "teknolojiler": ["CV'deki teknolojiler"],
-            "eğitim": ["CV'deki eğitim bilgisi"],
+            "toplam_is_deneyimi": "Total work experience from CV",
+            "staj_deneyimi": "Internship experience from CV",
+            "teknik_beceriler": ["Technical skills from CV - use English terms like React, Node.js, Python, JavaScript, etc."],
+            "yazılım_dilleri": ["Programming languages from CV - use English terms like Python, JavaScript, Java, etc."],
+            "teknolojiler": ["Technologies from CV - use English terms like Web Development, Mobile Development, AI, etc."],
+            "eğitim": ["Education from CV"],
             "deneyim_seviyesi": "entry|junior|mid|senior",
-            "ana_uzmanlık_alanı": "CV'deki ana alan",
-            "uygun_iş_alanları": ["Uygun iş alanları"],
+            "ana_uzmanlık_alanı": "Main expertise area from CV - choose ONLY ONE area: Web Development, AI, Machine Learning, Mobile Development, Data Science, DevOps, Backend Development, Frontend Development, Full Stack Development, Software Development",
+            "uygun_iş_alanları": ["Suitable job areas - use English terms like Frontend Developer, Backend Developer, AI Developer, etc."],
             "cv_kalitesi": "zayıf|orta|iyi|mükemmel"
         }
         
-        Önemli: Sadece JSON döndür, başka açıklama ekleme. CV'de olmayan bilgileri "Belirtilmemiş" yaz.
+        IMPORTANT: 
+        1. Return only JSON, no other explanation
+        2. Use English terms for technical skills, programming languages, technologies, and job areas
+        3. Write "Belirtilmemiş" for missing information
+        4. For technical skills, use terms like: React, Angular, Vue.js, Node.js, Python, Java, JavaScript, TypeScript, etc.
+        5. For job areas, use terms like: Frontend Developer, Backend Developer, Full Stack Developer, AI Developer, Machine Learning Engineer, etc.
+        6. For ana_uzmanlık_alanı, choose ONLY ONE area from the list - do not combine multiple areas
+        7. Do not use commas or multiple areas in ana_uzmanlık_alanı - just one specific area
         """
         
         try:
@@ -149,29 +156,36 @@ class IntelligentJobAgent:
         print("🤖 CV analizi (bytes) başlatılıyor...")
         
         prompt = """
-        Bu CV'yi analiz et ve aşağıdaki JSON formatında sonuç döndür:
+        Analyze this CV and return the result in the following JSON format:
         
         {
             "kişisel_bilgiler": {
-                "ad_soyad": "CV'deki tam isim",
-                "email": "CV'deki email",
-                "telefon": "CV'deki telefon",
-                "lokasyon": "CV'deki şehir"
+                "ad_soyad": "Full name from CV",
+                "email": "Email from CV",
+                "telefon": "Phone from CV", 
+                "lokasyon": "City from CV"
             },
             "deneyim_yılı": 0,
-            "toplam_is_deneyimi": "CV'deki toplam deneyim",
-            "staj_deneyimi": "CV'deki staj deneyimi",
-            "teknik_beceriler": ["CV'deki teknik beceriler"],
-            "yazılım_dilleri": ["CV'deki programlama dilleri"],
-            "teknolojiler": ["CV'deki teknolojiler"],
-            "eğitim": ["CV'deki eğitim bilgisi"],
+            "toplam_is_deneyimi": "Total work experience from CV",
+            "staj_deneyimi": "Internship experience from CV",
+            "teknik_beceriler": ["Technical skills from CV - use English terms like React, Node.js, Python, JavaScript, etc."],
+            "yazılım_dilleri": ["Programming languages from CV - use English terms like Python, JavaScript, Java, etc."],
+            "teknolojiler": ["Technologies from CV - use English terms like Web Development, Mobile Development, AI, etc."],
+            "eğitim": ["Education from CV"],
             "deneyim_seviyesi": "entry|junior|mid|senior",
-            "ana_uzmanlık_alanı": "CV'deki ana alan",
-            "uygun_iş_alanları": ["Uygun iş alanları"],
+            "ana_uzmanlık_alanı": "Main expertise area from CV - choose ONLY ONE area: Web Development, AI, Machine Learning, Mobile Development, Data Science, DevOps, Backend Development, Frontend Development, Full Stack Development, Software Development",
+            "uygun_iş_alanları": ["Suitable job areas - use English terms like Frontend Developer, Backend Developer, AI Developer, etc."],
             "cv_kalitesi": "zayıf|orta|iyi|mükemmel"
         }
         
-        Önemli: Sadece JSON döndür, başka açıklama ekleme. CV'de olmayan bilgileri "Belirtilmemiş" yaz.
+        IMPORTANT: 
+        1. Return only JSON, no other explanation
+        2. Use English terms for technical skills, programming languages, technologies, and job areas
+        3. Write "Belirtilmemiş" for missing information
+        4. For technical skills, use terms like: React, Angular, Vue.js, Node.js, Python, Java, JavaScript, TypeScript, etc.
+        5. For job areas, use terms like: Frontend Developer, Backend Developer, Full Stack Developer, AI Developer, Machine Learning Engineer, etc.
+        6. For ana_uzmanlık_alanı, choose ONLY ONE area from the list - do not combine multiple areas
+        7. Do not use commas or multiple areas in ana_uzmanlık_alanı - just one specific area
         """
         
         try:
@@ -259,7 +273,7 @@ class IntelligentJobAgent:
             all_jobs = []
             
             # Her arama terimi için iş ara
-            for term in search_terms[:5]:  # İlk 5 terimi kullan
+            for term in search_terms[:8]:  # İlk 8 terimi kullan (daha fazla arama)
                 print(f"🔍 Aranan terim: {term}")
                 
                 querystring = {
@@ -365,7 +379,12 @@ class IntelligentJobAgent:
             'DevOps': 'DevOps Engineer',
             'Software Development': 'Software Developer',
             'Yazılım Geliştirme': 'Software Developer',
-            'Yazılım Geliştirici': 'Software Developer'
+            'Yazılım Geliştirici': 'Software Developer',
+            'Yazılım Geliştirme, Yapay Zeka': 'AI Developer',
+            'Yazılım Geliştirme, Yapay Zeka, Makine Öğrenmesi': 'AI Developer',
+            'Yazılım Geliştirme, Makine Öğrenmesi': 'Machine Learning Engineer',
+            'Yazılım Geliştirme, AI': 'AI Developer',
+            'Yazılım Geliştirme, AI, Machine Learning': 'AI Developer'
         }
         
         job_area_mapping = {
@@ -381,7 +400,14 @@ class IntelligentJobAgent:
             'Web Developer': 'Web Developer',
             'Yazılım Geliştirici': 'Software Developer',
             'Yapay Zeka Geliştirici': 'AI Developer',
-            'Makine Öğrenmesi Mühendisi': 'Machine Learning Engineer'
+            'Makine Öğrenmesi Mühendisi': 'Machine Learning Engineer',
+            'Yazılım Geliştirme, Yapay Zeka': 'AI Developer',
+            'Yazılım Geliştirme, Yapay Zeka, Makine Öğrenmesi': 'AI Developer',
+            'Yazılım Geliştirme, Makine Öğrenmesi': 'Machine Learning Engineer',
+            'Yazılım Geliştirme, AI': 'AI Developer',
+            'Yazılım Geliştirme, AI, Machine Learning': 'AI Developer',
+            'Yazılım Geliştirme, Yapay Zeka in Turkey': 'AI Developer',
+            'Yazılım Geliştirme, Yapay Zeka, Makine Öğrenmesi in Turkey': 'AI Developer'
         }
         
         lang_mapping = {
@@ -404,7 +430,12 @@ class IntelligentJobAgent:
         
         # 1. Ana uzmanlık alanından terim oluştur
         if main_expertise and main_expertise != 'Belirtilmemiş':
+            # Türkçe terimleri temizle ve İngilizce'ye çevir
             english_expertise = expertise_mapping.get(main_expertise, main_expertise)
+            
+            # Eğer hala Türkçe terim varsa, varsayılan değer kullan
+            if any(turkish_word in english_expertise.lower() for turkish_word in ['yazılım', 'yapay', 'zeka', 'makine', 'öğrenme', 'geliştirme']):
+                english_expertise = 'Software Developer'
             
             # Format: "Junior AI Developer"
             search_terms.append(f"{english_level} {english_expertise}")
@@ -415,10 +446,15 @@ class IntelligentJobAgent:
             # Format: "Machine Learning Engineer in Turkey"
             search_terms.append(f"{english_expertise} in Turkey")
         
-        # 2. Uygun iş alanlarından terim oluştur (en çok 2 tane)
-        for area in suitable_job_areas[:2]:
+        # 2. Uygun iş alanlarından terim oluştur (en çok 3 tane)
+        for area in suitable_job_areas[:3]:
             if area and area != 'Belirtilmemiş':
+                # Türkçe terimleri temizle ve İngilizce'ye çevir
                 english_area = job_area_mapping.get(area, area)
+                
+                # Eğer hala Türkçe terim varsa, varsayılan değer kullan
+                if any(turkish_word in english_area.lower() for turkish_word in ['yazılım', 'yapay', 'zeka', 'makine', 'öğrenme', 'geliştirme']):
+                    english_area = 'Software Developer'
                 
                 # Format: "Junior Frontend Developer"
                 search_terms.append(f"{english_level} {english_area}")
@@ -429,8 +465,8 @@ class IntelligentJobAgent:
                 # Format: "Frontend Developer in Turkey"
                 search_terms.append(f"{english_area} in Turkey")
         
-        # 3. Programlama dillerinden terim oluştur (en çok 2 tane)
-        for lang in programming_languages[:2]:
+        # 3. Programlama dillerinden terim oluştur (en çok 3 tane)
+        for lang in programming_languages[:3]:
             if lang and lang != 'Belirtilmemiş':
                 english_lang = lang_mapping.get(lang, lang)
                 
@@ -443,11 +479,10 @@ class IntelligentJobAgent:
                 # Format: "Python Developer in Turkey"
                 search_terms.append(f"{english_lang} Developer in Turkey")
         
-        # 4. Teknik becerilerden terim oluştur (en çok 1 tane)
-        if technical_skills and len(technical_skills) > 0:
-            top_skill = technical_skills[0]
-            if top_skill and top_skill != 'Belirtilmemiş':
-                english_skill = lang_mapping.get(top_skill, top_skill)
+        # 4. Teknik becerilerden terim oluştur (en çok 2 tane)
+        for skill in technical_skills[:2]:
+            if skill and skill != 'Belirtilmemiş':
+                english_skill = lang_mapping.get(skill, skill)
                 
                 # Format: "Junior React Developer"
                 search_terms.append(f"{english_level} {english_skill} Developer")
@@ -462,11 +497,14 @@ class IntelligentJobAgent:
                 "Software Developer jobs in Turkey",
                 "Web Developer jobs in Turkey",
                 "Junior Web Developer",
-                "Frontend Developer jobs in Turkey"
+                "Frontend Developer jobs in Turkey",
+                "Backend Developer jobs in Turkey",
+                "Full Stack Developer jobs in Turkey",
+                "JavaScript Developer jobs in Turkey"
             ]
         
-        # Benzersiz terimleri döndür (ilk 5'i)
-        unique_terms = list(dict.fromkeys(search_terms))[:5]
+        # Benzersiz terimleri döndür (ilk 8'i)
+        unique_terms = list(dict.fromkeys(search_terms))[:8]
         print(f"🔍 Oluşturulan arama terimleri: {unique_terms}")
         
         return unique_terms
