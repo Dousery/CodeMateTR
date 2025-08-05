@@ -31,7 +31,7 @@ const modules = [
     desc: 'Yapay zeka ile dinamik mülakat.',
     icon: <RecordVoiceOverIcon fontSize="large" color="info" />, 
     path: '/auto-interview',
-    tags: ['AI Mülakat Simülasyonu', 'Gerçek Zamanlı']
+    tags: ['AI Recruiter', 'Sesli Mülakat']
   },
   {
     title: 'Akıllı İş Bulma',
