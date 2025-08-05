@@ -9,21 +9,6 @@ import WorkIcon from '@mui/icons-material/Work';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
-// CSS for pulse animation
-const pulseAnimation = `
-  @keyframes pulse {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.5; }
-  }
-`;
-
-// Add CSS to document head
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = pulseAnimation;
-  document.head.appendChild(style);
-}
-
 // Typing animation component for CodeMateTR
 const TypingAnimation = () => {
   const [text, setText] = useState('');
@@ -60,14 +45,13 @@ const TypingAnimation = () => {
         sx={{ 
           fontSize: { xs: '2.5rem', md: '4rem', lg: '5rem' },
           fontFamily: 'monospace',
-          background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 25%, #06b6d4 50%, #10b981 75%, #f59e0b 100%)',
+          background: 'linear-gradient(45deg, #fff 0%, #e0e0e0 50%, #fff 100%)',
           backgroundClip: 'text',
           WebkitBackgroundClip: 'text',
           WebkitTextFillColor: 'transparent',
           textShadow: '0 4px 20px rgba(0,0,0,0.3)',
           letterSpacing: '0.1em',
           position: 'relative',
-          filter: 'drop-shadow(0 0 20px rgba(79, 70, 229, 0.3))',
         }}
       >
         {text}
@@ -78,11 +62,10 @@ const TypingAnimation = () => {
             display: 'inline-block',
             width: '3px',
             height: '1em',
-            background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 50%, #06b6d4 100%)',
+            background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
             marginLeft: '2px',
             borderRadius: '2px',
-            boxShadow: '0 0 15px rgba(79, 70, 229, 0.9)',
-            animation: 'pulse 2s infinite',
+            boxShadow: '0 0 10px rgba(79, 70, 229, 0.8)',
           }}
         />
       </Typography>
