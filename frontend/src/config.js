@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
 
   // Debug endpoints
   DEBUG_CLEAR_SESSIONS: `${API_BASE_URL}/debug/clear_auto_interview_sessions`,
+  DEBUG_CV_TEST: `${API_BASE_URL}/debug/cv-test`,
 };
 
 export default API_ENDPOINTS;

@@ -461,6 +461,71 @@ def health_check():
         'jsearch_api_key': bool(os.getenv('JSEARCH_API_KEY'))
     })
 
+@app.route('/debug/cv-test', methods=['POST'])
+def debug_cv_test():
+    """CV analizi test endpoint'i - debug için"""
+    try:
+        if 'cv_file' not in request.files:
+            return jsonify({'error': 'CV dosyası bulunamadı'}), 400
+        
+        cv_file = request.files['cv_file']
+        if cv_file.filename == '':
+            return jsonify({'error': 'Dosya seçilmedi'}), 400
+        
+        # CV'yi kaydet
+        filename = secure_filename(cv_file.filename)
+        timestamp = int(time.time())
+        unique_filename = f"debug_cv_{timestamp}.{filename.split('.')[-1]}"
+        cv_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+        cv_file.save(cv_path)
+        
+        try:
+            # PDF'den bytes oku
+            with open(cv_path, 'rb') as file:
+                pdf_bytes = file.read()
+            
+            print(f"DEBUG: PDF boyutu: {len(pdf_bytes)} bytes")
+            print(f"DEBUG: Gemini API key mevcut: {bool(os.getenv('GEMINI_API_KEY'))}")
+            print(f"DEBUG: JSearch API key mevcut: {bool(os.getenv('JSEARCH_API_KEY'))}")
+            
+            # Job agent'ı başlat
+            job_agent = IntelligentJobAgent()
+            
+            # CV analizi yap
+            print("DEBUG: CV analizi başlatılıyor...")
+            cv_analysis = job_agent.analyze_cv_from_pdf(pdf_bytes)
+            print(f"DEBUG: CV analizi sonucu: {cv_analysis}")
+            
+            # İş arama yap
+            print("DEBUG: İş arama başlatılıyor...")
+            jobs = job_agent.search_jobs_with_jsearch(cv_analysis, max_results=5)
+            print(f"DEBUG: Bulunan iş sayısı: {len(jobs)}")
+            
+            return jsonify({
+                'success': True,
+                'cv_analysis': cv_analysis,
+                'jobs': jobs,
+                'pdf_size': len(pdf_bytes),
+                'gemini_key_exists': bool(os.getenv('GEMINI_API_KEY')),
+                'jsearch_key_exists': bool(os.getenv('JSEARCH_API_KEY'))
+            })
+            
+        finally:
+            # Geçici dosyayı temizle
+            try:
+                if os.path.exists(cv_path):
+                    os.remove(cv_path)
+            except:
+                pass
+    
+    except Exception as e:
+        import traceback
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'traceback': traceback.format_exc()
+        }), 500
+
 @app.route('/set_interest', methods=['POST'])
 @login_required
 def set_interest():

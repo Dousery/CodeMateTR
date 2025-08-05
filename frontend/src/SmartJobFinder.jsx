@@ -285,6 +285,54 @@ const SmartJobFinder = () => {
     setError('');
   };
 
+  const debugTest = async (file) => {
+    if (!file) {
+      setError('Lütfen önce bir CV dosyası seçin');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSearchStatus('Debug test başlatılıyor...');
+
+    const formData = new FormData();
+    formData.append('cv_file', file);
+
+    try {
+      console.log('Debug test başlatılıyor...');
+      
+      const response = await axios.post(API_ENDPOINTS.DEBUG_CV_TEST, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000
+      });
+
+      const data = response.data;
+      console.log('Debug test response:', data);
+
+      if (data.success) {
+        setCvAnalysis(data.cv_analysis);
+        setJobs(data.jobs || []);
+        setActiveStep(3);
+        setSearchStatus(`✅ Debug test başarılı: ${data.jobs?.length || 0} iş bulundu`);
+        
+        // API key durumlarını göster
+        console.log('API Key Durumları:');
+        console.log('- Gemini API Key:', data.gemini_key_exists);
+        console.log('- JSearch API Key:', data.jsearch_key_exists);
+        console.log('- PDF Boyutu:', data.pdf_size);
+      } else {
+        setError(data.error || 'Debug test başarısız');
+        setSearchStatus('❌ Debug test başarısız');
+      }
+    } catch (error) {
+      console.error('Debug test hatası:', error);
+      setError('Debug test sırasında hata oluştu');
+      setSearchStatus('❌ Debug test hatası');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const renderCvAnalysis = () => {
     if (!cvAnalysis) return null;
 
@@ -741,6 +789,22 @@ const SmartJobFinder = () => {
                 <Typography variant="body2" sx={{ color: '#98FB98', fontWeight: 'bold' }}>
                   ✓ Seçilen dosya: {selectedFile.name}
                 </Typography>
+                
+                {/* Debug Test Butonu */}
+                <Box sx={{ mt: 2, display: 'flex', gap: 2, justifyContent: 'center' }}>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => debugTest(selectedFile)}
+                    sx={{ 
+                      borderColor: '#FF6B6B',
+                      color: '#FF6B6B',
+                      '&:hover': { borderColor: '#FF5252', backgroundColor: 'rgba(255, 107, 107, 0.1)' }
+                    }}
+                  >
+                    🐛 Debug Test
+                  </Button>
+                </Box>
               </Box>
             )}
             
