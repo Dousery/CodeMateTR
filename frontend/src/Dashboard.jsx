@@ -256,9 +256,9 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={3} justifyContent="center" sx={{ mt: 2, maxWidth: '1200px', mx: 'auto' }}>
+          <Grid container spacing={4} justifyContent="center" sx={{ mt: 2, maxWidth: '1200px', mx: 'auto' }}>
             {modules.map((mod, i) => (
-              <Grid item xs={12} sm={6} md={2.5} key={mod.title}>
+              <Grid item xs={12} sm={6} md={3} key={mod.title}>
                 <Card
                   component={motion.div}
                   whileHover={{ scale: 1.02, y: -8 }}
@@ -320,16 +320,15 @@ export default function Dashboard() {
                     <Button 
                       variant="contained" 
                       color="primary" 
-                      size="medium" 
+                      size="large" 
                       onClick={() => navigate(mod.path)}
                       sx={{
                         background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                        borderRadius: '20px',
-                        px: 3,
-                        py: 1,
+                        borderRadius: '25px',
+                        px: 4,
+                        py: 1.5,
                         textTransform: 'none',
                         fontWeight: 600,
-                        fontSize: '0.9rem',
                         boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
                         '&:hover': {
                           background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
