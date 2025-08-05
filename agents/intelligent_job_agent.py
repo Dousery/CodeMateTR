@@ -329,8 +329,7 @@ class IntelligentJobAgent:
     
     def _generate_search_terms(self, cv_analysis: Dict[str, Any]) -> List[str]:
         """
-        CV analizinden sade ve etkili arama terimleri oluşturur
-        Format: "Country Level Job_Title" veya "Job_Title jobs in Country"
+        CV analizinden kişinin en çok ilgilendiği alanla ilgili İngilizce arama cümleleri oluşturur
         """
         search_terms = []
         
@@ -348,91 +347,122 @@ class IntelligentJobAgent:
             'mid': 'Mid-level',
             'senior': 'Senior'
         }
-        english_level = level_mapping.get(experience_level, '')
+        english_level = level_mapping.get(experience_level, 'Junior')
         
-        # Ana uzmanlık alanından terim oluştur
+        # Türkçe-İngilizce çeviri sözlükleri
+        expertise_mapping = {
+            'Web Development': 'Web Developer',
+            'Mobile Development': 'Mobile Developer', 
+            'Data Science': 'Data Scientist',
+            'Machine Learning': 'Machine Learning Engineer',
+            'AI': 'AI Developer',
+            'Artificial Intelligence': 'AI Developer',
+            'Yapay Zeka': 'AI Developer',
+            'Makine Öğrenmesi': 'Machine Learning Engineer',
+            'Backend Development': 'Backend Developer',
+            'Frontend Development': 'Frontend Developer',
+            'Full Stack Development': 'Full Stack Developer',
+            'DevOps': 'DevOps Engineer',
+            'Software Development': 'Software Developer',
+            'Yazılım Geliştirme': 'Software Developer',
+            'Yazılım Geliştirici': 'Software Developer'
+        }
+        
+        job_area_mapping = {
+            'Frontend Developer': 'Frontend Developer',
+            'Backend Developer': 'Backend Developer', 
+            'Full Stack Developer': 'Full Stack Developer',
+            'Mobile Developer': 'Mobile Developer',
+            'Data Scientist': 'Data Scientist',
+            'Machine Learning Engineer': 'Machine Learning Engineer',
+            'AI Developer': 'AI Developer',
+            'DevOps Engineer': 'DevOps Engineer',
+            'Software Engineer': 'Software Engineer',
+            'Web Developer': 'Web Developer',
+            'Yazılım Geliştirici': 'Software Developer',
+            'Yapay Zeka Geliştirici': 'AI Developer',
+            'Makine Öğrenmesi Mühendisi': 'Machine Learning Engineer'
+        }
+        
+        lang_mapping = {
+            'JavaScript': 'JavaScript',
+            'Python': 'Python',
+            'Java': 'Java',
+            'C++': 'C++',
+            'C#': 'C#',
+            'PHP': 'PHP',
+            'Ruby': 'Ruby',
+            'Go': 'Go',
+            'Rust': 'Rust',
+            'Swift': 'Swift',
+            'Kotlin': 'Kotlin',
+            'React': 'React',
+            'Node.js': 'Node.js',
+            'Angular': 'Angular',
+            'Vue.js': 'Vue.js'
+        }
+        
+        # 1. Ana uzmanlık alanından terim oluştur
         if main_expertise and main_expertise != 'Belirtilmemiş':
-            # Türkçe terimleri İngilizce'ye çevir
-            expertise_mapping = {
-                'Web Development': 'Web Developer',
-                'Mobile Development': 'Mobile Developer',
-                'Data Science': 'Data Scientist',
-                'Machine Learning': 'Machine Learning Engineer',
-                'AI': 'AI Developer',
-                'Backend Development': 'Backend Developer',
-                'Frontend Development': 'Frontend Developer',
-                'Full Stack Development': 'Full Stack Developer',
-                'DevOps': 'DevOps Engineer',
-                'Software Development': 'Software Developer'
-            }
-            
             english_expertise = expertise_mapping.get(main_expertise, main_expertise)
             
-            # Format 1: "Turkey Junior Machine Learning Engineer"
-            if english_level:
-                search_terms.append(f"Turkey {english_level} {english_expertise}")
+            # Format: "Junior AI Developer"
+            search_terms.append(f"{english_level} {english_expertise}")
             
-            # Format 2: "Machine Learning Engineer jobs in Turkey"
+            # Format: "AI Developer jobs in Turkey"
             search_terms.append(f"{english_expertise} jobs in Turkey")
             
-            # Format 3: "Machine Learning Engineer Turkey" (daha kısa)
-            search_terms.append(f"{english_expertise} Turkey")
+            # Format: "Machine Learning Engineer in Turkey"
+            search_terms.append(f"{english_expertise} in Turkey")
         
-        # Uygun iş alanlarından terim oluştur
+        # 2. Uygun iş alanlarından terim oluştur (en çok 2 tane)
         for area in suitable_job_areas[:2]:
             if area and area != 'Belirtilmemiş':
-                # Türkçe iş alanlarını İngilizce'ye çevir
-                area_mapping = {
-                    'Frontend Developer': 'Frontend Developer',
-                    'Backend Developer': 'Backend Developer',
-                    'Full Stack Developer': 'Full Stack Developer',
-                    'Mobile Developer': 'Mobile Developer',
-                    'Data Scientist': 'Data Scientist',
-                    'Machine Learning Engineer': 'Machine Learning Engineer',
-                    'AI Developer': 'AI Developer',
-                    'DevOps Engineer': 'DevOps Engineer',
-                    'Software Engineer': 'Software Engineer',
-                    'Web Developer': 'Web Developer'
-                }
+                english_area = job_area_mapping.get(area, area)
                 
-                english_area = area_mapping.get(area, area)
+                # Format: "Junior Frontend Developer"
+                search_terms.append(f"{english_level} {english_area}")
                 
-                if english_level:
-                    search_terms.append(f"Turkey {english_level} {english_area}")
+                # Format: "Frontend Developer jobs in Turkey"
                 search_terms.append(f"{english_area} jobs in Turkey")
-                search_terms.append(f"{english_area} Turkey")
+                
+                # Format: "Frontend Developer in Turkey"
+                search_terms.append(f"{english_area} in Turkey")
         
-        # Programlama dillerinden terim oluştur
+        # 3. Programlama dillerinden terim oluştur (en çok 2 tane)
         for lang in programming_languages[:2]:
             if lang and lang != 'Belirtilmemiş':
-                # Dil adlarını normalize et
-                lang_mapping = {
-                    'JavaScript': 'JavaScript',
-                    'Python': 'Python',
-                    'Java': 'Java',
-                    'C++': 'C++',
-                    'C#': 'C#',
-                    'PHP': 'PHP',
-                    'Ruby': 'Ruby',
-                    'Go': 'Go',
-                    'Rust': 'Rust',
-                    'Swift': 'Swift',
-                    'Kotlin': 'Kotlin'
-                }
-                
                 english_lang = lang_mapping.get(lang, lang)
                 
-                if english_level:
-                    search_terms.append(f"Turkey {english_level} {english_lang} Developer")
+                # Format: "Junior Python Developer"
+                search_terms.append(f"{english_level} {english_lang} Developer")
+                
+                # Format: "Python Developer jobs in Turkey"
                 search_terms.append(f"{english_lang} Developer jobs in Turkey")
-                search_terms.append(f"{english_lang} Developer Turkey")
+                
+                # Format: "Python Developer in Turkey"
+                search_terms.append(f"{english_lang} Developer in Turkey")
+        
+        # 4. Teknik becerilerden terim oluştur (en çok 1 tane)
+        if technical_skills and len(technical_skills) > 0:
+            top_skill = technical_skills[0]
+            if top_skill and top_skill != 'Belirtilmemiş':
+                english_skill = lang_mapping.get(top_skill, top_skill)
+                
+                # Format: "Junior React Developer"
+                search_terms.append(f"{english_level} {english_skill} Developer")
+                
+                # Format: "React Developer jobs in Turkey"
+                search_terms.append(f"{english_skill} Developer jobs in Turkey")
         
         # Eğer hiç terim oluşturulamadıysa varsayılan terimler
         if not search_terms:
             search_terms = [
-                "Turkey Junior Software Developer",
-                "Software Developer Turkey",
-                "Web Developer Turkey"
+                "Junior Software Developer",
+                "Software Developer jobs in Turkey",
+                "Web Developer jobs in Turkey",
+                "Junior Web Developer",
+                "Frontend Developer jobs in Turkey"
             ]
         
         # Benzersiz terimleri döndür (ilk 5'i)
