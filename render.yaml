@@ -19,7 +19,7 @@ services:
         value: https://codematetr.onrender.com
       - key: GEMINI_API_KEY
         sync: false
-      - key: SERPAPI_KEY
+      - key: JSEARCH_API_KEY
         sync: false
 
   # Frontend Static Site

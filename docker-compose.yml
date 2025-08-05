@@ -29,6 +29,7 @@ services:
       - SECRET_KEY=your-secret-key-here
       - FRONTEND_URL=http://localhost:3000
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - JSEARCH_API_KEY=${JSEARCH_API_KEY}
     ports:
       - "8000:8000"
     depends_on:

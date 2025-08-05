@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Akıllı İş Bulma Asistanı - Basit ve Etkili Versiyon
-CV analizi + SerpAPI Google Jobs
+Akıllı İş Bulma Asistanı - JSearch API ile
+CV analizi + JSearch API
 """
 
 import os
@@ -12,7 +12,6 @@ from datetime import datetime
 from typing import Dict, Any, List
 import google.generativeai as genai
 from google.generativeai import types
-from serpapi import GoogleSearch
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,12 +27,19 @@ class IntelligentJobAgent:
         genai.configure(api_key=gemini_api_key)
         self.genai_client = genai
         
-        # SerpAPI setup
-        self.serpapi_key = os.getenv('SERPAPI_KEY')
-        if not self.serpapi_key:
-            print("⚠️ SERPAPI_KEY bulunamadı!")
+        # JSearch API setup
+        self.jsearch_api_key = os.getenv('JSEARCH_API_KEY')
+        if not self.jsearch_api_key:
+            print("⚠️ JSEARCH_API_KEY bulunamadı!")
         else:
-            print("✅ SerpAPI Google Jobs hazır")
+            print("✅ JSearch API hazır")
+        
+        # JSearch API endpoints
+        self.jsearch_url = "https://jsearch.p.rapidapi.com/search"
+        self.jsearch_headers = {
+            "x-rapidapi-key": self.jsearch_api_key,
+            "x-rapidapi-host": "jsearch.p.rapidapi.com"
+        }
     
     def analyze_cv_from_pdf(self, pdf_bytes: bytes) -> Dict[str, Any]:
         """
@@ -102,7 +108,7 @@ class IntelligentJobAgent:
             
         except Exception as e:
             print(f"❌ CV analizi hatası: {e}")
-            # Hata durumunda varsayılan analiz
+            # Varsayılan CV analizi döndür
             return {
                 "kişisel_bilgiler": {
                     "ad_soyad": "Belirtilmemiş",
@@ -115,238 +121,237 @@ class IntelligentJobAgent:
                 "staj_deneyimi": "Belirtilmemiş",
                 "teknik_beceriler": ["HTML", "CSS", "JavaScript"],
                 "yazılım_dilleri": ["JavaScript"],
-                "teknolojiler": ["HTML", "CSS"],
+                "teknolojiler": ["Web Development"],
                 "eğitim": ["Belirtilmemiş"],
                 "deneyim_seviyesi": "entry",
-                "ana_uzmanlık_alanı": "Software Developer",
-                "uygun_iş_alanları": ["Junior Developer", "Frontend Developer"],
-                "cv_kalitesi": "zayıf"
+                "ana_uzmanlık_alanı": "Web Development",
+                "uygun_iş_alanları": ["Frontend Developer", "Web Developer", "JavaScript Developer"],
+                "cv_kalitesi": "orta"
             }
     
-    def search_jobs_with_serpapi(self, cv_analysis: Dict[str, Any], max_results: int = 20) -> List[Dict[str, Any]]:
+    def search_jobs_with_jsearch(self, cv_analysis: Dict[str, Any], max_results: int = 20) -> List[Dict[str, Any]]:
         """
-        SerpAPI Google Jobs ile iş ilanları arar
+        JSearch API ile iş ilanları arar
         """
-        if not self.serpapi_key:
-            print("⚠️ SERPAPI_KEY bulunamadı, varsayılan işler döndürülüyor")
+        print("🔍 JSearch API ile iş arama başlatılıyor...")
+        
+        if not self.jsearch_api_key:
+            print("❌ JSearch API key bulunamadı!")
             return self._get_default_jobs()
         
         try:
-            # CV'den arama terimlerini oluştur
-            skills = cv_analysis.get('teknik_beceriler', [])
-            job_areas = cv_analysis.get('uygun_iş_alanları', ['Software Developer'])
-            location = cv_analysis.get('kişisel_bilgiler', {}).get('lokasyon', 'Türkiye')
+            # CV analizinden arama terimlerini oluştur
+            search_terms = self._generate_search_terms(cv_analysis)
             
-            # Arama terimlerini birleştir
-            search_keywords = " ".join(skills[:3] + job_areas[:1])
-            if not search_keywords:
-                search_keywords = "Software Developer"
+            all_jobs = []
             
-            print(f"🔍 Google Jobs ile iş aranıyor: '{search_keywords}' ({location})")
-            
-            # SerpAPI Google Jobs API kullan
-            params = {
-                "engine": "google_jobs",
-                "q": search_keywords,
-                "location": location,
-                "hl": "tr",  # Türkçe
-                "gl": "tr",  # Türkiye
-                "api_key": self.serpapi_key
-            }
-            
-            # GoogleSearch ile arama yap
-            search = GoogleSearch(params)
-            results = search.get_dict()
-            
-            print(f"SerpAPI Response Keys: {list(results.keys())}")
-            
-            # Google Jobs sonuçlarını al
-            jobs = results.get("jobs_results", [])
-            
-            if not jobs:
-                print("⚠️ Google Jobs'dan sonuç alınamadı, varsayılan işler döndürülüyor")
-                return self._get_default_jobs()
-            
-            print(f"İlk job örneği: {jobs[0].keys() if jobs else 'No jobs'}")
-            
-            # İlk job'un detaylı yapısını göster
-            if jobs:
-                first_job = jobs[0]
-                print(f"🔍 İlk job detayları:")
-                print(f"  Title: {first_job.get('title', 'N/A')}")
-                print(f"  Company: {first_job.get('company_name', 'N/A')}")
-                print(f"  Job ID: {first_job.get('job_id', 'N/A')}")
-                print(f"  Related Links: {first_job.get('related_links', [])}")
-                print(f"  Via: {first_job.get('via', {})}")
-                print(f"  All keys: {list(first_job.keys())}")
-                print()
-            
-            # İşleri formatla - frontend uyumlu
-            formatted_jobs = []
-            for i, job in enumerate(jobs[:max_results]):
-                # Basit skor hesaplama
-                score = 50 + (i * 5)  # İlk işler daha yüksek skor
+            # Her arama terimi için iş ara
+            for term in search_terms[:3]:  # İlk 3 terimi kullan
+                print(f"🔍 Aranan terim: {term}")
                 
-                # Job highlights'ları al
-                job_highlights = job.get('job_highlights', {})
-                qualifications = job_highlights.get('Qualifications', [])
-                responsibilities = job_highlights.get('Responsibilities', [])
-                
-                # Tüm requirements'ları birleştir
-                all_requirements = qualifications + responsibilities
-                
-                # Gerçek iş ilanı URL'sini al
-                job_url = None
-                
-                # SerpAPI Google Jobs'dan gelen URL'leri kontrol et
-                if 'related_links' in job and job['related_links']:
-                    # İlk related_link'i al
-                    related_link = job['related_links'][0]
-                    if 'link' in related_link:
-                        job_url = related_link['link']
-                        print(f"  Related link URL: {job_url}")
-                
-                # Eğer related_links yoksa, via link'ini dene
-                if not job_url and 'via' in job and job['via']:
-                    if 'link' in job['via']:
-                        job_url = job['via']['link']
-                        print(f"  Via link URL: {job_url}")
-                
-                # Eğer hala URL yoksa ve job_id varsa, Google Jobs URL'i oluştur
-                if not job_url and 'job_id' in job:
-                    # Google Jobs'a direkt yönlendiren URL oluştur
-                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs&htivrt=jobs&htidocid={job['job_id']}"
-                    print(f"  Generated Google Jobs URL: {job_url}")
-                
-                # Eğer hala URL yoksa, şirket web sitesini dene
-                if not job_url and 'company_name' in job:
-                    # Şirket adından basit bir arama URL'i oluştur
-                    company_name = job['company_name'].replace(' ', '+')
-                    job_url = f"https://www.google.com/search?q={company_name}+{search_keywords}+jobs"
-                    print(f"  Company search URL: {job_url}")
-                
-                # Son çare: Genel Google Jobs arama URL'i
-                if not job_url:
-                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs"
-                    print(f"  Fallback Google Jobs URL: {job_url}")
-                
-                formatted_job = {
-                    'id': job.get('job_id', f"google_job_{i}"),
-                    'title': job.get('title', 'İş İlanı'),
-                    'company': job.get('company_name', 'Şirket'),
-                    'location': job.get('location', location),
-                    'description': job.get('description', ''),
-                    'requirements': all_requirements,
-                    'salary': job.get('salary', 'Belirtilmemiş'),
-                    'url': job_url,  # Gerçek iş ilanı URL'i
-                    'posted_date': job.get('posted_at', datetime.now().strftime('%Y-%m-%d')),
-                    'source': 'Google Jobs',
-                    'score': score,  # Frontend için uyum skoru
-                    'match_reasons': [f"{skill} beceriniz bu pozisyona uygun" for skill in skills[:2]],
-                    'missing_skills': ["Daha fazla deneyim", "Proje portföyü"],
-                    'recommendations': ["CV'nizi güncelleyin", "Başvuru yapabilirsiniz"]
+                querystring = {
+                    "query": term,
+                    "page": "1",
+                    "num_pages": "1",
+                    "country": "us",  # Varsayılan olarak US, daha sonra lokasyon bazlı yapılabilir
+                    "date_posted": "all"
                 }
-                formatted_jobs.append(formatted_job)
                 
-                print(f"Job {i+1}: {job.get('title', 'N/A')} - {job.get('company_name', 'N/A')}")
-                print(f"  URL: {job_url}")
-                print(f"  Job ID: {job.get('job_id', 'N/A')}")
-                print()
+                response = requests.get(
+                    self.jsearch_url, 
+                    headers=self.jsearch_headers, 
+                    params=querystring
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    if data.get('status') == 'OK' and data.get('data'):
+                        jobs = data['data']
+                        
+                        # Her iş için skor hesapla
+                        for job in jobs:
+                            job['score'] = self._calculate_job_match_score(job, cv_analysis)
+                            job['search_term'] = term
+                        
+                        all_jobs.extend(jobs)
+                        print(f"✅ {term} için {len(jobs)} iş bulundu")
+                    else:
+                        print(f"⚠️ {term} için iş bulunamadı")
+                else:
+                    print(f"❌ API hatası: {response.status_code}")
             
-            print(f"✅ Google Jobs'dan {len(formatted_jobs)} iş ilanı bulundu")
-            return formatted_jobs
+            # Skorlara göre sırala ve en iyi sonuçları döndür
+            all_jobs.sort(key=lambda x: x.get('score', 0), reverse=True)
+            
+            # Benzersiz işleri filtrele (job_id'ye göre)
+            unique_jobs = []
+            seen_job_ids = set()
+            
+            for job in all_jobs:
+                job_id = job.get('job_id')
+                if job_id and job_id not in seen_job_ids:
+                    unique_jobs.append(job)
+                    seen_job_ids.add(job_id)
+            
+            # En iyi sonuçları döndür
+            top_jobs = unique_jobs[:max_results]
+            
+            print(f"✅ Toplam {len(top_jobs)} benzersiz iş bulundu")
+            return top_jobs
             
         except Exception as e:
-            print(f"❌ SerpAPI Google Jobs hatası: {e}")
-            print(f"Hata detayı: {type(e).__name__}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+            print(f"❌ JSearch API hatası: {e}")
             return self._get_default_jobs()
+    
+    def _generate_search_terms(self, cv_analysis: Dict[str, Any]) -> List[str]:
+        """
+        CV analizinden arama terimleri oluşturur
+        """
+        search_terms = []
+        
+        # Teknik becerilerden terimler oluştur
+        technical_skills = cv_analysis.get('teknik_beceriler', [])
+        programming_languages = cv_analysis.get('yazılım_dilleri', [])
+        technologies = cv_analysis.get('teknolojiler', [])
+        
+        # Ana uzmanlık alanı
+        main_expertise = cv_analysis.get('ana_uzmanlık_alanı', '')
+        if main_expertise and main_expertise != 'Belirtilmemiş':
+            search_terms.append(f"{main_expertise} jobs")
+        
+        # Uygun iş alanları
+        suitable_job_areas = cv_analysis.get('uygun_iş_alanları', [])
+        for area in suitable_job_areas[:2]:  # İlk 2 alanı kullan
+            if area and area != 'Belirtilmemiş':
+                search_terms.append(f"{area} jobs")
+        
+        # Teknik becerilerden terimler
+        for skill in technical_skills[:3]:  # İlk 3 beceriyi kullan
+            if skill and skill != 'Belirtilmemiş':
+                search_terms.append(f"{skill} developer jobs")
+        
+        # Programlama dillerinden terimler
+        for lang in programming_languages[:2]:  # İlk 2 dili kullan
+            if lang and lang != 'Belirtilmemiş':
+                search_terms.append(f"{lang} developer jobs")
+        
+        # Eğer hiç terim oluşturulamadıysa varsayılan terimler
+        if not search_terms:
+            search_terms = [
+                "software developer jobs",
+                "web developer jobs", 
+                "programmer jobs"
+            ]
+        
+        return search_terms
+    
+    def _calculate_job_match_score(self, job: Dict[str, Any], cv_analysis: Dict[str, Any]) -> float:
+        """
+        İş ilanı ile CV arasındaki uyum skorunu hesaplar
+        """
+        score = 0.0
+        
+        # İş başlığından skor hesapla
+        job_title = job.get('job_title', '').lower()
+        technical_skills = [skill.lower() for skill in cv_analysis.get('teknik_beceriler', [])]
+        programming_languages = [lang.lower() for lang in cv_analysis.get('yazılım_dilleri', [])]
+        
+        # Teknik beceriler eşleşmesi
+        for skill in technical_skills:
+            if skill in job_title:
+                score += 10
+        
+        # Programlama dilleri eşleşmesi
+        for lang in programming_languages:
+            if lang in job_title:
+                score += 15
+        
+        # İş türü eşleşmesi
+        employment_type = job.get('job_employment_type', '').lower()
+        if 'full-time' in employment_type:
+            score += 5
+        elif 'part-time' in employment_type:
+            score += 3
+        
+        # Şirket büyüklüğü (varsa)
+        employer_name = job.get('employer_name', '').lower()
+        if any(keyword in employer_name for keyword in ['google', 'microsoft', 'amazon', 'apple', 'meta']):
+            score += 10
+        
+        return score
     
     def _get_default_jobs(self) -> List[Dict[str, Any]]:
         """
-        Varsayılan iş ilanları döndürür - frontend uyumlu
+        API çalışmadığında varsayılan iş ilanları döndürür
         """
         return [
             {
-                'id': 'default_1',
-                'title': 'Junior Software Developer',
-                'company': 'Teknoloji Şirketi',
-                'location': 'İstanbul, Türkiye',
-                'description': 'Yazılım geliştirme ekibine katılacak junior developer aranmaktadır.',
-                'requirements': ['Temel programlama bilgisi', 'Takım çalışması'],
-                'salary': '8.000 - 12.000 TL',
-                'url': 'https://www.google.com/search?q=Junior+Software+Developer+İstanbul&ibp=htl;jobs',
-                'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Google Jobs',
-                'score': 85,
-                'match_reasons': ['JavaScript beceriniz bu pozisyona uygun', 'Frontend geliştirme deneyiminiz değerli'],
-                'missing_skills': ['Daha fazla proje deneyimi', 'Backend teknolojileri'],
-                'recommendations': ['CV\'nizi güncelleyin', 'GitHub profilinizi aktif tutun']
+                "job_id": "default_1",
+                "job_title": "Frontend Developer",
+                "employer_name": "Tech Company",
+                "employer_logo": None,
+                "employer_website": "https://example.com",
+                "job_publisher": "LinkedIn",
+                "job_employment_type": "Full-time",
+                "job_apply_link": "https://example.com/apply",
+                "job_apply_is_direct": False,
+                "score": 85,
+                "search_term": "frontend developer jobs"
             },
             {
-                'id': 'default_2',
-                'title': 'Frontend Developer',
-                'company': 'Dijital Ajans',
-                'location': 'İstanbul, Türkiye',
-                'description': 'Modern web teknolojileri ile kullanıcı dostu arayüzler geliştirecek developer aranmaktadır.',
-                'requirements': ['HTML/CSS/JavaScript', 'React/Vue.js'],
-                'salary': '10.000 - 15.000 TL',
-                'url': 'https://www.google.com/search?q=Frontend+Developer+İstanbul&ibp=htl;jobs',
-                'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Google Jobs',
-                'score': 80,
-                'match_reasons': ['HTML/CSS becerileriniz uygun', 'Frontend odaklı pozisyon'],
-                'missing_skills': ['React/Vue.js deneyimi', 'Responsive tasarım'],
-                'recommendations': ['Modern framework\'ler öğrenin', 'Portföy projeleri geliştirin']
-            },
-            {
-                'id': 'default_3',
-                'title': 'Backend Developer',
-                'company': 'Fintech Startup',
-                'location': 'İstanbul, Türkiye',
-                'description': 'Ölçeklenebilir backend sistemleri geliştirecek developer aranmaktadır.',
-                'requirements': ['Python/Java/Node.js', 'Veritabanı yönetimi'],
-                'salary': '12.000 - 18.000 TL',
-                'url': 'https://linkedin.com/jobs',
-                'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan',
-                'score': 75,
-                'match_reasons': ['Programlama temelleriniz güçlü', 'Öğrenme motivasyonunuz yüksek'],
-                'missing_skills': ['Backend teknolojileri', 'Veritabanı deneyimi'],
-                'recommendations': ['Backend teknolojileri öğrenin', 'API geliştirme projeleri yapın']
+                "job_id": "default_2", 
+                "job_title": "JavaScript Developer",
+                "employer_name": "Startup Inc",
+                "employer_logo": None,
+                "employer_website": "https://startup.com",
+                "job_publisher": "Indeed",
+                "job_employment_type": "Full-time",
+                "job_apply_link": "https://startup.com/careers",
+                "job_apply_is_direct": False,
+                "score": 80,
+                "search_term": "javascript developer jobs"
             }
         ]
     
     def process_cv_and_find_jobs(self, pdf_bytes: bytes, max_results: int = 20) -> Dict[str, Any]:
         """
-        Ana fonksiyon: CV analizi + iş arama
+        CV'yi analiz eder ve uygun işleri bulur
         """
+        print("🚀 CV analizi ve iş arama başlatılıyor...")
+        
         try:
-            # 1. CV Analizi
+            # CV analizi
             cv_analysis = self.analyze_cv_from_pdf(pdf_bytes)
             
-            # 2. İş Arama
-            jobs = self.search_jobs_with_serpapi(cv_analysis, max_results)
+            # İş arama
+            jobs = self.search_jobs_with_jsearch(cv_analysis, max_results)
             
             return {
                 'success': True,
                 'cv_analysis': cv_analysis,
                 'jobs': jobs,
                 'stats': {
-                    'total_jobs': len(jobs),
-                    'search_method': 'SerpAPI' if self.serpapi_key else 'Varsayılan'
+                    'total_jobs_found': len(jobs),
+                    'cv_skills_count': len(cv_analysis.get('teknik_beceriler', [])),
+                    'search_method': 'JSearch API',
+                    'avg_match_score': sum(job.get('score', 0) for job in jobs) / len(jobs) if jobs else 0
                 }
             }
             
         except Exception as e:
-            print(f"❌ İşlem hatası: {e}")
+            print(f"❌ CV işleme hatası: {e}")
             return {
                 'success': False,
                 'error': str(e),
-                'cv_analysis': {},
-                'jobs': [],
-                'stats': {}
+                'cv_analysis': None,
+                'jobs': self._get_default_jobs(),
+                'stats': {
+                    'total_jobs_found': 0,
+                    'cv_skills_count': 0,
+                    'search_method': 'Default',
+                    'avg_match_score': 0
+                }
             }
 
 # Test fonksiyonu
@@ -366,17 +371,17 @@ if __name__ == "__main__":
     
     print("🧪 Test iş arama başlatılıyor...")
     
-    # SERPAPI_KEY kontrolü
-    if not agent.serpapi_key:
-        print("❌ SERPAPI_KEY bulunamadı!")
-        print("📝 .env dosyasına SERPAPI_KEY=your_api_key_here ekleyin")
-        print("🔗 https://serpapi.com/ adresinden ücretsiz API key alabilirsiniz")
+    # JSEARCH_API_KEY kontrolü
+    if not agent.jsearch_api_key:
+        print("❌ JSEARCH_API_KEY bulunamadı!")
+        print("📝 .env dosyasına JSEARCH_API_KEY=your_api_key_here ekleyin")
+        print("🔗 https://rapidapi.com/letscrape/api/jsearch adresinden ücretsiz API key alabilirsiniz")
     else:
-        print("✅ SERPAPI_KEY bulundu, Google Jobs test ediliyor...")
-        jobs = agent.search_jobs_with_serpapi(test_cv_analysis, max_results=5)
+        print("✅ JSEARCH_API_KEY bulundu, JSearch API test ediliyor...")
+        jobs = agent.search_jobs_with_jsearch(test_cv_analysis, max_results=5)
         
         print(f"📊 Test sonucu: {len(jobs)} iş bulundu")
         for i, job in enumerate(jobs):
-            print(f"  {i+1}. {job['title']} - {job['company']} ({job['score']}%)")
-            print(f"     URL: {job['url']}")
+            print(f"  {i+1}. {job['job_title']} - {job['employer_name']} ({job['score']}%)")
+            print(f"     URL: {job['job_apply_link']}")
             print()

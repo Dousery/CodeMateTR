@@ -2869,9 +2869,9 @@ def search_jobs():
         # Akıllı Job Agent'ı başlat
         job_agent = IntelligentJobAgent()
         
-        # Google Jobs ile iş ilanlarını ara
-        print(f"Google Jobs ile iş ilanları aranıyor - Kullanıcı: {session.get('username')}")
-        jobs = job_agent.search_jobs_with_serpapi(
+        # JSearch API ile iş ilanlarını ara
+        print(f"JSearch API ile iş ilanları aranıyor - Kullanıcı: {session.get('username')}")
+        jobs = job_agent.search_jobs_with_jsearch(
             cv_analysis=cv_analysis,
             max_results=max_jobs
         )
@@ -2885,7 +2885,7 @@ def search_jobs():
                     'total_found': 0,
                     'matched': 0,
                     'search_areas': cv_analysis.get('uygun_iş_alanları', []),
-                    'search_method': 'Google Jobs'
+                    'search_method': 'JSearch API'
                 }
             })
         
@@ -2895,7 +2895,7 @@ def search_jobs():
             'matched': len(jobs),
             'search_areas': cv_analysis.get('uygun_iş_alanları', []),
             'avg_match_score': sum(job.get('score', 0) for job in jobs) / len(jobs) if jobs else 0,
-            'search_method': 'Google Jobs',
+            'search_method': 'JSearch API',
             'total_jobs': len(jobs)
         }
         
@@ -2946,7 +2946,7 @@ def process_cv_file():
                 job_agent = IntelligentJobAgent()
                 
                 # CV analizi ve iş arama
-                print(f"CV analizi ve Google Jobs iş arama başlatılıyor - Kullanıcı: {session['username']}")
+                print(f"CV analizi ve JSearch API iş arama başlatılıyor - Kullanıcı: {session['username']}")
                 result = job_agent.process_cv_and_find_jobs(pdf_bytes, max_results=20)
                 
                 print(f"İşlem sonucu: {result.get('success', False)}")

@@ -195,10 +195,10 @@ const SmartJobFinder = () => {
 
     setLoading(true);
     setActiveStep(2);
-    setSearchStatus('Google Jobs\'da iş aranıyor...');
+    setSearchStatus('JSearch API\'da iş aranıyor...');
 
     try {
-      console.log('Searching jobs with Google Jobs:', API_ENDPOINTS.SEARCH_JOBS);
+      console.log('Searching jobs with JSearch API:', API_ENDPOINTS.SEARCH_JOBS);
       console.log('Search data:', { 
         cv_analysis_keys: Object.keys(analysis),
         location: 'Türkiye',
@@ -220,9 +220,9 @@ const SmartJobFinder = () => {
       if (data.success) {
         setJobs(data.jobs);
         setStats(data.stats);
-        setSearchSource(data.stats?.search_method || 'Google Jobs');
+        setSearchSource(data.stats?.search_method || 'JSearch API');
         setActiveStep(3);
-        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'Google Jobs'})`);
+        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'JSearch API'})`);
       } else {
         setError(data.error || 'İş arama başarısız');
         setSearchStatus('❌ İş arama başarısız');
@@ -240,9 +240,9 @@ const SmartJobFinder = () => {
     try {
       console.log('Getting job application tips with:', API_ENDPOINTS.JOB_TIPS);
       console.log('Job data:', { 
-        job_title: job.title,
-        company: job.company,
-        url: job.url
+        job_title: job.job_title || job.title,
+        company: job.employer_name || job.company,
+        url: job.job_apply_link || job.url
       });
       
       const response = await axios.post(API_ENDPOINTS.JOB_TIPS, {
@@ -259,7 +259,7 @@ const SmartJobFinder = () => {
       if (data.success) {
         // Tips'i job objesine ekle
         const updatedJobs = jobs.map(j => 
-          j.url === job.url ? { ...j, tips: data.tips } : j
+          (j.job_apply_link === job.job_apply_link || j.url === job.url) ? { ...j, tips: data.tips } : j
         );
         setJobs(updatedJobs);
       }
@@ -461,27 +461,27 @@ const SmartJobFinder = () => {
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
           <Box sx={{ flex: 1 }}>
             <Typography variant="h6" component="div" gutterBottom sx={{ color: '#E6E6FA' }}>
-              {job.title}
+              {job.job_title || job.title}
             </Typography>
             
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <Business sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} />
               <Typography variant="body2" color="text.secondary">
-                {job.company}
+                {job.employer_name || job.company}
               </Typography>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
               <LocationOn sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} />
               <Typography variant="body2" color="text.secondary">
-                {job.location}
+                {job.job_city || job.job_country || job.location || 'Belirtilmemiş'}
               </Typography>
             </Box>
             
             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
               <AccessTime sx={{ mr: 1, fontSize: 20, color: 'text.secondary' }} />
               <Typography variant="body2" color="text.secondary">
-                {new Date(job.posted_date).toLocaleDateString('tr-TR')}
+                {job.job_employment_type || 'Tam Zamanlı'}
               </Typography>
             </Box>
           </Box>
@@ -618,13 +618,15 @@ const SmartJobFinder = () => {
           <Button
             variant="contained"
             color="primary"
-            href={job.url}
+            href={job.job_apply_link || job.url}
             target="_blank"
             rel="noopener noreferrer"
             size="small"
             startIcon={<Work />}
           >
-            {job.source === 'Google Jobs' ? 'Google Jobs\'da Görüntüle' : 'İlanı Görüntüle'}
+            {job.job_publisher === 'LinkedIn' ? 'LinkedIn\'de Görüntüle' : 
+             job.job_publisher === 'Indeed' ? 'Indeed\'de Görüntüle' : 
+             'İlanı Görüntüle'}
           </Button>
           
           {!job.tips && (
