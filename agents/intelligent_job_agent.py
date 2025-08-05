@@ -7,13 +7,12 @@ CV analizi + SerpAPI Google Jobs
 
 import os
 import json
-import time
 import requests
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import Dict, Any, List
 import google.generativeai as genai
-from google import genai as google_genai
-from google.genai import types
+from google.generativeai import types
+from serpapi import GoogleSearch
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -21,19 +20,20 @@ load_dotenv()
 class IntelligentJobAgent:
     def __init__(self):
         # Gemini AI setup
-        self.gemini_api_key = os.getenv('GEMINI_API_KEY')
-        if not self.gemini_api_key:
-            raise ValueError("GEMINI_API_KEY çevre değişkeni bulunamadı")
+        load_dotenv()
+        gemini_api_key = os.getenv('GEMINI_API_KEY')
+        if not gemini_api_key:
+            print("⚠️ GEMINI_API_KEY bulunamadı!")
+        
+        genai.configure(api_key=gemini_api_key)
+        self.genai_client = genai
         
         # SerpAPI setup
         self.serpapi_key = os.getenv('SERPAPI_KEY')
-        
-        # Gemini client setup
-        genai.configure(api_key=self.gemini_api_key)
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
-        self.genai_client = google_genai.Client(api_key=self.gemini_api_key)
-        
-        print("✅ IntelligentJobAgent başlatıldı")
+        if not self.serpapi_key:
+            print("⚠️ SERPAPI_KEY bulunamadı!")
+        else:
+            print("✅ SerpAPI Google Jobs hazır")
     
     def analyze_cv_from_pdf(self, pdf_bytes: bytes) -> Dict[str, Any]:
         """
@@ -146,24 +146,22 @@ class IntelligentJobAgent:
             
             # SerpAPI Google Jobs API kullan
             params = {
-                "api_key": self.serpapi_key,
-                "engine": "google_jobs",  # Önemli: Google Jobs engine'i
+                "engine": "google_jobs",
                 "q": search_keywords,
                 "location": location,
                 "hl": "tr",  # Türkçe
                 "gl": "tr",  # Türkiye
-                "chips": "date_posted:all",  # Tüm tarihler
-                "num": max_results  # Sonuç sayısı
+                "api_key": self.serpapi_key
             }
             
-            response = requests.get("https://serpapi.com/search", params=params)
-            response.raise_for_status()
-            data = response.json()
+            # GoogleSearch ile arama yap
+            search = GoogleSearch(params)
+            results = search.get_dict()
             
-            print(f"SerpAPI Response Keys: {list(data.keys())}")
+            print(f"SerpAPI Response Keys: {list(results.keys())}")
             
             # Google Jobs sonuçlarını al
-            jobs = data.get("jobs_results", [])
+            jobs = results.get("jobs_results", [])
             
             if not jobs:
                 print("⚠️ Google Jobs'dan sonuç alınamadı, varsayılan işler döndürülüyor")
