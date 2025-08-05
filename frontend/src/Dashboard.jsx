@@ -256,7 +256,7 @@ export default function Dashboard() {
 
       {!alan ? null : (
         <>
-          <Grid container spacing={6} justifyContent="center" sx={{ mt: 2, maxWidth: '1400px', mx: 'auto' }}>
+          <Grid container spacing={6} justifyContent="flex-start" sx={{ mt: -1, maxWidth: '1400px', mx: 'auto', pl: 4 }}>
             {modules.map((mod, i) => (
               <Grid item xs={12} sm={6} md={3} key={mod.title}>
                 <Card
@@ -270,7 +270,7 @@ export default function Dashboard() {
                   onClick={() => navigate(mod.path)}
                   sx={{ 
                     borderRadius: 4, 
-                    height: 340, 
+                    height: 300, 
                     maxWidth: 320,
                     display: 'flex', 
                     flexDirection: 'column', 
@@ -278,69 +278,73 @@ export default function Dashboard() {
                     cursor: 'pointer'
                   }}
                 >
-                  <CardContent sx={{ textAlign: 'center' }}>
-                    <Avatar sx={{ 
-                      bgcolor: 'rgba(255,255,255,0.1)', 
-                      mx: 'auto', 
-                      mb: 2, 
-                      width: 64, 
-                      height: 64, 
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                      border: '1px solid rgba(255,255,255,0.2)'
-                    }}>
-                      {mod.icon}
-                    </Avatar>
-                    <Typography variant="h5" fontWeight={600} mb={1} color="white">
-                      {mod.title}
-                    </Typography>
-                    <Typography color="rgba(255,255,255,0.8)" mb={2}>{mod.desc}</Typography>
+                  <CardContent sx={{ textAlign: 'center', flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <Box>
+                      <Avatar sx={{ 
+                        bgcolor: 'rgba(255,255,255,0.1)', 
+                        mx: 'auto', 
+                        mb: 2, 
+                        width: 64, 
+                        height: 64, 
+                        boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                        border: '1px solid rgba(255,255,255,0.2)'
+                      }}>
+                        {mod.icon}
+                      </Avatar>
+                      <Typography variant="h5" fontWeight={600} mb={1} color="white">
+                        {mod.title}
+                      </Typography>
+                      <Typography color="rgba(255,255,255,0.8)" mb={2}>{mod.desc}</Typography>
+                      
+                      {/* AI Tags */}
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', mb: 2 }}>
+                        {mod.tags.map((tag, index) => (
+                          <Chip
+                            key={index}
+                            label={tag}
+                            size="small"
+                            sx={{
+                              background: 'rgba(255, 255, 255, 0.2)',
+                              backdropFilter: 'blur(10px)',
+                              color: 'white',
+                              fontSize: '0.7rem',
+                              fontWeight: 500,
+                              border: '1px solid rgba(255, 255, 255, 0.3)',
+                              '& .MuiChip-label': {
+                                px: 1,
+                              }
+                            }}
+                          />
+                        ))}
+                      </Box>
+                    </Box>
                     
-                    {/* AI Tags */}
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, justifyContent: 'center', mb: 1 }}>
-                      {mod.tags.map((tag, index) => (
-                        <Chip
-                          key={index}
-                          label={tag}
-                          size="small"
-                          sx={{
-                            background: 'rgba(255, 255, 255, 0.2)',
-                            backdropFilter: 'blur(10px)',
-                            color: 'white',
-                            fontSize: '0.7rem',
-                            fontWeight: 500,
-                            border: '1px solid rgba(255, 255, 255, 0.3)',
-                            '& .MuiChip-label': {
-                              px: 1,
-                            }
-                          }}
-                        />
-                      ))}
+                    {/* Başla Button */}
+                    <Box sx={{ mt: 'auto', pt: 2 }}>
+                      <Button 
+                        variant="contained" 
+                        color="primary" 
+                        size="large" 
+                        onClick={() => navigate(mod.path)}
+                        sx={{
+                          background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                          borderRadius: '25px',
+                          px: 4,
+                          py: 1.5,
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
+                          '&:hover': {
+                            background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
+                            boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
+                            transform: 'translateY(-2px)'
+                          }
+                        }}
+                      >
+                        Başla
+                      </Button>
                     </Box>
                   </CardContent>
-                  <CardActions sx={{ justifyContent: 'center', pb: 2 }}>
-                    <Button 
-                      variant="contained" 
-                      color="primary" 
-                      size="large" 
-                      onClick={() => navigate(mod.path)}
-                      sx={{
-                        background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                        borderRadius: '25px',
-                        px: 4,
-                        py: 1.5,
-                        textTransform: 'none',
-                        fontWeight: 600,
-                        boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
-                        '&:hover': {
-                          background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                          boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
-                          transform: 'translateY(-2px)'
-                        }
-                      }}
-                    >
-                      Başla
-                    </Button>
-                  </CardActions>
                 </Card>
               </Grid>
             ))}
