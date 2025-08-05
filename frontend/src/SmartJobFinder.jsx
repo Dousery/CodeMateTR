@@ -26,7 +26,8 @@ import {
   Grid,
   Rating,
   Divider,
-  Tooltip
+  Tooltip,
+  Error
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import {
@@ -48,13 +49,14 @@ import {
 const steps = ['CV Yükle', 'CV Analizi', 'İş Arama', 'Sonuçlar'];
 
 const SmartJobFinder = () => {
-  const [activeStep, setActiveStep] = useState(0);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [cvAnalysis, setCvAnalysis] = useState(null);
   const [jobs, setJobs] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [activeStep, setActiveStep] = useState(0);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
+  const [serpapiStatus, setSerpapiStatus] = useState(null); // SerpAPI durumu
 
   // Component mount olduğunda session kontrolü yap
   useEffect(() => {
@@ -80,6 +82,28 @@ const SmartJobFinder = () => {
     
     checkSession();
   }, []);
+
+  // SerpAPI durumunu kontrol et
+  const checkSerpapiStatus = async () => {
+    try {
+      setSerpapiStatus('checking');
+      const response = await axios.get(API_ENDPOINTS.TEST_SERPAPI, {
+        withCredentials: true,
+        timeout: 10000
+      });
+      
+      if (response.data.success) {
+        setSerpapiStatus('working');
+        console.log('✅ SerpAPI çalışıyor');
+      } else {
+        setSerpapiStatus('error');
+        console.log('❌ SerpAPI çalışmıyor');
+      }
+    } catch (error) {
+      setSerpapiStatus('error');
+      console.error('SerpAPI test hatası:', error);
+    }
+  };
 
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
@@ -268,11 +292,12 @@ const SmartJobFinder = () => {
 
   const resetProcess = () => {
     setActiveStep(0);
-    setSelectedFile(null);
     setCvAnalysis(null);
     setJobs([]);
-    setStats(null);
+    setSelectedFile(null);
     setError('');
+    setStats(null);
+    setSerpapiStatus(null); // SerpAPI durumunu da sıfırla
   };
 
   const renderCvAnalysis = () => {
@@ -688,40 +713,98 @@ const SmartJobFinder = () => {
           </Box>
         )}
 
-        {/* Step 0: File Upload */}
+        {/* File Upload */}
         {activeStep === 0 && (
-          <Box sx={{ textAlign: 'center' }}>
-            <input
-              accept="application/pdf"
-              style={{ display: 'none' }}
-              id="cv-upload-button"
-              type="file"
-              onChange={handleFileSelect}
-            />
-            <label htmlFor="cv-upload-button">
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h4" gutterBottom sx={{ color: '#E6E6FA', mb: 3 }}>
+              Akıllı İş Bulma Asistanı
+            </Typography>
+            
+            <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.8)', mb: 4 }}>
+              CV'nizi yükleyin, AI destekli analiz ile size en uygun iş ilanlarını bulalım.
+            </Typography>
+
+            {/* SerpAPI Durum Göstergesi */}
+            <Box sx={{ mb: 3, p: 2, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 2 }}>
+              <Typography variant="subtitle2" sx={{ color: '#E6E6FA', mb: 1 }}>
+                Google Jobs Bağlantısı
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+                {serpapiStatus === null && (
+                  <>
+                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+                      Durum kontrol edilmedi
+                    </Typography>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      onClick={checkSerpapiStatus}
+                      sx={{ color: '#E6E6FA', borderColor: '#E6E6FA' }}
+                    >
+                      Test Et
+                    </Button>
+                  </>
+                )}
+                {serpapiStatus === 'checking' && (
+                  <>
+                    <CircularProgress size={20} sx={{ color: '#E6E6FA' }} />
+                    <Typography variant="body2" sx={{ color: '#FFB347' }}>
+                      Kontrol ediliyor...
+                    </Typography>
+                  </>
+                )}
+                {serpapiStatus === 'working' && (
+                  <>
+                    <CheckCircle sx={{ color: '#90EE90', fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ color: '#90EE90' }}>
+                      Google Jobs çalışıyor
+                    </Typography>
+                  </>
+                )}
+                {serpapiStatus === 'error' && (
+                  <>
+                    <Error sx={{ color: '#FF6B6B', fontSize: 20 }} />
+                    <Typography variant="body2" sx={{ color: '#FF6B6B' }}>
+                      Google Jobs bağlantısı yok
+                    </Typography>
+                    <Button 
+                      size="small" 
+                      variant="outlined" 
+                      onClick={checkSerpapiStatus}
+                      sx={{ color: '#FF6B6B', borderColor: '#FF6B6B' }}
+                    >
+                      Tekrar Dene
+                    </Button>
+                  </>
+                )}
+              </Box>
+            </Box>
+            
+            <label htmlFor="cv-upload">
               <Button
-                variant="contained"
                 component="span"
+                variant="contained"
                 size="large"
                 startIcon={<CloudUpload />}
-                fullWidth
                 sx={{
-                  mb: 2,
-                  background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                  borderRadius: '25px',
-                  py: 1.5,
-                  textTransform: 'none',
-                  fontWeight: 600,
-                  boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
+                  backgroundColor: '#E6E6FA',
+                  color: '#2C2C2C',
                   '&:hover': {
-                    background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
-                    boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
+                    backgroundColor: '#D8D8D8'
                   }
                 }}
               >
                 CV Dosyası Seç (PDF)
               </Button>
             </label>
+            
+            <input
+              accept="application/pdf"
+              style={{ display: 'none' }}
+              id="cv-upload"
+              type="file"
+              onChange={handleFileSelect}
+            />
             
             {selectedFile && (
               <Box sx={{ mb: 3 }}>
@@ -759,20 +842,20 @@ const SmartJobFinder = () => {
               </Typography>
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{stats.total_found}</Typography>
+                  <Typography variant="h4">{stats.total_jobs || stats.total_found || 0}</Typography>
                   <Typography variant="body2">Toplam Bulunan</Typography>
                 </Grid>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{stats.matched}</Typography>
+                  <Typography variant="h4">{jobs.length}</Typography>
                   <Typography variant="body2">Uygun İş</Typography>
                 </Grid>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{Math.round(stats.avg_match_score || 0)}%</Typography>
+                  <Typography variant="h4">{Math.round(jobs.reduce((acc, job) => acc + (job.score || 0), 0) / Math.max(jobs.length, 1))}%</Typography>
                   <Typography variant="body2">Ortalama Uyum</Typography>
                 </Grid>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{stats.search_areas?.length || 0}</Typography>
-                  <Typography variant="body2">Arama Alanı</Typography>
+                  <Typography variant="h4">{stats.search_method === 'SerpAPI' ? 'Google Jobs' : 'Varsayılan'}</Typography>
+                  <Typography variant="body2">Arama Kaynağı</Typography>
                 </Grid>
               </Grid>
             </CardContent>

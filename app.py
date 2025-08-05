@@ -3057,6 +3057,26 @@ def extract_text_from_pdf(file_path):
     
     return text.strip()
 
+@app.route('/api/test-serpapi', methods=['GET'])
+@login_required
+def test_serpapi():
+    """SerpAPI bağlantısını test eder"""
+    try:
+        job_agent = IntelligentJobAgent()
+        is_working = job_agent.test_serpapi_connection()
+        
+        return jsonify({
+            'success': is_working,
+            'message': 'SerpAPI bağlantısı başarılı' if is_working else 'SerpAPI bağlantısı başarısız'
+        })
+        
+    except Exception as e:
+        print(f"SerpAPI test hatası: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
     port = int(os.environ.get('PORT', 5000))
