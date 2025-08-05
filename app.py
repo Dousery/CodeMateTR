@@ -2874,13 +2874,12 @@ def search_jobs():
         # Akıllı Job Agent'ı başlat
         job_agent = IntelligentJobAgent()
         
-        # 1. İş ilanlarını scrape et
+        # 1. İş ilanlarını ara (SerpAPI veya Fallback)
         print(f"İş ilanları aranıyor - Kullanıcı: test_user")
         job_areas = cv_analysis.get('uygun_iş_alanları', ['Software Developer'])
-        jobs = job_agent.scrape_linkedin_jobs(
-            job_areas=job_areas,
-            location=location,
-            max_per_search=max_jobs // len(job_areas) if job_areas else 10
+        jobs = job_agent.find_jobs_with_serpapi(
+            cv_analysis=cv_analysis,
+            max_results=max_jobs
         )
         
         if not jobs:
@@ -2916,6 +2915,73 @@ def search_jobs():
     except Exception as e:
         print(f"İş arama hatası: {e}")
         return jsonify({'error': f'İş arama sırasında hata: {str(e)}'}), 500
+
+@app.route('/api/process-cv-file', methods=['POST'])
+@login_required
+def process_cv_file():
+    """PDF CV dosyasını analiz eder ve uygun işleri bulur (Yeni entegrasyon)"""
+    print(f"DEBUG: process_cv_file called by user: {session.get('username')}")
+    
+    try:
+        if 'cv_file' not in request.files:
+            return jsonify({'error': 'CV dosyası seçilmemiş.'}), 400
+        
+        file = request.files['cv_file']
+        if file.filename == '':
+            return jsonify({'error': 'Dosya seçilmemiş.'}), 400
+        
+        if file and allowed_file(file.filename):
+            # CV'yi kaydet
+            filename = secure_filename(file.filename)
+            timestamp = int(time.time())
+            unique_filename = f"cv_{session['username']}_{timestamp}.{filename.split('.')[-1]}"
+            cv_path = os.path.join(app.config['UPLOAD_FOLDER'], unique_filename)
+            file.save(cv_path)
+            
+            try:
+                # Akıllı Job Agent'ı başlat
+                job_agent = IntelligentJobAgent()
+                
+                # CV'yi analiz et ve işleri bul
+                print(f"CV analizi ve iş arama başlatılıyor - Kullanıcı: {session['username']}")
+                result = job_agent.process_cv_and_find_jobs(cv_path, max_results=20)
+                
+                if result.get('success'):
+                    # CV analiz sonucunu veritabanına kaydet
+                    user = User.query.filter_by(username=session['username']).first()
+                    if user:
+                        user.cv_analysis = json.dumps(result['cv_analysis'])
+                        db.session.commit()
+                        print(f"CV analiz sonucu veritabanına kaydedildi - Kullanıcı: {user.username}")
+                    
+                    # Sonucu döndür
+                    return jsonify({
+                        'success': True,
+                        'cv_analysis': result['cv_analysis'],
+                        'jobs': result['job_results'],
+                        'stats': result['stats'],
+                        'cv_filename': unique_filename
+                    })
+                else:
+                    return jsonify({'error': result.get('error', 'CV işleme başarısız')}), 500
+                    
+            except Exception as e:
+                print(f"CV işleme hatası: {e}")
+                return jsonify({'error': f'CV işleme sırasında hata: {str(e)}'}), 500
+            
+            finally:
+                # Geçici dosyayı temizle
+                try:
+                    if os.path.exists(cv_path):
+                        os.remove(cv_path)
+                except:
+                    pass
+        else:
+            return jsonify({'error': 'Geçersiz dosya formatı. Sadece PDF dosyaları kabul edilir.'}), 400
+    
+    except Exception as e:
+        print(f"CV dosya işleme endpoint hatası: {e}")
+        return jsonify({'error': 'Beklenmedik hata oluştu'}), 500
 
 @app.route('/api/job-application-tips', methods=['POST'])
 @login_required

@@ -68,6 +68,7 @@ export const API_ENDPOINTS = {
   ANALYZE_CV: `${API_BASE_URL}/api/analyze-cv`,
   SEARCH_JOBS: `${API_BASE_URL}/api/search-jobs`,
   JOB_TIPS: `${API_BASE_URL}/api/job-application-tips`,
+  PROCESS_CV_FILE: `${API_BASE_URL}/api/process-cv-file`,
 
   // Debug endpoints
   DEBUG_CLEAR_SESSIONS: `${API_BASE_URL}/debug/clear_auto_interview_sessions`,

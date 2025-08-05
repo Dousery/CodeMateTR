@@ -2,38 +2,173 @@
 # -*- coding: utf-8 -*-
 """
 Akıllı İş Bulma Asistanı - Optimized Version
-CV analizi + LinkedIn scraping + Gemini AI eşleştirme
+CV analizi + SerpAPI Google Jobs + Gemini AI eşleştirme
 """
 
 import os
 import json
 import time
 import re
-import asyncio
-import concurrent.futures
+
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Set
 import requests
-from bs4 import BeautifulSoup
 import google.generativeai as genai
 from google import genai as google_genai
 from google.genai import types
 import httpx
 from dotenv import load_dotenv
 from functools import lru_cache
-import threading
 from collections import defaultdict
+from dataclasses import dataclass
+import pathlib
 
-# Selenium imports
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
+
 
 load_dotenv()
+
+@dataclass
+class CVData:
+    """CV'den çıkarılan veri yapısı"""
+    name: str
+    email: str
+    phone: str
+    skills: List[str]
+    experience_years: int
+    education: str
+    location: str
+    job_titles: List[str]
+    languages: List[str]
+    summary: str
+    certifications: List[str]
+
+class GeminiCVExtractor:
+    """Gemini API kullanarak CV'den bilgi çıkarma sınıfı (sadece PDF için)"""
+    
+    def __init__(self, gemini_api_key: str):
+        if gemini_api_key:
+            genai.configure(api_key=gemini_api_key)
+        else:
+            raise ValueError("Gemini API anahtarı sağlanmalıdır.")
+        
+        self.model = genai.GenerativeModel("gemini-1.5-flash")
+        
+        self.extraction_prompt = """
+Bu CV dosyasından aşağıdaki bilgileri JSON formatında çıkar. Eğer bir bilgi bulunamazsa null değeri ver:
+
+{
+  "name": "Kişinin tam adı",
+  "email": "Email adresi", 
+  "phone": "Türkiye telefon numarası",
+  "location": "Şehir/Konum bilgisi",
+  "summary": "Kısa özet/profil bilgisi",
+  "experience_years": "Toplam iş deneyimi yılı (sayı olarak)",
+  "current_job_title": "Mevcut/son iş unvanı",
+  "skills": ["Teknik yetenekler listesi"],
+  "job_titles": ["Geçmiş iş unvanları"],
+  "education": "En yüksek eğitim durumu",
+  "languages": ["Bildiği diller"],
+  "certifications": ["Sertifikalar"]
+}
+
+Sadece JSON formatında yanıt ver, başka açıklama ekleme. Türkçe karakterleri düzgün kullan.
+"""
+
+    def extract_from_file(self, file_path: str) -> CVData:
+        filepath = pathlib.Path(file_path)
+        if not filepath.exists() or filepath.suffix.lower() != '.pdf':
+            raise ValueError(f"Geçersiz dosya. Lütfen var olan bir PDF dosyası sağlayın: {file_path}")
+        
+        try:
+            file_part = types.Part(
+                mime_type='application/pdf',
+                data=filepath.read_bytes()
+            )
+            response = self.model.generate_content([self.extraction_prompt, file_part])
+            
+            cv_data_dict = self._parse_gemini_response(response.text)
+            return self._dict_to_cvdata(cv_data_dict)
+            
+        except Exception as e:
+            print(f"Gemini API hatası: {e}")
+            return self._empty_cvdata()
+    
+    def _parse_gemini_response(self, response_text: str) -> Dict:
+        try:
+            json_text = re.sub(r'```json\n|```', '', response_text, flags=re.DOTALL).strip()
+            return json.loads(json_text)
+        except json.JSONDecodeError as e:
+            print(f"JSON parse hatası: {e}")
+            return {}
+    
+    def _dict_to_cvdata(self, data: Dict) -> CVData:
+        return CVData(
+            name=data.get('name', 'Bilinmiyor'),
+            email=data.get('email', ''),
+            phone=data.get('phone', ''),
+            skills=data.get('skills', []),
+            experience_years=data.get('experience_years', 0),
+            education=data.get('education', ''),
+            location=data.get('location', ''),
+            job_titles=data.get('job_titles', []),
+            languages=data.get('languages', []),
+            summary=data.get('summary', ''),
+            certifications=data.get('certifications', [])
+        )
+    
+    def _empty_cvdata(self) -> CVData:
+        return CVData(
+            name="", email="", phone="", skills=[], experience_years=0,
+            education="", location="", job_titles=[], languages=[],
+            summary="", certifications=[]
+        )
+
+class SerpAPIGoogleJobs:
+    """SerpAPI kullanarak Google Jobs API'dan iş ilanları çeker."""
+    
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+        self.endpoint = "https://serpapi.com/search"
+        
+    def search_jobs(self, keywords: str, location: str, max_results: int = 20) -> List[Dict]:
+        """
+        Belirtilen anahtar kelimeler ve konum için iş ilanlarını arar.
+        
+        Args:
+            keywords: Aranacak anahtar kelimeler (örn. "Python Developer").
+            location: İş konum bilgisi (örn. "İstanbul, Türkiye").
+            max_results: Maksimum sonuç sayısı.
+        
+        Returns:
+            API'dan dönen iş ilanlarının listesi.
+        """
+        if not self.api_key:
+            raise ValueError("SerpAPI anahtarı sağlanmalıdır.")
+            
+        params = {
+            "api_key": self.api_key,
+            "engine": "google_jobs",
+            "q": keywords,
+            "location": location,
+            "chips": f"date_posted:all",
+            "hl": "tr",
+            "gl": "tr"
+        }
+        
+        try:
+            response = requests.get(self.endpoint, params=params)
+            response.raise_for_status()
+            data = response.json()
+            
+            job_results = data.get("jobs_results", [])
+            return job_results[:max_results]
+        
+        except requests.exceptions.HTTPError as err:
+            print(f"HTTP Hatası: {err}")
+            return []
+        except Exception as e:
+            print(f"SerpAPI hatası: {e}")
+            return []
 
 class IntelligentJobAgent:
     def __init__(self):
@@ -42,12 +177,23 @@ class IntelligentJobAgent:
         if not self.gemini_api_key:
             raise ValueError("GEMINI_API_KEY çevre değişkeni bulunamadı")
         
+        # SerpAPI setup
+        self.serpapi_key = os.getenv('SERPAPI_KEY')
+        
         # Traditional Gemini setup
         genai.configure(api_key=self.gemini_api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
         
         # New Gemini client for PDF processing
         self.genai_client = google_genai.Client(api_key=self.gemini_api_key)
+        
+        # Initialize CV extractor and job finder
+        self.cv_extractor = GeminiCVExtractor(self.gemini_api_key)
+        if self.serpapi_key:
+            self.job_finder = SerpAPIGoogleJobs(self.serpapi_key)
+        else:
+            self.job_finder = None
+            print("⚠️ SERPAPI_KEY bulunamadı, Google Jobs API kullanılamayacak")
         
         # Performance optimizations
         self.cache = {}
@@ -57,16 +203,7 @@ class IntelligentJobAgent:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
         
-        # Job scraping keywords
-        self.turkish_cities = [
-            'istanbul', 'ankara', 'izmir', 'bursa', 'antalya', 'adana', 
-            'konya', 'sancaktepe', 'kadıköy', 'beşiktaş', 'şişli', 'beyoğlu'
-        ]
         
-        # Selenium driver (will be initialized when needed)
-        self.driver = None
-        self.wait = None
-        self.driver_lock = threading.Lock()
         
         # Pre-compiled regex patterns for performance
         self.email_pattern = re.compile(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b')
@@ -305,6 +442,148 @@ class IntelligentJobAgent:
             # Fallback analiz
             return self._fallback_cv_analysis(cv_text)
     
+    def analyze_cv_from_file(self, file_path: str) -> Dict[str, Any]:
+        """
+        PDF dosyasından CV analizi yapar ve uygun işleri bulur
+        """
+        try:
+            print("CV analizi için Gemini API'ya gönderiliyor...")
+            cv_data = self.cv_extractor.extract_from_file(file_path)
+            
+            # CVData'yı Dict formatına çevir
+            cv_analysis = {
+                "kişisel_bilgiler": {
+                    "ad_soyad": cv_data.name,
+                    "email": cv_data.email,
+                    "telefon": cv_data.phone,
+                    "lokasyon": cv_data.location
+                },
+                "deneyim_yılı": cv_data.experience_years,
+                "teknik_beceriler": cv_data.skills,
+                "yazılım_dilleri": [skill for skill in cv_data.skills if any(lang in skill.lower() for lang in ['python', 'java', 'javascript', 'c++', 'c#', 'php', 'ruby', 'go', 'rust', 'swift', 'kotlin'])],
+                "teknolojiler": cv_data.skills,
+                "eğitim": [cv_data.education] if cv_data.education else [],
+                "sertifikalar": cv_data.certifications,
+                "diller": cv_data.languages,
+                "deneyim_seviyesi": self._determine_experience_level(cv_data.experience_years),
+                "ana_uzmanlık_alanı": cv_data.job_titles[0] if cv_data.job_titles else "Software Developer",
+                "uygun_iş_alanları": cv_data.job_titles if cv_data.job_titles else ["Software Developer"],
+                "güçlü_yönler": cv_data.skills[:5],
+                "cv_kalitesi": "iyi",
+                "öneriler": []
+            }
+            
+            return cv_analysis
+            
+        except Exception as e:
+            print(f"CV dosya analizi hatası: {e}")
+            return self._fallback_cv_analysis("")
+    
+    def _determine_experience_level(self, experience_years: int) -> str:
+        """Deneyim yılına göre seviye belirler"""
+        if experience_years == 0:
+            return "entry"
+        elif experience_years <= 2:
+            return "junior"
+        elif experience_years <= 5:
+            return "mid"
+        else:
+            return "senior"
+    
+    def find_jobs_with_serpapi(self, cv_analysis: Dict[str, Any], max_results: int = 20) -> List[Dict[str, Any]]:
+        """
+        SerpAPI kullanarak CV'ye uygun işleri arar
+        """
+        if not self.job_finder:
+            print("⚠️ SerpAPI kullanılamıyor, fallback moduna geçiliyor...")
+            return self._fallback_job_search(
+                cv_analysis.get('uygun_iş_alanları', ['Software Developer']),
+                cv_analysis.get('kişisel_bilgiler', {}).get('lokasyon', 'Türkiye'),
+                max_results
+            )
+        
+        try:
+            # CV'den arama terimleri oluştur
+            skills = cv_analysis.get('teknik_beceriler', [])
+            job_titles = cv_analysis.get('uygun_iş_alanları', [])
+            location = cv_analysis.get('kişisel_bilgiler', {}).get('lokasyon', 'Türkiye')
+            
+            # Arama terimlerini birleştir
+            search_keywords = " ".join(skills[:3] + (job_titles[:1] if job_titles else []))
+            
+            if not search_keywords:
+                search_keywords = "Software Developer"
+            
+            print(f"SerpAPI'den iş ilanları aranıyor: '{search_keywords}' ({location})")
+            
+            # SerpAPI ile iş ara
+            jobs = self.job_finder.search_jobs(
+                keywords=search_keywords,
+                location=location,
+                max_results=max_results
+            )
+            
+            # İşleri formatla
+            formatted_jobs = []
+            for job in jobs:
+                formatted_job = {
+                    'id': job.get('job_id', f"serpapi_{hash(job.get('title', ''))}"),
+                    'title': job.get('title', 'İş İlanı'),
+                    'company': job.get('company_name', 'Şirket'),
+                    'location': job.get('location', location),
+                    'description': job.get('description', ''),
+                    'requirements': job.get('job_highlights', {}).get('Qualifications', []),
+                    'salary': job.get('salary', 'Belirtilmemiş'),
+                    'url': job.get('related_links', [{}])[0].get('link', 'https://google.com/jobs'),
+                    'posted_date': job.get('posted_at', ''),
+                    'source': 'Google Jobs (SerpAPI)',
+                    'match_score': 85  # SerpAPI işleri için yüksek skor
+                }
+                formatted_jobs.append(formatted_job)
+            
+            print(f"✅ SerpAPI'den {len(formatted_jobs)} iş ilanı bulundu")
+            return formatted_jobs
+            
+        except Exception as e:
+            print(f"SerpAPI iş arama hatası: {e}")
+            return self._fallback_job_search(
+                cv_analysis.get('uygun_iş_alanları', ['Software Developer']),
+                cv_analysis.get('kişisel_bilgiler', {}).get('lokasyon', 'Türkiye'),
+                max_results
+            )
+    
+    def process_cv_and_find_jobs(self, cv_file_path: str, max_results: int = 20) -> Dict[str, Any]:
+        """
+        PDF CV'yi analiz eder ve uygun iş ilanlarını bulur (Ana metod)
+        """
+        try:
+            # 1. CV Analizi
+            cv_analysis = self.analyze_cv_from_file(cv_file_path)
+            
+            if not cv_analysis:
+                return {'error': 'CV analizi başarısız', 'success': False}
+            
+            # 2. İş Arama (SerpAPI öncelikli, fallback ile)
+            jobs = self.find_jobs_with_serpapi(cv_analysis, max_results)
+            
+            # 3. CV-İş Eşleştirme
+            matched_jobs = self.match_cv_with_jobs(cv_analysis, jobs)
+            
+            return {
+                'success': True,
+                'cv_analysis': cv_analysis,
+                'job_results': matched_jobs,
+                'stats': {
+                    'total_found': len(jobs),
+                    'matched': len(matched_jobs),
+                    'search_method': 'SerpAPI' if self.job_finder else 'Fallback'
+                }
+            }
+            
+        except Exception as e:
+            print(f"CV işleme hatası: {e}")
+            return {'error': f'İşlem hatası: {str(e)}', 'success': False}
+    
     def _validate_experience(self, cv_analysis: Dict[str, Any]) -> Dict[str, Any]:
         """
         Deneyim bilgilerini doğrular ve tutarlılık kontrol eder
@@ -403,494 +682,25 @@ class IntelligentJobAgent:
             ]
         }
     
-    def setup_selenium_driver(self, headless: bool = True):
-        """Selenium WebDriver'ı başlatır (Production Optimized)"""
-        with self.driver_lock:
-            if self.driver:
-                return  # Zaten başlatılmış
-                
-            chrome_options = Options()
-            if headless:
-                chrome_options.add_argument("--headless")
-            
-            # Production environment optimizations
-            chrome_options.add_argument("--no-sandbox")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-            chrome_options.add_argument("--disable-background-timer-throttling")
-            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-            chrome_options.add_argument("--disable-renderer-backgrounding")
-            chrome_options.add_argument("--disable-field-trial-config")
-            chrome_options.add_argument("--disable-ipc-flooding-protection")
-            chrome_options.add_argument("--window-size=1920,1080")
-            chrome_options.add_argument("--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-            chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
-            chrome_options.add_experimental_option('useAutomationExtension', False)
-            chrome_options.add_argument("--disable-extensions")
-            chrome_options.add_argument("--disable-plugins")
-            chrome_options.add_argument("--disable-images")
-            chrome_options.add_argument("--disable-javascript")  # Sadece HTML parsing için
-            chrome_options.add_argument("--blink-settings=imagesEnabled=false")
-            chrome_options.add_argument("--disk-cache-size=1")
-            chrome_options.add_argument("--media-cache-size=1")
-            chrome_options.add_argument("--disk-cache-dir=/dev/null")
-            
-            # Production specific settings
-            chrome_options.add_argument("--remote-debugging-port=9222")
-            chrome_options.add_argument("--disable-setuid-sandbox")
-            chrome_options.add_argument("--disable-software-rasterizer")
-            chrome_options.add_argument("--disable-background-networking")
-            chrome_options.add_argument("--disable-default-apps")
-            chrome_options.add_argument("--disable-sync")
-            chrome_options.add_argument("--metrics-recording-only")
-            chrome_options.add_argument("--no-first-run")
-            chrome_options.add_argument("--safebrowsing-disable-auto-update")
-            chrome_options.add_argument("--disable-component-extensions-with-background-pages")
-            chrome_options.add_argument("--disable-background-mode")
-            chrome_options.add_argument("--disable-client-side-phishing-detection")
-            chrome_options.add_argument("--disable-hang-monitor")
-            chrome_options.add_argument("--disable-prompt-on-repost")
-            chrome_options.add_argument("--disable-domain-reliability")
-            chrome_options.add_argument("--disable-features=TranslateUI")
-            chrome_options.add_argument("--disable-ipc-flooding-protection")
-            chrome_options.add_argument("--disable-renderer-backgrounding")
-            chrome_options.add_argument("--disable-backgrounding-occluded-windows")
-            chrome_options.add_argument("--disable-background-timer-throttling")
-            chrome_options.add_argument("--disable-features=VizDisplayCompositor")
-            chrome_options.add_argument("--disable-web-security")
-            chrome_options.add_argument("--disable-gpu")
-            chrome_options.add_argument("--disable-dev-shm-usage")
-            chrome_options.add_argument("--no-sandbox")
-            
-            try:
-                print("Chrome driver başlatılıyor...")
-                service = Service(ChromeDriverManager().install())
-                self.driver = webdriver.Chrome(service=service, options=chrome_options)
-                self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-                self.wait = WebDriverWait(self.driver, 15)  # Timeout'u artırdık
-                print("Chrome driver başarıyla başlatıldı")
-            except Exception as e:
-                print(f"Selenium driver başlatılamadı: {e}")
-                print(f"Chrome driver hatası detayı: {str(e)}")
-                self.driver = None
+
     
-    def scrape_linkedin_jobs(self, job_areas: List[str], location: str = "Istanbul, Turkey", max_per_search: int = 10) -> List[Dict[str, Any]]:
-        """
-        LinkedIn'den CV'ye uygun iş ilanlarını çeker (Production Optimized with Fallback)
-        """
-        # Cache key oluştur
-        cache_key = f"jobs_{hash(tuple(job_areas))}_{location}_{max_per_search}"
-        cached = self._get_cached_analysis(cache_key)
-        if cached:
-            return cached
-        
-        all_jobs = []
-        
-        # Selenium driver'ı başlat
-        self.setup_selenium_driver(headless=True)
-        if not self.driver:
-            print("⚠️ Selenium driver başlatılamadı, fallback moduna geçiliyor...")
-            return self._fallback_job_search(job_areas, location, max_per_search)
-        
-        try:
-            # Parallel processing için job areas'ları grupla
-            with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-                future_to_area = {}
-                
-                for job_area in job_areas:
-                    search_terms = self._generate_search_terms(job_area)
-                    print(f"   🔍 '{job_area}' için arama terimleri: {search_terms[:2]}")
-                    future = executor.submit(
-                        self._search_multiple_terms_parallel,
-                        search_terms[:4],  # Her alan için en fazla 4 arama (ML/AI için daha fazla)
-                        location,
-                        max_per_search
-                    )
-                    future_to_area[future] = job_area
-                
-                # Sonuçları topla
-                for future in concurrent.futures.as_completed(future_to_area):
-                    area = future_to_area[future]
-                    try:
-                        jobs = future.result()
-                        all_jobs.extend(jobs)
-                        print(f"✅ '{area}' için {len(jobs)} iş bulundu")
-                    except Exception as e:
-                        print(f"❌ '{area}' arama hatası: {e}")
-            
-            # Duplicates'leri kaldır (optimized)
-            original_count = len(all_jobs)
-            unique_jobs = self._remove_duplicates_optimized(all_jobs)
-            duplicate_count = original_count - len(unique_jobs)
-            print(f"📊 Toplamda {len(unique_jobs)} benzersiz iş ilanı bulundu ({(duplicate_count)} duplicate kaldırıldı)")
-            
-            # Cache'e kaydet
-            self._cache_analysis(cache_key, unique_jobs)
-            
-            return unique_jobs
-            
-        except Exception as e:
-            print(f"LinkedIn scraping hatası: {e}")
-            print("⚠️ Fallback moduna geçiliyor...")
-            return self._fallback_job_search(job_areas, location, max_per_search)
-        
-        finally:
-            self._close_driver()
+
     
-    def _generate_search_terms(self, job_area: str) -> List[str]:
-        """İş alanından arama terimleri oluşturur - Genişletilmiş ve esnek"""
-        base_terms = []
-        job_lower = job_area.lower()
-        
-        # Junior kelimesini çıkar - çok spesifik oluyor
-        clean_job = job_lower.replace('junior ', '').replace('entry level ', '').replace('entry ', '')
-        
-        # Temel arama terimlerini ekle
-        base_terms.extend([
-            clean_job,
-            job_lower  # Orijinal de dahil et
-        ])
-        
-        # Machine Learning / AI alanları için çok geniş terimler
-        if any(keyword in clean_job for keyword in ['veri bilimci', 'data scientist', 'data science', 'makine öğrenmesi', 'machine learning', 'ml', 'ai', 'yapay zeka', 'artificial intelligence']):
-            base_terms.extend([
-                'python developer',
-                'python engineer', 
-                'software developer',
-                'software engineer',
-                'backend developer',
-                'full stack developer',
-                'data analyst',
-                'data engineer',
-                'machine learning',
-                'artificial intelligence',
-                'python',
-                'data science',
-                'analytics',
-                'developer',
-                'engineer',
-                'yazılım geliştirici',
-                'yazılım mühendisi',
-                'python geliştiricisi',
-                'veri analisti'
-            ])
-        
-        # Yazılım geliştirici için çok geniş terimler
-        elif any(keyword in clean_job for keyword in ['yazılım', 'software', 'developer', 'geliştirici']):
-            base_terms.extend([
-                'python developer',
-                'javascript developer',
-                'java developer',
-                'software developer',
-                'software engineer',
-                'backend developer',
-                'frontend developer',
-                'full stack developer',
-                'web developer',
-                'mobile developer',
-                'developer',
-                'engineer',
-                'programmer',
-                'yazılım geliştirici',
-                'yazılım mühendisi',
-                'web geliştiricisi',
-                'mobil geliştirici',
-                'programcı'
-            ])
-        
-        # Diğer mühendislik alanları için geniş terimler
-        elif any(keyword in clean_job for keyword in ['engineer', 'mühendis']):
-            base_terms.extend([
-                'software engineer',
-                'software developer',
-                'system engineer',
-                'backend engineer',
-                'frontend engineer',
-                'devops engineer',
-                'cloud engineer',
-                'developer',
-                'engineer',
-                'yazılım mühendisi',
-                'sistem mühendisi',
-                'geliştirici'
-            ])
-        
-        # Hiçbiri değilse genel terimler ekle
-        else:
-            base_terms.extend([
-                'developer',
-                'engineer',
-                'software',
-                'python',
-                'javascript',
-                'yazılım',
-                'geliştirici',
-                'mühendis'
-            ])
-        
-        # Çok kısa terimleri filtrele ve unique yap
-        filtered_terms = []
-        for term in base_terms:
-            if len(term.strip()) >= 3 and term.strip() not in filtered_terms:
-                filtered_terms.append(term.strip())
-        
-        # En fazla 6 terim döndür (performans için)
-        return filtered_terms[:6]
+
     
-    def _search_multiple_terms_parallel(self, search_terms: List[str], location: str, max_results: int) -> List[Dict[str, Any]]:
-        """Birden fazla arama terimini paralel olarak arar"""
-        all_jobs = []
-        
-        for search_term in search_terms:
-            try:
-                jobs = self._search_single_term_optimized(search_term, location, max_results)
-                all_jobs.extend(jobs)
-                time.sleep(1)  # Rate limiting azaltıldı
-            except Exception as e:
-                print(f"Arama hatası ({search_term}): {e}")
-                continue
-        
-        return all_jobs
+
     
-    def _search_single_term_optimized(self, search_term: str, location: str, max_results: int) -> List[Dict[str, Any]]:
-        """Tek bir terim için LinkedIn'de arama yapar (Optimized + Debug)"""
-        jobs = []
-        
-        try:
-            # LinkedIn arama URL'si
-            base_url = "https://www.linkedin.com/jobs/search"
-            params = f"?keywords={search_term.replace(' ', '%20')}&location={location.replace(' ', '%20')}&f_TPR=r86400&start=0"
-            url = base_url + params
-            
-            print(f"      🔗 LinkedIn URL: {url}")
-            self.driver.get(url)
-            time.sleep(2)  # Bekleme süresini biraz artırdık
-            
-            # Sayfanın yüklenmesini bekle
-            try:
-                self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "jobs-search__results-list")))
-                print(f"      ✅ Sayfa yüklendi: {search_term}")
-            except:
-                print(f"      ❌ Sayfa yüklenemedi: {search_term}")
-                return jobs
-            
-            # Sayfayı scroll et (optimized)
-            self._scroll_page_optimized()
-            
-            # İş ilanlarını bul (batch processing)
-            job_elements = self.driver.find_elements(By.CSS_SELECTOR, ".jobs-search__results-list li")
-            print(f"      📋 {len(job_elements)} iş elementi bulundu")
-            
-            # Batch processing ile veri çıkar
-            jobs = self._extract_job_data_batch(job_elements[:max_results], search_term)
-            print(f"      ✅ {len(jobs)} uygun iş çıkarıldı")
-            
-        except Exception as e:
-            print(f"      ❌ Arama hatası ({search_term}): {e}")
-        
-        return jobs
+
     
-    def _extract_job_data_batch(self, job_elements: List, search_term: str) -> List[Dict[str, Any]]:
-        """İş ilanı verilerini batch olarak çıkarır (Debug enabled)"""
-        jobs = []
-        total_elements = len(job_elements)
-        
-        for i, job_element in enumerate(job_elements):
-            try:
-                job_data = self._extract_job_data_optimized(job_element)
-                if job_data:
-                    is_relevant = self._is_relevant_job_fast(job_data, search_term)
-                    if is_relevant:
-                        jobs.append(job_data)
-                        print(f"         ✅ İş #{i+1}: {job_data['title'][:50]} - {job_data['company'][:30]}")
-                    else:
-                        print(f"         ❌ İş #{i+1}: {job_data['title'][:50]} - Alakasız")
-                else:
-                    print(f"         ⚠️ İş #{i+1}: Veri çıkarılamadı")
-            except Exception as e:
-                print(f"         ❌ İş #{i+1} hatası: {e}")
-                continue
-        
-        print(f"      📊 {len(jobs)}/{total_elements} iş filtrelendi")
-        return jobs
+
     
-    def _extract_job_data_optimized(self, job_element) -> Optional[Dict[str, Any]]:
-        """İş ilanı verilerini çıkarır (Optimized)"""
-        try:
-            # Tek seferde tüm elementleri bul
-            elements = {
-                'title': job_element.find_elements(By.CSS_SELECTOR, "h3"),
-                'url': job_element.find_elements(By.CSS_SELECTOR, "a[href*='jobs']"),
-                'all_links': job_element.find_elements(By.CSS_SELECTOR, "a"),
-                'spans': job_element.find_elements(By.CSS_SELECTOR, "span"),
-                'time': job_element.find_elements(By.CSS_SELECTOR, "time")
-            }
-            
-            # Başlık
-            title = elements['title'][0].text.strip() if elements['title'] else "Başlık bulunamadı"
-            
-            # URL
-            job_url = elements['url'][0].get_attribute("href") if elements['url'] else "URL bulunamadı"
-            
-            # Şirket
-            company = "Şirket belirtilmemiş"
-            if len(elements['all_links']) >= 2:
-                company = elements['all_links'][1].text.strip()
-            
-            # Lokasyon
-            location = "Lokasyon belirtilmemiş"
-            for span in elements['spans']:
-                    span_text = span.text.strip()
-                    if any(city in span_text.lower() for city in self.turkish_cities):
-                        location = span_text
-                        break
-            
-            # Tarih
-            posted_date = datetime.now().isoformat()
-            if elements['time']:
-                posted_date = elements['time'][0].get_attribute("datetime") or posted_date
-            
-            return {
-                'title': title,
-                'company': company,
-                'location': location,
-                'url': job_url,
-                'posted_date': posted_date,
-                'scraped_at': datetime.now().isoformat(),
-                'source': 'LinkedIn'
-            }
-            
-        except Exception as e:
-            return None
+
     
-    def _is_relevant_job_fast(self, job_data: Dict[str, Any], search_term: str) -> bool:
-        """İş ilanının alakalı olup olmadığını hızlı kontrol eder - ÇOK ESNEK"""
-        title_lower = job_data['title'].lower()
-        
-        # Sadece çok üst düzey pozisyonları filtrele (çok kısıtlayıcı filtreleri kaldırdık)
-        if any(keyword in title_lower for keyword in ['ceo', 'cto', 'founder', 'co-founder']):
-            return False
-        
-        # Alakasız sektörleri filtrele
-        irrelevant_keywords = {
-            'sales', 'marketing', 'hr', 'human resources', 'finance', 'accounting',
-            'legal', 'lawyer', 'doctor', 'nurse', 'teacher', 'driver', 'chef',
-            'cleaner', 'security guard', 'receptionist', 'cashier'
-        }
-        
-        if any(keyword in title_lower for keyword in irrelevant_keywords):
-            return False
-        
-        # Çok geniş teknoloji ve iş terimleri - neredeyse her teknoloji işini kabul et
-        tech_keywords = {
-            # Genel teknoloji
-            'developer', 'engineer', 'programmer', 'software', 'backend', 'frontend',
-            'full stack', 'specialist', 'architect', 'consultant', 'analyst',
-            'technician', 'technical', 'it', 'system', 'web', 'mobile', 'app',
-            
-            # Programlama ve teknoloji
-            'python', 'javascript', 'java', 'php', 'c++', 'c#', 'ruby', 'go',
-            'react', 'angular', 'vue', 'django', 'flask', 'spring', 'laravel',
-            'node.js', 'express', 'api', 'rest', 'graphql', 'microservices',
-            
-            # Database ve data
-            'sql', 'mysql', 'postgresql', 'mongodb', 'redis', 'elasticsearch',
-            'database', 'data', 'analytics', 'bi', 'etl', 'pipeline',
-            
-            # ML/AI alanları
-            'data science', 'machine learning', 'ml', 'ai', 'artificial intelligence',
-            'deep learning', 'neural network', 'tensorflow', 'pytorch', 'scikit-learn',
-            'computer vision', 'nlp', 'natural language processing',
-            
-            # Cloud ve DevOps
-            'aws', 'azure', 'gcp', 'cloud', 'docker', 'kubernetes', 'devops',
-            'ci/cd', 'jenkins', 'terraform', 'ansible',
-            
-            # Türkçe terimler
-            'yazılım', 'geliştirici', 'mühendis', 'programcı', 'sistem',
-            'veri', 'analiz', 'teknoloji', 'bilişim', 'web', 'mobil'
-        }
-        
-        # Eğer başlıkta herhangi bir teknoloji terimi varsa kabul et
-        if any(keyword in title_lower for keyword in tech_keywords):
-            return True
-        
-        # Arama teriminde geçen herhangi bir kelime başlıkta varsa kabul et
-        search_words = search_term.lower().split()
-        for word in search_words:
-            if len(word) > 2 and word in title_lower:  # 3 harften uzun kelimeleri kontrol et
-                return True
-        
-        # Eğer hiçbiri yoksa da genel bir kontrol yap - çok esnek
-        general_keywords = {
-            'junior', 'senior', 'mid', 'level', 'trainee', 'intern', 
-            'entry', 'graduate', 'associate', 'lead', 'principal'
-        }
-        
-        # Eğer pozisyon seviyesi belirten bir kelime varsa muhtemelen teknoloji işi
-        if any(keyword in title_lower for keyword in general_keywords):
-            return True
-        
-        # Son olarak, eğer şirket adında teknoloji ile ilgili kelime varsa
-        company_lower = job_data.get('company', '').lower()
-        company_tech_keywords = {'software', 'tech', 'technology', 'digital', 'systems', 'solutions', 'yazılım', 'teknoloji', 'bilişim'}
-        if any(keyword in company_lower for keyword in company_tech_keywords):
-            return True
-            
-        # Hiçbiri yoksa False döndür
-        return False
+
     
-    def _scroll_page_optimized(self):
-        """Sayfayı scroll eder (Optimized)"""
-        try:
-            last_height = self.driver.execute_script("return document.body.scrollHeight")
-            scroll_count = 0
-            max_scrolls = 2  # Scroll sayısını azalttık
-            
-            while scroll_count < max_scrolls:
-                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                time.sleep(1)  # Bekleme süresini azalttık
-                new_height = self.driver.execute_script("return document.body.scrollHeight")
-                if new_height == last_height:
-                    break
-                last_height = new_height
-                scroll_count += 1
-        except:
-            pass
+
     
-    def _remove_duplicates_optimized(self, jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Duplicate iş ilanlarını kaldırır (Optimized)"""
-        seen_urls: Set[str] = set()
-        seen_titles: Set[str] = set()
-        unique_jobs = []
-        duplicate_count = 0
-        
-        for job in jobs:
-            # URL'den parametreleri temizle
-            clean_url = job['url'].split('?')[0] if job['url'] != "URL bulunamadı" else job['title']
-            clean_title = job['title'].lower().strip()
-            
-            # Hem URL hem de başlık kontrolü
-            is_duplicate = False
-            if clean_url in seen_urls:
-                is_duplicate = True
-            elif clean_title in seen_titles:
-                is_duplicate = True
-            
-            if not is_duplicate:
-                unique_jobs.append(job)
-                seen_urls.add(clean_url)
-                seen_titles.add(clean_title)
-            else:
-                duplicate_count += 1
-        
-        if duplicate_count > 0:
-            print(f"   🔄 {duplicate_count} duplicate iş ilanı temizlendi")
-        
-        return unique_jobs
+
     
     def match_cv_with_jobs(self, cv_analysis: Dict[str, Any], jobs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
@@ -1374,19 +1184,7 @@ class IntelligentJobAgent:
         print(f"📊 Toplamda {len(fallback_jobs)} fallback iş ilanı oluşturuldu")
         return fallback_jobs
 
-    def _close_driver(self):
-        """Selenium driver'ı kapatır"""
-        if self.driver:
-            try:
-                self.driver.quit()
-                self.driver = None
-                self.wait = None
-            except:
-                pass
-    
-    def __del__(self):
-        """Cleanup"""
-        self._close_driver()
+
 
 
 # Test fonksiyonu
@@ -1429,11 +1227,11 @@ if __name__ == "__main__":
         print(f"Ana uzmanlık: {cv_analysis.get('ana_uzmanlık_alanı')}")
         print(f"Uygun iş alanları: {cv_analysis.get('uygun_iş_alanları')}")
         
-        # 2. İş İlanları Scraping
+        # 2. İş İlanları Arama
         print("\n🔍 İş ilanları aranıyor...")
-        jobs = agent.scrape_linkedin_jobs(
-            job_areas=cv_analysis.get('uygun_iş_alanları', ['Python Developer']),
-            max_per_search=5
+        jobs = agent.find_jobs_with_serpapi(
+            cv_analysis=cv_analysis,
+            max_results=5
         )
         print(f"✅ {len(jobs)} iş ilanı bulundu!")
         

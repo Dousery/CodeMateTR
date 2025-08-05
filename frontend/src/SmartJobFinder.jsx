@@ -108,42 +108,69 @@ const SmartJobFinder = () => {
     formData.append('cv_file', file);
 
     try {
-      console.log('Analyzing CV with:', API_ENDPOINTS.ANALYZE_CV);
+      // Yeni entegrasyon: Tek seferde CV analizi ve iş arama
+      console.log('Processing CV with new integration:', API_ENDPOINTS.PROCESS_CV_FILE);
       console.log('CV file data:', { 
         filename: file.name,
         size: file.size,
         type: file.type
       });
       
-      const response = await axios.post(API_ENDPOINTS.ANALYZE_CV, formData, {
+      const response = await axios.post(API_ENDPOINTS.PROCESS_CV_FILE, formData, {
         withCredentials: true,
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 60000
+        timeout: 120000 // 2 dakika timeout
       });
 
       const data = response.data;
-      console.log('CV analysis response:', data);
+      console.log('CV processing response:', data);
 
       if (data.success) {
         setCvAnalysis(data.cv_analysis);
-        setActiveStep(1);
+        setJobs(data.jobs || []);
+        setStats(data.stats || {});
+        setActiveStep(3); // Direkt sonuçlar adımına geç
         
-        // Otomatik olarak iş arama adımına geç
-        setTimeout(() => {
-          searchJobs(data.cv_analysis);
-        }, 1000);
+        console.log(`✅ CV analizi ve iş arama tamamlandı: ${data.jobs?.length || 0} iş bulundu`);
       } else {
-        setError(data.error || 'CV analizi başarısız');
+        setError(data.error || 'CV işleme başarısız');
       }
     } catch (error) {
-      console.error('CV analizi hatası:', error);
+      console.error('CV işleme hatası:', error);
       console.error('Error response:', error.response);
-      if (error.response?.status === 401) {
-        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
-      } else if (error.code === 'ECONNABORTED') {
-        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
-      } else {
-        setError(error.response?.data?.error || 'CV analizi sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+      
+      // Fallback: Eski yöntemi dene
+      try {
+        console.log('Fallback: Eski CV analiz yöntemini deniyor...');
+        const fallbackResponse = await axios.post(API_ENDPOINTS.ANALYZE_CV, formData, {
+          withCredentials: true,
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 60000
+        });
+
+        const fallbackData = fallbackResponse.data;
+        console.log('Fallback CV analysis response:', fallbackData);
+
+        if (fallbackData.success) {
+          setCvAnalysis(fallbackData.cv_analysis);
+          setActiveStep(1);
+          
+          // Otomatik olarak iş arama adımına geç
+          setTimeout(() => {
+            searchJobs(fallbackData.cv_analysis);
+          }, 1000);
+        } else {
+          setError(fallbackData.error || 'CV analizi başarısız');
+        }
+      } catch (fallbackError) {
+        console.error('Fallback CV analizi de başarısız:', fallbackError);
+        if (error.response?.status === 401) {
+          setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
+        } else if (error.code === 'ECONNABORTED') {
+          setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
+        } else {
+          setError(error.response?.data?.error || 'CV işleme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
+        }
       }
     } finally {
       setLoading(false);
