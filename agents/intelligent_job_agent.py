@@ -74,6 +74,9 @@ class IntelligentJobAgent:
         """
         
         try:
+            print(f"🔍 PDF boyutu: {len(pdf_bytes)} bytes")
+            print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
+            
             # Gemini PDF API kullan
             response = self.genai_client.models.generate_content(
                 model="gemini-1.5-flash",
@@ -86,12 +89,16 @@ class IntelligentJobAgent:
                 ]
             )
             
+            print(f"🔍 Gemini API response alındı: {response.text[:200]}...")
+            
             # JSON'u temizle ve parse et
             json_text = response.text.strip()
             if json_text.startswith('```json'):
                 json_text = json_text[7:-3]
             elif json_text.startswith('```'):
                 json_text = json_text[3:-3]
+            
+            print(f"🔍 Temizlenmiş JSON: {json_text[:200]}...")
             
             cv_analysis = json.loads(json_text)
             
@@ -108,6 +115,106 @@ class IntelligentJobAgent:
             
         except Exception as e:
             print(f"❌ CV analizi hatası: {e}")
+            import traceback
+            print(f"❌ CV analizi traceback: {traceback.format_exc()}")
+            # Varsayılan CV analizi döndür
+            return {
+                "kişisel_bilgiler": {
+                    "ad_soyad": "Belirtilmemiş",
+                    "email": "Belirtilmemiş",
+                    "telefon": "Belirtilmemiş",
+                    "lokasyon": "Belirtilmemiş"
+                },
+                "deneyim_yılı": 0,
+                "toplam_is_deneyimi": "Belirtilmemiş",
+                "staj_deneyimi": "Belirtilmemiş",
+                "teknik_beceriler": ["HTML", "CSS", "JavaScript"],
+                "yazılım_dilleri": ["JavaScript"],
+                "teknolojiler": ["Web Development"],
+                "eğitim": ["Belirtilmemiş"],
+                "deneyim_seviyesi": "entry",
+                "ana_uzmanlık_alanı": "Web Development",
+                "uygun_iş_alanları": ["Frontend Developer", "Web Developer", "JavaScript Developer"],
+                "cv_kalitesi": "orta"
+            }
+    
+    def analyze_cv_from_pdf_bytes(self, pdf_bytes: bytes) -> Dict[str, Any]:
+        """
+        PDF'yi Gemini ile analiz eder ve JSON formatında sonuç döndürür
+        (Eski çalışan versiyon)
+        """
+        print("🤖 CV analizi (bytes) başlatılıyor...")
+        
+        prompt = """
+        Bu CV'yi analiz et ve aşağıdaki JSON formatında sonuç döndür:
+        
+        {
+            "kişisel_bilgiler": {
+                "ad_soyad": "CV'deki tam isim",
+                "email": "CV'deki email",
+                "telefon": "CV'deki telefon",
+                "lokasyon": "CV'deki şehir"
+            },
+            "deneyim_yılı": 0,
+            "toplam_is_deneyimi": "CV'deki toplam deneyim",
+            "staj_deneyimi": "CV'deki staj deneyimi",
+            "teknik_beceriler": ["CV'deki teknik beceriler"],
+            "yazılım_dilleri": ["CV'deki programlama dilleri"],
+            "teknolojiler": ["CV'deki teknolojiler"],
+            "eğitim": ["CV'deki eğitim bilgisi"],
+            "deneyim_seviyesi": "entry|junior|mid|senior",
+            "ana_uzmanlık_alanı": "CV'deki ana alan",
+            "uygun_iş_alanları": ["Uygun iş alanları"],
+            "cv_kalitesi": "zayıf|orta|iyi|mükemmel"
+        }
+        
+        Önemli: Sadece JSON döndür, başka açıklama ekleme. CV'de olmayan bilgileri "Belirtilmemiş" yaz.
+        """
+        
+        try:
+            print(f"🔍 PDF boyutu: {len(pdf_bytes)} bytes")
+            print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
+            
+            # Gemini PDF API kullan
+            response = self.genai_client.models.generate_content(
+                model="gemini-1.5-flash",
+                contents=[
+                    types.Part.from_bytes(
+                        data=pdf_bytes,
+                        mime_type='application/pdf',
+                    ),
+                    prompt
+                ]
+            )
+            
+            print(f"🔍 Gemini API response alındı: {response.text[:200]}...")
+            
+            # JSON'u temizle ve parse et
+            json_text = response.text.strip()
+            if json_text.startswith('```json'):
+                json_text = json_text[7:-3]
+            elif json_text.startswith('```'):
+                json_text = json_text[3:-3]
+            
+            print(f"🔍 Temizlenmiş JSON: {json_text[:200]}...")
+            
+            cv_analysis = json.loads(json_text)
+            
+            # Eğer teknik beceriler boşsa, varsayılan ekle
+            if not cv_analysis.get('teknik_beceriler'):
+                cv_analysis['teknik_beceriler'] = ['HTML', 'CSS', 'JavaScript']
+            
+            # CV kalitesi yoksa varsayılan ekle
+            if not cv_analysis.get('cv_kalitesi'):
+                cv_analysis['cv_kalitesi'] = 'orta'
+            
+            print(f"✅ CV analizi (bytes) tamamlandı: {len(cv_analysis.get('teknik_beceriler', []))} beceri bulundu")
+            return cv_analysis
+            
+        except Exception as e:
+            print(f"❌ CV analizi (bytes) hatası: {e}")
+            import traceback
+            print(f"❌ CV analizi (bytes) traceback: {traceback.format_exc()}")
             # Varsayılan CV analizi döndür
             return {
                 "kişisel_bilgiler": {
@@ -157,17 +264,26 @@ class IntelligentJobAgent:
                     "date_posted": "all"
                 }
                 
+                print(f"🔍 JSearch API parametreleri: {querystring}")
+                print(f"🔍 JSearch API URL: {self.jsearch_url}")
+                print(f"🔍 JSearch API Headers: {self.jsearch_headers}")
+                
                 response = requests.get(
                     self.jsearch_url, 
                     headers=self.jsearch_headers, 
                     params=querystring
                 )
                 
+                print(f"🔍 JSearch API Response Status: {response.status_code}")
+                print(f"🔍 JSearch API Response Headers: {dict(response.headers)}")
+                
                 if response.status_code == 200:
                     data = response.json()
+                    print(f"🔍 JSearch API Response Data: {data}")
                     
                     if data.get('status') == 'OK' and data.get('data'):
                         jobs = data['data']
+                        print(f"🔍 JSearch API'den gelen iş sayısı: {len(jobs)}")
                         
                         # Her iş için skor hesapla
                         for job in jobs:
@@ -177,9 +293,10 @@ class IntelligentJobAgent:
                         all_jobs.extend(jobs)
                         print(f"✅ {term} için {len(jobs)} iş bulundu")
                     else:
-                        print(f"⚠️ {term} için iş bulunamadı")
+                        print(f"⚠️ {term} için iş bulunamadı - API Response: {data}")
                 else:
                     print(f"❌ API hatası: {response.status_code}")
+                    print(f"❌ API Error Response: {response.text}")
             
             # Skorlara göre sırala ve en iyi sonuçları döndür
             all_jobs.sort(key=lambda x: x.get('score', 0), reverse=True)
@@ -394,7 +511,7 @@ class IntelligentJobAgent:
         
         try:
             # CV analizi
-            cv_analysis = self.analyze_cv_from_pdf(pdf_bytes)
+            cv_analysis = self.analyze_cv_from_pdf_bytes(pdf_bytes)
             
             # İş arama
             jobs = self.search_jobs_with_jsearch(cv_analysis, max_results)

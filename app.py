@@ -493,13 +493,18 @@ def debug_cv_test():
             
             # CV analizi yap
             print("DEBUG: CV analizi başlatılıyor...")
-            cv_analysis = job_agent.analyze_cv_from_pdf(pdf_bytes)
+            cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
             print(f"DEBUG: CV analizi sonucu: {cv_analysis}")
             
             # İş arama yap
             print("DEBUG: İş arama başlatılıyor...")
+            print(f"DEBUG: CV analizi: {cv_analysis}")
             jobs = job_agent.search_jobs_with_jsearch(cv_analysis, max_results=5)
             print(f"DEBUG: Bulunan iş sayısı: {len(jobs)}")
+            if jobs:
+                print(f"DEBUG: İlk iş örneği: {jobs[0]}")
+            else:
+                print("DEBUG: Hiç iş bulunamadı!")
             
             return jsonify({
                 'success': True,
@@ -2886,7 +2891,7 @@ def analyze_cv():
             print(f"PDF boyutu: {len(pdf_bytes)} bytes")
             print(f"Gemini API key mevcut: {bool(os.getenv('GEMINI_API_KEY'))}")
             
-            cv_analysis = job_agent.analyze_cv_from_pdf(pdf_bytes)
+            cv_analysis = job_agent.analyze_cv_from_pdf_bytes(pdf_bytes)
             print(f"CV analizi sonucu: {cv_analysis}")
             
             # CV analiz sonucunu veritabanına kaydet
@@ -3034,7 +3039,7 @@ def process_cv_file():
                     
                     # Stats'a search_method ekle
                     stats = result.get('stats', {})
-                    stats['search_method'] = 'Google Jobs'
+                    stats['search_method'] = 'JSearch API'
                     
                     # Sonucu döndür
                     return jsonify({
