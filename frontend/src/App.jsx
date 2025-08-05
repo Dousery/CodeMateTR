@@ -145,6 +145,8 @@ function App() {
               <Route path="/smart-job-finder" element={<ProtectedRoute><SmartJobFinder /></ProtectedRoute>} />
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
+              {/* Catch-all route for 404 handling */}
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Box>
         </Router>

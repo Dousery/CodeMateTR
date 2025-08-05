@@ -22,11 +22,12 @@ services:
       - key: JSEARCH_API_KEY
         sync: false
 
-  # Frontend Web Service (Docker)
+  # Frontend Static Site
   - type: web
     name: codematetr
-    env: docker
-    dockerfilePath: ./frontend/Dockerfile
+    env: static
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
     envVars:
       - key: VITE_API_BASE_URL
         value: https://btk-project-backend.onrender.com
