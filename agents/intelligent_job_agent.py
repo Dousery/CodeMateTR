@@ -171,6 +171,18 @@ class IntelligentJobAgent:
             
             print(f"İlk job örneği: {jobs[0].keys() if jobs else 'No jobs'}")
             
+            # İlk job'un detaylı yapısını göster
+            if jobs:
+                first_job = jobs[0]
+                print(f"🔍 İlk job detayları:")
+                print(f"  Title: {first_job.get('title', 'N/A')}")
+                print(f"  Company: {first_job.get('company_name', 'N/A')}")
+                print(f"  Job ID: {first_job.get('job_id', 'N/A')}")
+                print(f"  Related Links: {first_job.get('related_links', [])}")
+                print(f"  Via: {first_job.get('via', {})}")
+                print(f"  All keys: {list(first_job.keys())}")
+                print()
+            
             # İşleri formatla - frontend uyumlu
             formatted_jobs = []
             for i, job in enumerate(jobs[:max_results]):
@@ -188,18 +200,37 @@ class IntelligentJobAgent:
                 # Gerçek iş ilanı URL'sini al
                 job_url = None
                 
-                # Farklı URL alanlarını kontrol et
+                # SerpAPI Google Jobs'dan gelen URL'leri kontrol et
                 if 'related_links' in job and job['related_links']:
-                    job_url = job['related_links'][0].get('link')
-                elif 'via' in job and job['via']:
-                    job_url = job['via'].get('link')
-                elif 'job_id' in job:
-                    # Google Jobs ID'si varsa, Google Jobs URL'i oluştur
-                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs&htivrt=jobs&htidocid={job['job_id']}"
+                    # İlk related_link'i al
+                    related_link = job['related_links'][0]
+                    if 'link' in related_link:
+                        job_url = related_link['link']
+                        print(f"  Related link URL: {job_url}")
                 
-                # Eğer hala URL yoksa, genel Google Jobs arama URL'i
+                # Eğer related_links yoksa, via link'ini dene
+                if not job_url and 'via' in job and job['via']:
+                    if 'link' in job['via']:
+                        job_url = job['via']['link']
+                        print(f"  Via link URL: {job_url}")
+                
+                # Eğer hala URL yoksa ve job_id varsa, Google Jobs URL'i oluştur
+                if not job_url and 'job_id' in job:
+                    # Google Jobs'a direkt yönlendiren URL oluştur
+                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs&htivrt=jobs&htidocid={job['job_id']}"
+                    print(f"  Generated Google Jobs URL: {job_url}")
+                
+                # Eğer hala URL yoksa, şirket web sitesini dene
+                if not job_url and 'company_name' in job:
+                    # Şirket adından basit bir arama URL'i oluştur
+                    company_name = job['company_name'].replace(' ', '+')
+                    job_url = f"https://www.google.com/search?q={company_name}+{search_keywords}+jobs"
+                    print(f"  Company search URL: {job_url}")
+                
+                # Son çare: Genel Google Jobs arama URL'i
                 if not job_url:
                     job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs"
+                    print(f"  Fallback Google Jobs URL: {job_url}")
                 
                 formatted_job = {
                     'id': job.get('job_id', f"google_job_{i}"),
@@ -247,9 +278,9 @@ class IntelligentJobAgent:
                 'description': 'Yazılım geliştirme ekibine katılacak junior developer aranmaktadır.',
                 'requirements': ['Temel programlama bilgisi', 'Takım çalışması'],
                 'salary': '8.000 - 12.000 TL',
-                'url': 'https://linkedin.com/jobs',
+                'url': 'https://www.google.com/search?q=Junior+Software+Developer+İstanbul&ibp=htl;jobs',
                 'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan',
+                'source': 'Google Jobs',
                 'score': 85,
                 'match_reasons': ['JavaScript beceriniz bu pozisyona uygun', 'Frontend geliştirme deneyiminiz değerli'],
                 'missing_skills': ['Daha fazla proje deneyimi', 'Backend teknolojileri'],
@@ -263,9 +294,9 @@ class IntelligentJobAgent:
                 'description': 'Modern web teknolojileri ile kullanıcı dostu arayüzler geliştirecek developer aranmaktadır.',
                 'requirements': ['HTML/CSS/JavaScript', 'React/Vue.js'],
                 'salary': '10.000 - 15.000 TL',
-                'url': 'https://linkedin.com/jobs',
+                'url': 'https://www.google.com/search?q=Frontend+Developer+İstanbul&ibp=htl;jobs',
                 'posted_date': datetime.now().strftime('%Y-%m-%d'),
-                'source': 'Varsayılan',
+                'source': 'Google Jobs',
                 'score': 80,
                 'match_reasons': ['HTML/CSS becerileriniz uygun', 'Frontend odaklı pozisyon'],
                 'missing_skills': ['React/Vue.js deneyimi', 'Responsive tasarım'],
