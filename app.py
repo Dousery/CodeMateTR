@@ -2858,10 +2858,6 @@ def search_jobs():
     print(f"DEBUG: Session data: {dict(session)}")
     
     try:
-        # Kullanıcı girişi kontrolü (geçici olarak devre dışı - debug için)
-        # if 'user_id' not in session:
-        #     return jsonify({'error': 'Giriş yapmanız gerekiyor'}), 401
-        
         data = request.json
         if not data or 'cv_analysis' not in data:
             return jsonify({'error': 'CV analizi verisi bulunamadı'}), 400
@@ -2873,10 +2869,9 @@ def search_jobs():
         # Akıllı Job Agent'ı başlat
         job_agent = IntelligentJobAgent()
         
-        # 1. İş ilanlarını ara (SerpAPI veya Fallback)
-        print(f"İş ilanları aranıyor - Kullanıcı: test_user")
-        job_areas = cv_analysis.get('uygun_iş_alanları', ['Software Developer'])
-        jobs = job_agent.find_jobs_with_serpapi(
+        # Google Jobs ile iş ilanlarını ara
+        print(f"Google Jobs ile iş ilanları aranıyor - Kullanıcı: {session.get('username')}")
+        jobs = job_agent.search_jobs_with_serpapi(
             cv_analysis=cv_analysis,
             max_results=max_jobs
         )
@@ -2889,30 +2884,31 @@ def search_jobs():
                 'stats': {
                     'total_found': 0,
                     'matched': 0,
-                    'search_areas': job_areas
+                    'search_areas': cv_analysis.get('uygun_iş_alanları', []),
+                    'search_method': 'Google Jobs'
                 }
             })
         
-        # 2. CV ile işleri eşleştir
-        print(f"CV-İş eşleştirmesi yapılıyor...")
-        matched_jobs = job_agent.match_cv_with_jobs(cv_analysis, jobs)
-        
-        # 3. İstatistikler
+        # İstatistikler
         stats = {
             'total_found': len(jobs),
-            'matched': len(matched_jobs),
-            'search_areas': job_areas,
-            'avg_match_score': sum(job.get('score', 0) for job in matched_jobs) / len(matched_jobs) if matched_jobs else 0
+            'matched': len(jobs),
+            'search_areas': cv_analysis.get('uygun_iş_alanları', []),
+            'avg_match_score': sum(job.get('score', 0) for job in jobs) / len(jobs) if jobs else 0,
+            'search_method': 'Google Jobs',
+            'total_jobs': len(jobs)
         }
         
         return jsonify({
             'success': True,
-            'jobs': matched_jobs,
+            'jobs': jobs,
             'stats': stats
         })
     
     except Exception as e:
         print(f"İş arama hatası: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': f'İş arama sırasında hata: {str(e)}'}), 500
 
 @app.route('/api/process-cv-file', methods=['POST'])
@@ -2950,7 +2946,7 @@ def process_cv_file():
                 job_agent = IntelligentJobAgent()
                 
                 # CV analizi ve iş arama
-                print(f"CV analizi ve iş arama başlatılıyor - Kullanıcı: {session['username']}")
+                print(f"CV analizi ve Google Jobs iş arama başlatılıyor - Kullanıcı: {session['username']}")
                 result = job_agent.process_cv_and_find_jobs(pdf_bytes, max_results=20)
                 
                 print(f"İşlem sonucu: {result.get('success', False)}")
@@ -2965,12 +2961,16 @@ def process_cv_file():
                         db.session.commit()
                         print(f"CV analiz sonucu veritabanına kaydedildi - Kullanıcı: {user.username}")
                     
+                    # Stats'a search_method ekle
+                    stats = result.get('stats', {})
+                    stats['search_method'] = 'Google Jobs'
+                    
                     # Sonucu döndür
                     return jsonify({
                         'success': True,
                         'cv_analysis': result['cv_analysis'],
                         'jobs': result['jobs'],
-                        'stats': result['stats'],
+                        'stats': stats,
                         'cv_filename': unique_filename
                     })
                 else:

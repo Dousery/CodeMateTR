@@ -55,6 +55,8 @@ const SmartJobFinder = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState(null);
+  const [searchSource, setSearchSource] = useState('Google Jobs'); // Yeni: Arama kaynağı
+  const [searchStatus, setSearchStatus] = useState(''); // Yeni: Arama durumu
 
   // Component mount olduğunda session kontrolü yap
   useEffect(() => {
@@ -103,13 +105,14 @@ const SmartJobFinder = () => {
 
     setLoading(true);
     setError('');
+    setSearchStatus('CV analizi başlatılıyor...');
 
     const formData = new FormData();
     formData.append('cv_file', file);
 
     try {
-      // Yeni entegrasyon: Tek seferde CV analizi ve iş arama
-      console.log('Processing CV with new integration:', API_ENDPOINTS.PROCESS_CV_FILE);
+      // Yeni entegrasyon: Tek seferde CV analizi ve Google Jobs iş arama
+      console.log('Processing CV with Google Jobs integration:', API_ENDPOINTS.PROCESS_CV_FILE);
       console.log('CV file data:', { 
         filename: file.name,
         size: file.size,
@@ -129,11 +132,14 @@ const SmartJobFinder = () => {
         setCvAnalysis(data.cv_analysis);
         setJobs(data.jobs || []);
         setStats(data.stats || {});
+        setSearchSource(data.stats?.search_method || 'Google Jobs');
         setActiveStep(3); // Direkt sonuçlar adımına geç
         
-        console.log(`✅ CV analizi ve iş arama tamamlandı: ${data.jobs?.length || 0} iş bulundu`);
+        console.log(`✅ CV analizi ve Google Jobs iş arama tamamlandı: ${data.jobs?.length || 0} iş bulundu`);
+        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'Google Jobs'})`);
       } else {
         setError(data.error || 'CV işleme başarısız');
+        setSearchStatus('❌ CV işleme başarısız');
       }
     } catch (error) {
       console.error('CV işleme hatası:', error);
@@ -142,6 +148,8 @@ const SmartJobFinder = () => {
       // Fallback: Eski yöntemi dene
       try {
         console.log('Fallback: Eski CV analiz yöntemini deniyor...');
+        setSearchStatus('Fallback modu: Eski yöntem deneniyor...');
+        
         const fallbackResponse = await axios.post(API_ENDPOINTS.ANALYZE_CV, formData, {
           withCredentials: true,
           headers: { 'Content-Type': 'multipart/form-data' },
@@ -161,6 +169,7 @@ const SmartJobFinder = () => {
           }, 1000);
         } else {
           setError(fallbackData.error || 'CV analizi başarısız');
+          setSearchStatus('❌ Fallback analiz de başarısız');
         }
       } catch (fallbackError) {
         console.error('Fallback CV analizi de başarısız:', fallbackError);
@@ -171,6 +180,7 @@ const SmartJobFinder = () => {
         } else {
           setError(error.response?.data?.error || 'CV işleme sırasında bir hata oluştu. Lütfen tekrar deneyin.');
         }
+        setSearchStatus('❌ Tüm yöntemler başarısız');
       }
     } finally {
       setLoading(false);
@@ -185,9 +195,10 @@ const SmartJobFinder = () => {
 
     setLoading(true);
     setActiveStep(2);
+    setSearchStatus('Google Jobs\'da iş aranıyor...');
 
     try {
-      console.log('Searching jobs with:', API_ENDPOINTS.SEARCH_JOBS);
+      console.log('Searching jobs with Google Jobs:', API_ENDPOINTS.SEARCH_JOBS);
       console.log('Search data:', { 
         cv_analysis_keys: Object.keys(analysis),
         location: 'Türkiye',
@@ -209,20 +220,17 @@ const SmartJobFinder = () => {
       if (data.success) {
         setJobs(data.jobs);
         setStats(data.stats);
+        setSearchSource(data.stats?.search_method || 'Google Jobs');
         setActiveStep(3);
+        setSearchStatus(`✅ ${data.jobs?.length || 0} iş ilanı bulundu (${data.stats?.search_method || 'Google Jobs'})`);
       } else {
         setError(data.error || 'İş arama başarısız');
+        setSearchStatus('❌ İş arama başarısız');
       }
     } catch (error) {
-      console.error('İş arama hatası:', error);
-      console.error('Error response:', error.response);
-      if (error.response?.status === 401) {
-        setError('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
-      } else if (error.code === 'ECONNABORTED') {
-        setError('Bağlantı zaman aşımı. Lütfen tekrar deneyin.');
-      } else {
-        setError(error.response?.data?.error || 'İş arama sırasında bir hata oluştu. Lütfen tekrar deneyin.');
-      }
+      console.error('Job search error:', error);
+      setError('İş arama sırasında bir hata oluştu');
+      setSearchStatus('❌ İş arama hatası');
     } finally {
       setLoading(false);
     }
@@ -614,8 +622,9 @@ const SmartJobFinder = () => {
             target="_blank"
             rel="noopener noreferrer"
             size="small"
+            startIcon={<Work />}
           >
-            İlanı Görüntüle
+            {job.source === 'Google Jobs' ? 'Google Jobs\'da Görüntüle' : 'İlanı Görüntüle'}
           </Button>
           
           {!job.tips && (
@@ -757,13 +766,23 @@ const SmartJobFinder = () => {
               <Typography variant="h6" gutterBottom sx={{ color: '#E6E6FA' }}>
                 Arama İstatistikleri
               </Typography>
+              
+              {/* Arama Durumu */}
+              {searchStatus && (
+                <Box sx={{ mb: 2, p: 1, backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#98FB98' }}>
+                    {searchStatus}
+                  </Typography>
+                </Box>
+              )}
+              
               <Grid container spacing={2}>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{stats.total_found}</Typography>
+                  <Typography variant="h4">{stats.total_found || stats.total_jobs || 0}</Typography>
                   <Typography variant="body2">Toplam Bulunan</Typography>
                 </Grid>
                 <Grid item xs={6} sm={3}>
-                  <Typography variant="h4">{stats.matched}</Typography>
+                  <Typography variant="h4">{stats.matched || jobs.length}</Typography>
                   <Typography variant="body2">Uygun İş</Typography>
                 </Grid>
                 <Grid item xs={6} sm={3}>
@@ -775,6 +794,15 @@ const SmartJobFinder = () => {
                   <Typography variant="body2">Arama Alanı</Typography>
                 </Grid>
               </Grid>
+              
+              {/* Arama Kaynağı */}
+              {searchSource && (
+                <Box sx={{ mt: 2, p: 1, backgroundColor: 'rgba(79, 70, 229, 0.2)', borderRadius: 1 }}>
+                  <Typography variant="body2" sx={{ color: '#E6E6FA', fontWeight: 'bold' }}>
+                    🔍 Arama Kaynağı: {searchSource}
+                  </Typography>
+                </Box>
+              )}
             </CardContent>
           </Card>
         )}

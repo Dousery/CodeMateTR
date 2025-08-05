@@ -132,7 +132,7 @@ class IntelligentJobAgent:
             return self._get_default_jobs()
         
         try:
-            # CV'den arama terimleri oluştur
+            # CV'den arama terimlerini oluştur
             skills = cv_analysis.get('teknik_beceriler', [])
             job_areas = cv_analysis.get('uygun_iş_alanları', ['Software Developer'])
             location = cv_analysis.get('kişisel_bilgiler', {}).get('lokasyon', 'Türkiye')
@@ -160,7 +160,7 @@ class IntelligentJobAgent:
             response.raise_for_status()
             data = response.json()
             
-            print(f"SerpAPI Response: {data.keys()}")
+            print(f"SerpAPI Response Keys: {list(data.keys())}")
             
             # Google Jobs sonuçlarını al
             jobs = data.get("jobs_results", [])
@@ -168,6 +168,8 @@ class IntelligentJobAgent:
             if not jobs:
                 print("⚠️ Google Jobs'dan sonuç alınamadı, varsayılan işler döndürülüyor")
                 return self._get_default_jobs()
+            
+            print(f"İlk job örneği: {jobs[0].keys() if jobs else 'No jobs'}")
             
             # İşleri formatla - frontend uyumlu
             formatted_jobs = []
@@ -183,6 +185,22 @@ class IntelligentJobAgent:
                 # Tüm requirements'ları birleştir
                 all_requirements = qualifications + responsibilities
                 
+                # Gerçek iş ilanı URL'sini al
+                job_url = None
+                
+                # Farklı URL alanlarını kontrol et
+                if 'related_links' in job and job['related_links']:
+                    job_url = job['related_links'][0].get('link')
+                elif 'via' in job and job['via']:
+                    job_url = job['via'].get('link')
+                elif 'job_id' in job:
+                    # Google Jobs ID'si varsa, Google Jobs URL'i oluştur
+                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs&htivrt=jobs&htidocid={job['job_id']}"
+                
+                # Eğer hala URL yoksa, genel Google Jobs arama URL'i
+                if not job_url:
+                    job_url = f"https://www.google.com/search?q={search_keywords}&ibp=htl;jobs"
+                
                 formatted_job = {
                     'id': job.get('job_id', f"google_job_{i}"),
                     'title': job.get('title', 'İş İlanı'),
@@ -191,7 +209,7 @@ class IntelligentJobAgent:
                     'description': job.get('description', ''),
                     'requirements': all_requirements,
                     'salary': job.get('salary', 'Belirtilmemiş'),
-                    'url': job.get('related_links', [{}])[0].get('link', 'https://google.com/jobs'),
+                    'url': job_url,  # Gerçek iş ilanı URL'i
                     'posted_date': job.get('posted_at', datetime.now().strftime('%Y-%m-%d')),
                     'source': 'Google Jobs',
                     'score': score,  # Frontend için uyum skoru
@@ -200,6 +218,11 @@ class IntelligentJobAgent:
                     'recommendations': ["CV'nizi güncelleyin", "Başvuru yapabilirsiniz"]
                 }
                 formatted_jobs.append(formatted_job)
+                
+                print(f"Job {i+1}: {job.get('title', 'N/A')} - {job.get('company_name', 'N/A')}")
+                print(f"  URL: {job_url}")
+                print(f"  Job ID: {job.get('job_id', 'N/A')}")
+                print()
             
             print(f"✅ Google Jobs'dan {len(formatted_jobs)} iş ilanı bulundu")
             return formatted_jobs
@@ -313,10 +336,18 @@ if __name__ == "__main__":
     }
     
     print("🧪 Test iş arama başlatılıyor...")
-    jobs = agent.search_jobs_with_serpapi(test_cv_analysis, max_results=5)
     
-    print(f"📊 Test sonucu: {len(jobs)} iş bulundu")
-    for i, job in enumerate(jobs):
-        print(f"  {i+1}. {job['title']} - {job['company']} ({job['score']}%)")
-        print(f"     URL: {job['url']}")
-        print()
+    # SERPAPI_KEY kontrolü
+    if not agent.serpapi_key:
+        print("❌ SERPAPI_KEY bulunamadı!")
+        print("📝 .env dosyasına SERPAPI_KEY=your_api_key_here ekleyin")
+        print("🔗 https://serpapi.com/ adresinden ücretsiz API key alabilirsiniz")
+    else:
+        print("✅ SERPAPI_KEY bulundu, Google Jobs test ediliyor...")
+        jobs = agent.search_jobs_with_serpapi(test_cv_analysis, max_results=5)
+        
+        print(f"📊 Test sonucu: {len(jobs)} iş bulundu")
+        for i, job in enumerate(jobs):
+            print(f"  {i+1}. {job['title']} - {job['company']} ({job['score']}%)")
+            print(f"     URL: {job['url']}")
+            print()
