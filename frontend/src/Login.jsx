@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, Alert, Link } from '@mui/material';
 import { motion } from 'framer-motion';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_ENDPOINTS from './config.js';
 
@@ -10,10 +10,6 @@ export default function Login({ setIsLoggedIn }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
-  const location = useLocation();
-
-  // Kullanıcının geldiği sayfayı al (varsayılan olarak dashboard)
-  const from = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -61,8 +57,7 @@ export default function Login({ setIsLoggedIn }) {
         window.dispatchEvent(new Event('localStorageChange'));
         
         setIsLoggedIn(true);
-        // Kullanıcıyı geldiği sayfaya yönlendir
-        setTimeout(() => navigate(from, { replace: true }), 1000);
+        setTimeout(() => navigate('/dashboard'), 1000);
       } else {
         setError('Giriş başarısız.');
       }
