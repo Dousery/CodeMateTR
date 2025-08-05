@@ -8,10 +8,10 @@ CV analizi + JSearch API
 import os
 import json
 import requests
+import base64
 from datetime import datetime
 from typing import Dict, Any, List
 import google.generativeai as genai
-from google.generativeai import types
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -77,13 +77,18 @@ class IntelligentJobAgent:
             print(f"🔍 PDF boyutu: {len(pdf_bytes)} bytes")
             print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
             
-            # Gemini PDF API kullan
+            # PDF'yi base64'e çevir
+            pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+            
+            # Gemini PDF API kullan - güncel versiyon
             model = self.genai_client.GenerativeModel("gemini-1.5-flash")
+            
+            # PDF'yi image olarak gönder (Gemini 1.5-flash PDF'yi destekler)
             response = model.generate_content([
-                types.Part.from_bytes(
-                    data=pdf_bytes,
-                    mime_type='application/pdf',
-                ),
+                {
+                    "mime_type": "application/pdf",
+                    "data": pdf_base64
+                },
                 prompt
             ])
             
@@ -173,13 +178,18 @@ class IntelligentJobAgent:
             print(f"🔍 PDF boyutu: {len(pdf_bytes)} bytes")
             print(f"🔍 Gemini API key mevcut: {bool(self.genai_client)}")
             
-            # Gemini PDF API kullan
+            # PDF'yi base64'e çevir
+            pdf_base64 = base64.b64encode(pdf_bytes).decode('utf-8')
+            
+            # Gemini PDF API kullan - güncel versiyon
             model = self.genai_client.GenerativeModel("gemini-1.5-flash")
+            
+            # PDF'yi image olarak gönder (Gemini 1.5-flash PDF'yi destekler)
             response = model.generate_content([
-                types.Part.from_bytes(
-                    data=pdf_bytes,
-                    mime_type='application/pdf',
-                ),
+                {
+                    "mime_type": "application/pdf",
+                    "data": pdf_base64
+                },
                 prompt
             ])
             
