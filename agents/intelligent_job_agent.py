@@ -125,7 +125,7 @@ class IntelligentJobAgent:
     
     def search_jobs_with_serpapi(self, cv_analysis: Dict[str, Any], max_results: int = 20) -> List[Dict[str, Any]]:
         """
-        SerpAPI ile iş ilanları arar - Google Jobs entegrasyonu
+        SerpAPI Google Jobs ile iş ilanları arar
         """
         if not self.serpapi_key:
             print("⚠️ SERPAPI_KEY bulunamadı, varsayılan işler döndürülüyor")
@@ -142,19 +142,18 @@ class IntelligentJobAgent:
             if not search_keywords:
                 search_keywords = "Software Developer"
             
-            print(f"🔍 Google Jobs'ta aranıyor: '{search_keywords}' ({location})")
+            print(f"🔍 Google Jobs ile iş aranıyor: '{search_keywords}' ({location})")
             
-            # SerpAPI Google Jobs parametreleri
+            # SerpAPI Google Jobs API kullan
             params = {
                 "api_key": self.serpapi_key,
-                "engine": "google_jobs",
+                "engine": "google_jobs",  # Önemli: Google Jobs engine'i
                 "q": search_keywords,
                 "location": location,
                 "hl": "tr",  # Türkçe
                 "gl": "tr",  # Türkiye
                 "chips": "date_posted:all",  # Tüm tarihler
-                "num": max_results,  # Sonuç sayısı
-                "start": 0  # Başlangıç pozisyonu
+                "num": max_results  # Sonuç sayısı
             }
             
             response = requests.get("https://serpapi.com/search", params=params)
@@ -164,19 +163,25 @@ class IntelligentJobAgent:
             print(f"SerpAPI Response: {data.keys()}")
             
             # Google Jobs sonuçlarını al
-            jobs_results = data.get("jobs_results", [])
-            if not jobs_results:
-                print("⚠️ Google Jobs'tan sonuç alınamadı, varsayılan işler döndürülüyor")
+            jobs = data.get("jobs_results", [])
+            
+            if not jobs:
+                print("⚠️ Google Jobs'dan sonuç alınamadı, varsayılan işler döndürülüyor")
                 return self._get_default_jobs()
             
-            # İşleri formatla - Google Jobs yapısına uygun
+            # İşleri formatla - frontend uyumlu
             formatted_jobs = []
-            for i, job in enumerate(jobs_results[:max_results]):
-                # Gerçek iş ilanı URL'sini al
-                job_url = self._extract_job_url(job)
-                
+            for i, job in enumerate(jobs[:max_results]):
                 # Basit skor hesaplama
                 score = 50 + (i * 5)  # İlk işler daha yüksek skor
+                
+                # Job highlights'ları al
+                job_highlights = job.get('job_highlights', {})
+                qualifications = job_highlights.get('Qualifications', [])
+                responsibilities = job_highlights.get('Responsibilities', [])
+                
+                # Tüm requirements'ları birleştir
+                all_requirements = qualifications + responsibilities
                 
                 formatted_job = {
                     'id': job.get('job_id', f"google_job_{i}"),
@@ -184,79 +189,27 @@ class IntelligentJobAgent:
                     'company': job.get('company_name', 'Şirket'),
                     'location': job.get('location', location),
                     'description': job.get('description', ''),
-                    'requirements': self._extract_requirements(job),
+                    'requirements': all_requirements,
                     'salary': job.get('salary', 'Belirtilmemiş'),
-                    'url': job_url,
+                    'url': job.get('related_links', [{}])[0].get('link', 'https://google.com/jobs'),
                     'posted_date': job.get('posted_at', datetime.now().strftime('%Y-%m-%d')),
                     'source': 'Google Jobs',
-                    'score': score,
+                    'score': score,  # Frontend için uyum skoru
                     'match_reasons': [f"{skill} beceriniz bu pozisyona uygun" for skill in skills[:2]],
                     'missing_skills': ["Daha fazla deneyim", "Proje portföyü"],
                     'recommendations': ["CV'nizi güncelleyin", "Başvuru yapabilirsiniz"]
                 }
                 formatted_jobs.append(formatted_job)
             
-            print(f"✅ Google Jobs'tan {len(formatted_jobs)} iş ilanı bulundu")
+            print(f"✅ Google Jobs'dan {len(formatted_jobs)} iş ilanı bulundu")
             return formatted_jobs
             
         except Exception as e:
             print(f"❌ SerpAPI Google Jobs hatası: {e}")
             print(f"Hata detayı: {type(e).__name__}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
             return self._get_default_jobs()
-    
-    def _extract_job_url(self, job: Dict[str, Any]) -> str:
-        """
-        İş ilanının gerçek URL'sini çıkarır
-        """
-        try:
-            # Google Jobs'tan gelen URL'leri kontrol et
-            related_links = job.get('related_links', [])
-            if related_links:
-                for link in related_links:
-                    url = link.get('link', '')
-                    if url and ('linkedin.com' in url or 'indeed.com' in url or 'glassdoor.com' in url):
-                        return url
-            
-            # Varsayılan olarak Google Jobs arama sayfası
-            job_title = job.get('title', '')
-            company = job.get('company_name', '')
-            location = job.get('location', '')
-            
-            search_query = f"{job_title} {company} {location}".replace(' ', '+')
-            return f"https://www.google.com/search?q={search_query}&ibp=htl;jobs"
-            
-        except Exception as e:
-            print(f"URL çıkarma hatası: {e}")
-            return "https://www.google.com/search?q=jobs&ibp=htl;jobs"
-    
-    def _extract_requirements(self, job: Dict[str, Any]) -> List[str]:
-        """
-        İş ilanından gereksinimleri çıkarır
-        """
-        try:
-            requirements = []
-            
-            # Job highlights'dan requirements al
-            job_highlights = job.get('job_highlights', {})
-            qualifications = job_highlights.get('Qualifications', [])
-            if qualifications:
-                requirements.extend(qualifications)
-            
-            # Description'dan da requirements çıkar
-            description = job.get('description', '')
-            if description:
-                # Basit keyword arama
-                req_keywords = ['gerekli', 'aranan', 'beklenen', 'deneyim', 'beceri', 'yetenek']
-                lines = description.split('\n')
-                for line in lines:
-                    if any(keyword in line.lower() for keyword in req_keywords):
-                        requirements.append(line.strip())
-            
-            return requirements[:5]  # En fazla 5 requirement
-            
-        except Exception as e:
-            print(f"Requirements çıkarma hatası: {e}")
-            return ['Deneyim', 'Takım çalışması', 'Problem çözme becerisi']
     
     def _get_default_jobs(self) -> List[Dict[str, Any]]:
         """
@@ -344,36 +297,26 @@ class IntelligentJobAgent:
                 'stats': {}
             }
 
-    def test_serpapi_connection(self) -> bool:
-        """
-        SerpAPI bağlantısını test eder
-        """
-        if not self.serpapi_key:
-            print("❌ SERPAPI_KEY bulunamadı")
-            return False
-        
-        try:
-            print("🔍 SerpAPI bağlantısı test ediliyor...")
-            
-            # Basit test sorgusu
-            params = {
-                "api_key": self.serpapi_key,
-                "engine": "google_jobs",
-                "q": "software developer",
-                "location": "Istanbul, Turkey",
-                "hl": "tr",
-                "gl": "tr",
-                "num": 3
-            }
-            
-            response = requests.get("https://serpapi.com/search", params=params)
-            response.raise_for_status()
-            data = response.json()
-            
-            jobs_count = len(data.get("jobs_results", []))
-            print(f"✅ SerpAPI test başarılı: {jobs_count} iş ilanı bulundu")
-            return jobs_count > 0
-            
-        except Exception as e:
-            print(f"❌ SerpAPI test hatası: {e}")
-            return False
+# Test fonksiyonu
+if __name__ == "__main__":
+    # Test CV analizi
+    agent = IntelligentJobAgent()
+    
+    # Test iş arama
+    test_cv_analysis = {
+        "kişisel_bilgiler": {
+            "ad_soyad": "Test User",
+            "lokasyon": "İstanbul, Türkiye"
+        },
+        "teknik_beceriler": ["Python", "JavaScript", "React"],
+        "uygun_iş_alanları": ["Software Developer", "Frontend Developer"]
+    }
+    
+    print("🧪 Test iş arama başlatılıyor...")
+    jobs = agent.search_jobs_with_serpapi(test_cv_analysis, max_results=5)
+    
+    print(f"📊 Test sonucu: {len(jobs)} iş bulundu")
+    for i, job in enumerate(jobs):
+        print(f"  {i+1}. {job['title']} - {job['company']} ({job['score']}%)")
+        print(f"     URL: {job['url']}")
+        print()
