@@ -26,8 +26,7 @@ import {
   Grid,
   Rating,
   Divider,
-  Tooltip,
-  Error
+  Tooltip
 } from '@mui/material';
 import { motion } from 'framer-motion';
 import {
@@ -43,7 +42,8 @@ import {
   AccessTime,
   AttachMoney,
   Schedule,
-  Lightbulb
+  Lightbulb,
+  Error
 } from '@mui/icons-material';
 
 const steps = ['CV Yükle', 'CV Analizi', 'İş Arama', 'Sonuçlar'];
