@@ -17,7 +17,7 @@ const modules = [
     desc: 'Bilgini test et, eksiklerini gör.',
     icon: <QuizIcon fontSize="large" color="primary" />, 
     path: '/test',
-    tags: ['AI Test Sistemi', 'Kişiselleştirilmiş Öneriler']
+    tags: ['Kişiselleştirilmiş Öneriler']
   },
   {
     title: 'Kodlama Odası',
