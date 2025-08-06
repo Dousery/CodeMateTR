@@ -62,14 +62,7 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        const username = localStorage.getItem('username');
-        if (!username) {
-          setIsLoggedIn(false);
-          setIsLoading(false);
-          return;
-        }
-
-        // Backend'de session'ı kontrol et
+        // Backend'de session'ı kontrol et (localStorage'a bakmadan)
         const response = await fetch('https://btk-project-backend.onrender.com/profile', {
           method: 'GET',
           credentials: 'include',
@@ -82,7 +75,7 @@ function App() {
           const data = await response.json();
           setIsLoggedIn(true);
           // localStorage'ı güncelle
-          localStorage.setItem('username', data.username || username);
+          localStorage.setItem('username', data.username);
           if (data.interest) {
             localStorage.setItem('interest', data.interest);
           }
