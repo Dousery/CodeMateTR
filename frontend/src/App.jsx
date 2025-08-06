@@ -62,6 +62,33 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       try {
+        console.log('🔍 Session kontrolü başlatılıyor...');
+        
+        // Önce session-status endpoint'ini kontrol et
+        const sessionResponse = await fetch('https://btk-project-backend.onrender.com/session-status', {
+          method: 'GET',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        
+        const sessionData = await sessionResponse.json();
+        console.log('📊 Session Status Response:', sessionData);
+        
+        if (sessionData.has_username) {
+          console.log('✅ Backend\'de session var, kullanıcı giriş yapmış');
+          setIsLoggedIn(true);
+          localStorage.setItem('username', sessionData.session_data.username);
+          if (sessionData.user_interest) {
+            localStorage.setItem('interest', sessionData.user_interest);
+          }
+          setIsLoading(false);
+          return;
+        }
+        
+        console.log('❌ Backend\'de session yok, profile endpoint\'ini kontrol ediyorum...');
+        
         // Backend'de session'ı kontrol et (localStorage'a bakmadan)
         const response = await fetch('https://btk-project-backend.onrender.com/profile', {
           method: 'GET',
@@ -71,8 +98,12 @@ function App() {
           }
         });
 
+        console.log('📡 Profile Response Status:', response.status);
+        console.log('📡 Profile Response Headers:', response.headers);
+
         if (response.ok) {
           const data = await response.json();
+          console.log('✅ Profile endpoint başarılı, kullanıcı giriş yapmış');
           setIsLoggedIn(true);
           // localStorage'ı güncelle
           localStorage.setItem('username', data.username);
@@ -80,13 +111,14 @@ function App() {
             localStorage.setItem('interest', data.interest);
           }
         } else {
+          console.log('❌ Profile endpoint başarısız, session geçersiz');
           // Session geçersiz, localStorage'ı temizle
           localStorage.removeItem('username');
           localStorage.removeItem('interest');
           setIsLoggedIn(false);
         }
       } catch (error) {
-        console.error('Session check error:', error);
+        console.error('💥 Session check error:', error);
         // Hata durumunda localStorage'ı temizle
         localStorage.removeItem('username');
         localStorage.removeItem('interest');

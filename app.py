@@ -439,13 +439,40 @@ def logout():
 @app.route('/session-status', methods=['GET'])
 def session_status():
     """Session durumunu kontrol etmek için test endpoint'i"""
-    return jsonify({
-        'session_data': dict(session),
-        'has_username': 'username' in session,
-        'has_user_id': 'user_id' in session,
-        'session_permanent': session.permanent,
-        'session_modified': session.modified
-    })
+    try:
+        # Session bilgilerini al
+        session_info = {
+            'session_data': dict(session),
+            'has_username': 'username' in session,
+            'has_user_id': 'user_id' in session,
+            'session_permanent': session.permanent,
+            'session_modified': session.modified,
+            'session_id': session.sid if hasattr(session, 'sid') else None,
+            'cookies_received': dict(request.cookies),
+            'headers': dict(request.headers),
+            'origin': request.headers.get('Origin'),
+            'referer': request.headers.get('Referer'),
+            'user_agent': request.headers.get('User-Agent')
+        }
+        
+        # Eğer username varsa, kullanıcı bilgilerini de al
+        if 'username' in session:
+            user = User.query.filter_by(username=session['username']).first()
+            if user:
+                session_info['user_exists'] = True
+                session_info['user_interest'] = user.interest
+            else:
+                session_info['user_exists'] = False
+        else:
+            session_info['user_exists'] = False
+            
+        return jsonify(session_info)
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'session_data': dict(session),
+            'has_username': 'username' in session
+        }), 500
 
 @app.route('/health', methods=['GET'])
 def health_check():
