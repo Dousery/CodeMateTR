@@ -45,7 +45,29 @@ const AuthContext = createContext();
 export function useAuth() { return useContext(AuthContext); }
 
 function ProtectedRoute({ children }) {
-  const { isLoggedIn } = useAuth();
+  const { isLoggedIn, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 64px)',
+        background: 'linear-gradient(135deg, #0a0e27 0%, #1a1b3d 25%, #2d1b69 50%, #4a148c 75%, #6a1b9a 100%)'
+      }}>
+        <Box sx={{ 
+          width: 40, 
+          height: 40, 
+          border: '2px solid rgba(255,255,255,0.3)', 
+          borderTop: '2px solid #4f46e5', 
+          borderRadius: '50%', 
+          animation: 'spin 1s linear infinite' 
+        }} />
+      </Box>
+    );
+  }
+  
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
@@ -62,34 +84,14 @@ function App() {
   useEffect(() => {
     const checkSession = async () => {
       try {
-        console.log('🔍 Session kontrolü başlatılıyor...');
-        
-        // Önce session-status endpoint'ini kontrol et
-        const sessionResponse = await fetch('https://btk-project-backend.onrender.com/session-status', {
-          method: 'GET',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          }
-        });
-        
-        const sessionData = await sessionResponse.json();
-        console.log('📊 Session Status Response:', sessionData);
-        
-        if (sessionData.has_username) {
-          console.log('✅ Backend\'de session var, kullanıcı giriş yapmış');
-          setIsLoggedIn(true);
-          localStorage.setItem('username', sessionData.session_data.username);
-          if (sessionData.user_interest) {
-            localStorage.setItem('interest', sessionData.user_interest);
-          }
+        const username = localStorage.getItem('username');
+        if (!username) {
+          setIsLoggedIn(false);
           setIsLoading(false);
           return;
         }
-        
-        console.log('❌ Backend\'de session yok, profile endpoint\'ini kontrol ediyorum...');
-        
-        // Backend'de session'ı kontrol et (localStorage'a bakmadan)
+
+        // Backend'de session'ı kontrol et
         const response = await fetch('https://btk-project-backend.onrender.com/profile', {
           method: 'GET',
           credentials: 'include',
@@ -98,27 +100,22 @@ function App() {
           }
         });
 
-        console.log('📡 Profile Response Status:', response.status);
-        console.log('📡 Profile Response Headers:', response.headers);
-
         if (response.ok) {
           const data = await response.json();
-          console.log('✅ Profile endpoint başarılı, kullanıcı giriş yapmış');
           setIsLoggedIn(true);
           // localStorage'ı güncelle
-          localStorage.setItem('username', data.username);
+          localStorage.setItem('username', data.username || username);
           if (data.interest) {
             localStorage.setItem('interest', data.interest);
           }
         } else {
-          console.log('❌ Profile endpoint başarısız, session geçersiz');
           // Session geçersiz, localStorage'ı temizle
           localStorage.removeItem('username');
           localStorage.removeItem('interest');
           setIsLoggedIn(false);
         }
       } catch (error) {
-        console.error('💥 Session check error:', error);
+        console.error('Session check error:', error);
         // Hata durumunda localStorage'ı temizle
         localStorage.removeItem('username');
         localStorage.removeItem('interest');
@@ -144,10 +141,43 @@ function App() {
 
 
 
+  // Loading durumunda loading spinner göster
+  if (isLoading) {
+    return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <Box sx={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          minHeight: '100vh',
+          background: 'linear-gradient(135deg, #0a0e27 0%, #1a1b3d 25%, #2d1b69 50%, #4a148c 75%, #6a1b9a 100%)'
+        }}>
+          <Box sx={{ 
+            width: 50, 
+            height: 50, 
+            border: '3px solid rgba(255,255,255,0.3)', 
+            borderTop: '3px solid #4f46e5', 
+            borderRadius: '50%', 
+            animation: 'spin 1s linear infinite' 
+          }} />
+        </Box>
+        <style>
+          {`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}
+        </style>
+      </ThemeProvider>
+    );
+  }
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn }}>
+      <AuthContext.Provider value={{ isLoggedIn, setIsLoggedIn, isLoading }}>
         <Router>
           <Header mode={mode} toggleTheme={toggleTheme} />
           <Box className="main-content" sx={{ 

@@ -54,11 +54,11 @@ else:
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 # CORS configuration for production
-FRONTEND_URL = 'https://codematetr.onrender.com'  # Render frontend adresin
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
 
-# Production'da sadece frontend originine izin ver
+# Production'da tüm origin'lere izin ver (güvenlik için daha sonra kısıtlanabilir)
 if os.getenv('FLASK_ENV') == 'production':
-    CORS_ORIGINS = [FRONTEND_URL]
+    CORS_ORIGINS = ['*']
 else:
     CORS_ORIGINS = [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:5173']
 
@@ -439,40 +439,13 @@ def logout():
 @app.route('/session-status', methods=['GET'])
 def session_status():
     """Session durumunu kontrol etmek için test endpoint'i"""
-    try:
-        # Session bilgilerini al
-        session_info = {
-            'session_data': dict(session),
-            'has_username': 'username' in session,
-            'has_user_id': 'user_id' in session,
-            'session_permanent': session.permanent,
-            'session_modified': session.modified,
-            'session_id': session.sid if hasattr(session, 'sid') else None,
-            'cookies_received': dict(request.cookies),
-            'headers': dict(request.headers),
-            'origin': request.headers.get('Origin'),
-            'referer': request.headers.get('Referer'),
-            'user_agent': request.headers.get('User-Agent')
-        }
-        
-        # Eğer username varsa, kullanıcı bilgilerini de al
-        if 'username' in session:
-            user = User.query.filter_by(username=session['username']).first()
-            if user:
-                session_info['user_exists'] = True
-                session_info['user_interest'] = user.interest
-            else:
-                session_info['user_exists'] = False
-        else:
-            session_info['user_exists'] = False
-            
-        return jsonify(session_info)
-    except Exception as e:
-        return jsonify({
-            'error': str(e),
-            'session_data': dict(session),
-            'has_username': 'username' in session
-        }), 500
+    return jsonify({
+        'session_data': dict(session),
+        'has_username': 'username' in session,
+        'has_user_id': 'user_id' in session,
+        'session_permanent': session.permanent,
+        'session_modified': session.modified
+    })
 
 @app.route('/health', methods=['GET'])
 def health_check():
