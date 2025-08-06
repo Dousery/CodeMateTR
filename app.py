@@ -54,11 +54,11 @@ else:
     app.config['SESSION_REFRESH_EACH_REQUEST'] = True
 
 # CORS configuration for production
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
+FRONTEND_URL = 'https://codematetr.onrender.com'  # Render frontend adresin
 
-# Production'da tüm origin'lere izin ver (güvenlik için daha sonra kısıtlanabilir)
+# Production'da sadece frontend originine izin ver
 if os.getenv('FLASK_ENV') == 'production':
-    CORS_ORIGINS = ['*']
+    CORS_ORIGINS = [FRONTEND_URL]
 else:
     CORS_ORIGINS = [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:5173']
 
