@@ -132,20 +132,53 @@ db = SQLAlchemy(app)
 # Session'ı initialize et
 Session(app)
 
-# Model sınıflarını burada tanımla
-class User(db.Model):
+# Import models
+from models.user import UserMixin
+from models.history import TestSessionMixin, AutoInterviewSessionMixin, UserHistoryMixin
+
+# Define User model with main db instance
+class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)  # scrypt hash için daha uzun alan
     interest = db.Column(db.String(80), nullable=True)
     cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
 
-    def set_password(self, password):
-        # Daha kısa hash için method belirt
-        self.password_hash = generate_password_hash(password, method='pbkdf2:sha256')
+# Define TestSession model with main db instance
+class TestSession(db.Model, TestSessionMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    questions = db.Column(db.Text, nullable=False)  # JSON string
+    difficulty = db.Column(db.String(20), nullable=False)
+    num_questions = db.Column(db.Integer, nullable=False)
+    duration = db.Column(db.Integer, nullable=False)  # saniye
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    status = db.Column(db.String(20), default='active')  # active, completed, expired
+    results = db.Column(db.Text, nullable=True)  # JSON string - test sonuçları
 
-    def check_password(self, password):
-        return check_password_hash(self.password_hash, password)
+# Define AutoInterviewSession model with main db instance
+class AutoInterviewSession(db.Model, AutoInterviewSessionMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.String(100), unique=True, nullable=False)
+    username = db.Column(db.String(80), nullable=False)
+    interest = db.Column(db.String(80), nullable=False)
+    questions = db.Column(db.Text, nullable=True)  # JSON string - sorular listesi
+    answers = db.Column(db.Text, nullable=True)  # JSON string - cevaplar listesi
+    current_question_index = db.Column(db.Integer, default=0)
+    status = db.Column(db.String(20), default='active')  # active, completed, paused
+    start_time = db.Column(db.DateTime, default=datetime.utcnow)
+    end_time = db.Column(db.DateTime, nullable=True)
+    conversation_context = db.Column(db.Text, nullable=True)  # Mülakat bağlamı
+    final_evaluation = db.Column(db.Text, nullable=True)  # Final değerlendirme
+
+# Define UserHistory model with main db instance
+class UserHistory(db.Model, UserHistoryMixin):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), nullable=False)
+    activity_type = db.Column(db.String(32), nullable=False)  # test, code, case, interview
+    detail = db.Column(db.Text, nullable=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 # Forum sistemi için yeni modeller
 class ForumPost(db.Model):
@@ -251,32 +284,7 @@ class TestPerformance(db.Model):
 # Geçici bellek içi veri saklama
 users = {}  # username: {password_hash, interest}
 
-# Test session'ları için database tablosu
-class TestSession(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(100), unique=True, nullable=False)
-    username = db.Column(db.String(80), nullable=False)
-    questions = db.Column(db.Text, nullable=False)  # JSON string
-    difficulty = db.Column(db.String(20), nullable=False)
-    num_questions = db.Column(db.Integer, nullable=False)
-    duration = db.Column(db.Integer, nullable=False)  # saniye
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
-    status = db.Column(db.String(20), default='active')  # active, completed, expired
 
-# Otomatik mülakat oturumları için database tablosu
-class AutoInterviewSession(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    session_id = db.Column(db.String(100), unique=True, nullable=False)
-    username = db.Column(db.String(80), nullable=False)
-    interest = db.Column(db.String(80), nullable=False)
-    questions = db.Column(db.Text, nullable=True)  # JSON string - sorular listesi
-    answers = db.Column(db.Text, nullable=True)  # JSON string - cevaplar listesi
-    current_question_index = db.Column(db.Integer, default=0)
-    status = db.Column(db.String(20), default='active')  # active, completed, paused
-    start_time = db.Column(db.DateTime, default=datetime.utcnow)
-    end_time = db.Column(db.DateTime, nullable=True)
-    conversation_context = db.Column(db.Text, nullable=True)  # Mülakat bağlamı
-    final_evaluation = db.Column(db.Text, nullable=True)  # Final değerlendirme
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -344,15 +352,20 @@ def init_app():
             db.create_all()
             print("Veritabanı tabloları başarıyla oluşturuldu.")
             
-            # Migration: password_hash sütununu güncelle
+            # Migration: password_hash sütununu güncelle (SQLite compatible)
             try:
-                with db.engine.connect() as conn:
-                    conn.execute(text("""
-                        ALTER TABLE "user" 
-                        ALTER COLUMN password_hash TYPE VARCHAR(255)
-                    """))
-                    conn.commit()
-                    print("✅ Database migration completed - password_hash column updated")
+                if DATABASE_URL and 'sqlite' in DATABASE_URL:
+                    # SQLite için migration yapma - sadece log
+                    print("ℹ️ SQLite database detected - skipping ALTER TABLE migration")
+                else:
+                    # PostgreSQL için migration
+                    with db.engine.connect() as conn:
+                        conn.execute(text("""
+                            ALTER TABLE "user" 
+                            ALTER COLUMN password_hash TYPE VARCHAR(255)
+                        """))
+                        conn.commit()
+                        print("✅ Database migration completed - password_hash column updated")
             except Exception as migration_error:
                 print(f"⚠️ Migration note: {migration_error}")
                 # Migration hatası kritik değil, devam et
@@ -369,14 +382,19 @@ def init_app():
         except Exception as e:
             print(f"❌ Veritabanı oluşturma hatası: {e}")
         
-        # Eski test session'larını temizle
-        expired_sessions = TestSession.query.filter_by(status='active').all()
-        for test_session in expired_sessions:
-            session_age = (datetime.utcnow() - test_session.start_time).total_seconds()
-            if session_age > test_session.duration:
-                test_session.status = 'expired'
-        db.session.commit()
-        print(f"🧹 {len([s for s in expired_sessions if s.status == 'expired'])} süresi dolmuş test session'ı temizlendi")
+        # Eski test session'larını temizle (eğer tablo varsa)
+        try:
+            expired_sessions = TestSession.query.filter_by(status='active').all()
+            for test_session in expired_sessions:
+                session_age = (datetime.utcnow() - test_session.start_time).total_seconds()
+                if session_age > test_session.duration:
+                    test_session.status = 'expired'
+            db.session.commit()
+            print(f"🧹 {len([s for s in expired_sessions if s.status == 'expired'])} süresi dolmuş test session'ı temizlendi")
+        except Exception as e:
+            print(f"⚠️ Test session cleanup failed: {e}")
+            # Session cleanup hatası kritik değil, devam et
+            pass
 
 # Session yüklemeyi app başladığında değil, route çağrıldığında yap
 # load_sessions_from_db()
