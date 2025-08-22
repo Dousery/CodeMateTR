@@ -2087,7 +2087,7 @@ def get_forum_posts():
         else:
             query = ForumPost.query
     else:
-    query = ForumPost.query.filter_by(interest=user.interest)
+        query = ForumPost.query.filter_by(interest=user.interest)
     
     # Kaldırılan gönderileri filtrele (admin hariç)
     if not user.is_admin:
