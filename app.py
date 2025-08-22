@@ -527,7 +527,16 @@ def login():
         print(f"Login error: {e}")
         import traceback
         traceback.print_exc()
-        return jsonify({'error': 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.'}), 500
+        
+        # Production'da daha detaylı hata bilgisi
+        if os.getenv('FLASK_ENV') == 'production':
+            return jsonify({
+                'error': 'Giriş sırasında bir hata oluştu.',
+                'details': str(e),
+                'type': type(e).__name__
+            }), 500
+        else:
+            return jsonify({'error': 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.'}), 500
 
 @app.route('/logout', methods=['POST'])
 def logout():
