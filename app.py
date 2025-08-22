@@ -349,8 +349,15 @@ def init_app():
     with app.app_context():
         try:
             # Veritabanı tablolarını güvenli bir şekilde oluştur
+            print("🔍 Creating database tables...")
+            print(f"🔍 Available models: {[model.__name__ for model in db.Model.__subclasses__()]}")
+            
+            # Explicitly check each model
+            for model in db.Model.__subclasses__():
+                print(f"🔍 Model: {model.__name__}, Table: {model.__tablename__}")
+            
             db.create_all()
-            print("Veritabanı tabloları başarıyla oluşturuldu.")
+            print("✅ Veritabanı tabloları başarıyla oluşturuldu.")
             
             # Migration: password_hash sütununu güncelle (SQLite compatible)
             try:
@@ -377,24 +384,14 @@ def init_app():
             pass
         # Veritabanı tablolarını oluştur (eğer yoksa)
         try:
+            print("🔍 Second db.create_all() call...")
             db.create_all()
             print("✅ Veritabanı tabloları kontrol edildi ve oluşturuldu!")
         except Exception as e:
             print(f"❌ Veritabanı oluşturma hatası: {e}")
         
-        # Eski test session'larını temizle (eğer tablo varsa)
-        try:
-            expired_sessions = TestSession.query.filter_by(status='active').all()
-            for test_session in expired_sessions:
-                session_age = (datetime.utcnow() - test_session.start_time).total_seconds()
-                if session_age > test_session.duration:
-                    test_session.status = 'expired'
-            db.session.commit()
-            print(f"🧹 {len([s for s in expired_sessions if s.status == 'expired'])} süresi dolmuş test session'ı temizlendi")
-        except Exception as e:
-            print(f"⚠️ Test session cleanup failed: {e}")
-            # Session cleanup hatası kritik değil, devam et
-            pass
+        # Session cleanup'i geçici olarak devre dışı bırak
+        print("ℹ️ Session cleanup skipped for now")
 
 # Session yüklemeyi app başladığında değil, route çağrıldığında yap
 # load_sessions_from_db()
