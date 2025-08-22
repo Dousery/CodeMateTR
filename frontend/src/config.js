@@ -66,13 +66,6 @@ export const API_ENDPOINTS = {
   FORUM_NOTIFICATIONS_MARK_READ: `${API_BASE_URL}/forum/notifications/mark-read`,
   FORUM_REPORT: `${API_BASE_URL}/forum/report`,
 
-  // Admin endpoints
-  ADMIN_REPORTS: `${API_BASE_URL}/admin/reports`,
-  ADMIN_STATS: `${API_BASE_URL}/admin/stats`,
-  ADMIN_REMOVE_POST: `${API_BASE_URL}/admin/posts/remove`,
-  ADMIN_RESTORE_POST: `${API_BASE_URL}/admin/posts/restore`,
-  ADMIN_ANNOUNCEMENT: `${API_BASE_URL}/admin/announcement`,
-
 
 
   // Debug endpoints
