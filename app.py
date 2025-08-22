@@ -507,10 +507,19 @@ def login():
         
         # Password kontrolü
         try:
+            print(f"DEBUG: Checking password for user: {username}")
+            print(f"DEBUG: Stored hash: {user.password_hash}")
+            print(f"DEBUG: Hash length: {len(user.password_hash) if user.password_hash else 0}")
+            
             if not user.check_password(password):
+                print(f"DEBUG: Password check failed for user: {username}")
                 return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
+            else:
+                print(f"DEBUG: Password check successful for user: {username}")
         except Exception as password_error:
             print(f"Password check error: {password_error}")
+            import traceback
+            traceback.print_exc()
             return jsonify({'error': 'Şifre doğrulama hatası. Lütfen daha sonra tekrar deneyin.'}), 500
         
         # Session'ı kalıcı yap
