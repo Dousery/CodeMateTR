@@ -21,6 +21,9 @@ export const API_ENDPOINTS = {
   TEST_PAGE: `${API_BASE_URL}/test`,
   TEST_SKILL: `${API_BASE_URL}/test_your_skill`,
   TEST_EVALUATE: `${API_BASE_URL}/test_your_skill/evaluate`,
+  TEST_STATISTICS: `${API_BASE_URL}/test_your_skill/statistics`,
+  TEST_REFRESH_POOL: `${API_BASE_URL}/test_your_skill/refresh_pool`,
+  TEST_RECOMMEND_ADAPTIVE: `${API_BASE_URL}/test_your_skill/recommend_adaptive`,
 
   // Code endpoints
   CODE_PAGE: `${API_BASE_URL}/code`,

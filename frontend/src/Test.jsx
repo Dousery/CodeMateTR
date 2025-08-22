@@ -22,6 +22,11 @@ export default function Test() {
   const [difficulty, setDifficulty] = useState('mixed');
   const [numQuestions, setNumQuestions] = useState(10);
   const [showTimer, setShowTimer] = useState(false);
+  const [useAdaptive, setUseAdaptive] = useState(false);
+  const [showAdaptiveRecommendation, setShowAdaptiveRecommendation] = useState(false);
+  const [adaptiveRecommendation, setAdaptiveRecommendation] = useState(null);
+  const [showStatistics, setShowStatistics] = useState(false);
+  const [statistics, setStatistics] = useState(null);
 
   // Sayfa yüklendiğinde session durumunu kontrol et
   useEffect(() => {
@@ -78,6 +83,54 @@ export default function Test() {
     }
   }, [questions, answers, testSessionId]);
 
+  // Adaptif test önerisi al
+  const getAdaptiveRecommendation = async () => {
+    try {
+      const res = await axios.get(API_ENDPOINTS.TEST_RECOMMEND_ADAPTIVE, { 
+        withCredentials: true 
+      });
+      setAdaptiveRecommendation(res.data.recommendation);
+      setShowAdaptiveRecommendation(true);
+    } catch (err) {
+      console.error('Adaptif öneri alma hatası:', err);
+    }
+  };
+
+  // Test istatistiklerini al
+  const getTestStatistics = async () => {
+    try {
+      const res = await axios.get(API_ENDPOINTS.TEST_STATISTICS, { 
+        withCredentials: true 
+      });
+      setStatistics(res.data);
+      setShowStatistics(true);
+    } catch (err) {
+      console.error('İstatistik alma hatası:', err);
+    }
+  };
+
+  // Soru havuzunu yenile
+  const refreshQuestionPool = async () => {
+    try {
+      setLoading(true);
+      const res = await axios.post(API_ENDPOINTS.TEST_REFRESH_POOL, {
+        force_refresh: true
+      }, { withCredentials: true });
+      
+      if (res.data.success) {
+        // İstatistikleri güncelle
+        await getTestStatistics();
+        alert('Soru havuzu başarıyla yenilendi!');
+      } else {
+        alert(res.data.message);
+      }
+    } catch (err) {
+      alert('Havuz yenileme hatası: ' + (err.response?.data?.error || 'Bilinmeyen hata'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Geri sayım timer - handleSubmit tanımlandıktan sonra
   useEffect(() => {
     let timer;
@@ -107,11 +160,16 @@ export default function Test() {
     setError('');
     try {
       console.log('Fetching questions from:', API_ENDPOINTS.TEST_SKILL);
-      console.log('Request data:', { num_questions: numQuestions, difficulty: difficulty });
+      console.log('Request data:', { 
+        num_questions: numQuestions, 
+        difficulty: difficulty,
+        use_adaptive: useAdaptive
+      });
       
       const res = await axios.post(API_ENDPOINTS.TEST_SKILL, {
         num_questions: numQuestions,
-        difficulty: difficulty
+        difficulty: difficulty,
+        use_adaptive: useAdaptive
       }, { 
         withCredentials: true,
         timeout: 15000
@@ -129,6 +187,11 @@ export default function Test() {
       setTimeout(() => {
         setShowTimer(false);
       }, 5000);
+      
+      // Adaptif test kullanıldıysa bilgi ver
+      if (res.data.is_adaptive) {
+        alert('🎯 Adaptif test başlatıldı! Zayıf alanlarınıza odaklanarak sorular üretildi.');
+      }
     } catch (err) {
       console.error('Error fetching questions:', err);
       console.error('Error response:', err.response);
@@ -210,6 +273,40 @@ export default function Test() {
                 ))}
               </Stack>
             </Box>
+            
+            {/* Adaptif Test Seçeneği */}
+            <Box>
+              <Typography color="white" mb={1} fontWeight={600}>Test Türü:</Typography>
+              <Stack direction="row" spacing={2}>
+                <Button
+                  variant={!useAdaptive ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => setUseAdaptive(false)}
+                  sx={{ 
+                    color: !useAdaptive ? 'white' : 'rgba(255,255,255,0.7)',
+                    borderColor: 'rgba(255,255,255,0.3)'
+                  }}
+                >
+                  🎯 Normal Test
+                </Button>
+                <Button
+                  variant={useAdaptive ? "contained" : "outlined"}
+                  size="small"
+                  onClick={() => setUseAdaptive(true)}
+                  sx={{ 
+                    color: useAdaptive ? 'white' : 'rgba(255,255,255,0.7)',
+                    borderColor: 'rgba(255,255,255,0.3)'
+                  }}
+                >
+                  🧠 Adaptif Test
+                </Button>
+              </Stack>
+              {useAdaptive && (
+                <Typography color="rgba(255,255,255,0.7)" fontSize="0.9rem" mt={1}>
+                  💡 Önceki test sonuçlarınıza göre zayıf alanlarınıza odaklanır
+                </Typography>
+              )}
+            </Box>
           </Stack>
           
           <Alert severity="info" sx={{ mb: 3, backgroundColor: 'rgba(33, 150, 243, 0.1)' }}>
@@ -221,6 +318,36 @@ export default function Test() {
           </Alert>
           
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+          
+          {/* İstatistik ve Öneri Butonları */}
+          <Stack direction="row" spacing={2} mb={3}>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={getAdaptiveRecommendation}
+              disabled={loading}
+              sx={{
+                color: 'rgba(255,255,255,0.8)',
+                borderColor: 'rgba(255,255,255,0.3)',
+                flex: 1
+              }}
+            >
+              💡 Adaptif Öneri
+            </Button>
+            <Button
+              variant="outlined"
+              size="small"
+              onClick={getTestStatistics}
+              disabled={loading}
+              sx={{
+                color: 'rgba(255,255,255,0.8)',
+                borderColor: 'rgba(255,255,255,0.3)',
+                flex: 1
+              }}
+            >
+              📊 İstatistikler
+            </Button>
+          </Stack>
           
           <Button 
             variant="contained" 
@@ -236,7 +363,7 @@ export default function Test() {
               py: 1.5,
               textTransform: 'none',
               fontWeight: 600,
-              boxShadow: '0 4px 15px rgba(79, 70, 229, 0.4)',
+              boxShadow: '0 4px 15px rgba(79, 70, 229,0.4)',
               '&:hover': {
                 background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)',
                 boxShadow: '0 6px 20px rgba(79, 70, 229, 0.6)',
@@ -937,6 +1064,258 @@ export default function Test() {
           </Grid>
         </Grid>
       </Box>
-    );
-  }
+      
+      {/* Adaptif Test Önerisi Modal */}
+      {showAdaptiveRecommendation && adaptiveRecommendation && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            p: 2
+          }}
+          onClick={() => setShowAdaptiveRecommendation(false)}
+        >
+          <Paper
+            component={motion.div}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            sx={{
+              p: 4,
+              maxWidth: 600,
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              borderRadius: 3
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h5" fontWeight={600} mb={3} textAlign="center">
+              🧠 Adaptif Test Önerisi
+            </Typography>
+            
+            <Alert severity={adaptiveRecommendation.should_use_adaptive ? "info" : "success"} sx={{ mb: 3 }}>
+              {adaptiveRecommendation.reason}
+            </Alert>
+            
+            {adaptiveRecommendation.should_use_adaptive && (
+              <>
+                <Typography variant="h6" mb={2}>
+                  📊 Önerilen Zorluk Seviyesi: {adaptiveRecommendation.suggested_difficulty}
+                </Typography>
+                
+                {adaptiveRecommendation.focus_areas.length > 0 && (
+                  <Box mb={3}>
+                    <Typography variant="h6" mb={2}>
+                      🎯 Odaklanılacak Alanlar:
+                    </Typography>
+                    <Stack spacing={1}>
+                      {adaptiveRecommendation.focus_areas.map((area, i) => (
+                        <Box key={i} sx={{ 
+                          p: 2, 
+                          border: '1px solid rgba(0,0,0,0.1)', 
+                          borderRadius: 1,
+                          backgroundColor: area.priority === 'high' ? 'rgba(244, 67, 54, 0.1)' : 'rgba(255, 193, 7, 0.1)'
+                        }}>
+                          <Typography variant="body1" fontWeight={600}>
+                            {area.category}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Mevcut Başarı: %{area.current_success_rate.toFixed(1)}
+                          </Typography>
+                          <Chip 
+                            label={area.priority === 'high' ? 'Yüksek Öncelik' : 'Orta Öncelik'} 
+                            size="small" 
+                            color={area.priority === 'high' ? 'error' : 'warning'}
+                            sx={{ mt: 1 }}
+                          />
+                        </Box>
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+                
+                <Button
+                  variant="contained"
+                  color="primary"
+                  fullWidth
+                  onClick={() => {
+                    setUseAdaptive(true);
+                    setShowAdaptiveRecommendation(false);
+                  }}
+                  sx={{ mb: 2 }}
+                >
+                  🎯 Adaptif Testi Başlat
+                </Button>
+              </>
+            )}
+            
+            <Button
+              variant="outlined"
+              fullWidth
+              onClick={() => setShowAdaptiveRecommendation(false)}
+            >
+              Kapat
+            </Button>
+          </Paper>
+        </Box>
+      )}
+      
+      {/* Test İstatistikleri Modal */}
+      {showStatistics && statistics && (
+        <Box
+          sx={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.8)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            p: 2
+          }}
+          onClick={() => setShowStatistics(false)}
+        >
+          <Paper
+            component={motion.div}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            sx={{
+              p: 4,
+              maxWidth: 800,
+              width: '100%',
+              maxHeight: '80vh',
+              overflow: 'auto',
+              backgroundColor: 'rgba(255,255,255,0.95)',
+              borderRadius: 3
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <Typography variant="h5" fontWeight={600} mb={3} textAlign="center">
+              📊 Test İstatistikleri
+            </Typography>
+            
+            <Grid container spacing={3}>
+              {/* Soru Havuzu İstatistikleri */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" mb={2}>
+                  🗂️ Soru Havuzu
+                </Typography>
+                <Stack spacing={2}>
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Toplam Soru
+                    </Typography>
+                    <Typography variant="h6">
+                      {statistics.question_pool_stats.total_questions_in_pool}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      İlgi Alanı
+                    </Typography>
+                    <Typography variant="h6">
+                      {statistics.interest_area}
+                    </Typography>
+                  </Box>
+                  
+                  {Object.keys(statistics.question_pool_stats.pool_categories).length > 0 && (
+                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary" mb={1}>
+                        Kategoriler
+                      </Typography>
+                      {Object.entries(statistics.question_pool_stats.pool_categories).map(([category, count]) => (
+                        <Box key={category} sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                          <Typography variant="body2">{category}</Typography>
+                          <Typography variant="body2" fontWeight={600}>{count}</Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  )}
+                </Stack>
+              </Grid>
+              
+              {/* Kullanıcı Test İstatistikleri */}
+              <Grid item xs={12} md={6}>
+                <Typography variant="h6" mb={2}>
+                  👤 Kullanıcı İstatistikleri
+                </Typography>
+                <Stack spacing={2}>
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Toplam Test
+                    </Typography>
+                    <Typography variant="h6">
+                      {statistics.user_test_stats.total_tests_taken}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Ortalama Başarı
+                      </Typography>
+                      <Typography variant="h6">
+                        %{statistics.user_test_stats.average_success_rate.toFixed(1)}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Toplam Soru
+                      </Typography>
+                      <Typography variant="h6">
+                        {statistics.user_test_stats.total_questions_answered}
+                      </Typography>
+                    </Box>
+                    
+                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Favori Zorluk
+                      </Typography>
+                      <Typography variant="h6">
+                        {statistics.user_test_stats.favorite_difficulty}
+                      </Typography>
+                    </Box>
+                  </Box>
+                </Stack>
+              </Grid>
+            </Grid>
+            
+            {/* Havuz Yenileme Butonu */}
+            <Box sx={{ mt: 3, textAlign: 'center' }}>
+              <Button
+                variant="contained"
+                color="secondary"
+                onClick={refreshQuestionPool}
+                disabled={loading}
+                sx={{ mr: 2 }}
+              >
+                🔄 Soru Havuzunu Yenile
+              </Button>
+              
+              <Button
+                variant="outlined"
+                onClick={() => setShowStatistics(false)}
+              >
+                Kapat
+              </Button>
+            </Box>
+          </Paper>
+        </Box>
+      )}
+    </Box>
+  );
 } 

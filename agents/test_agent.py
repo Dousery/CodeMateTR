@@ -3,19 +3,157 @@ import json
 import re
 import requests
 from urllib.parse import quote_plus
-
 import time
+import random
+import hashlib
+from datetime import datetime, timedelta
 from .topic_analysis_agent import TopicAnalysisAgent
 
 class TestAIAgent:
     def __init__(self, interest):
         self.interest = interest
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
-
-    def generate_questions(self, num_questions=10, difficulty='mixed'):
+        # Soru havuzu ve kullanıcı geçmişi için cache
+        self.question_pool = {}
+        self.user_history = {}
+        self.session_questions = {}
+        
+    def _generate_question_hash(self, question_text):
+        """Soru metninden benzersiz hash oluştur"""
+        return hashlib.md5(question_text.encode()).hexdigest()
+    
+    def _get_user_session_key(self, user_id, session_id):
+        """Kullanıcı ve seans için benzersiz anahtar oluştur"""
+        return f"{user_id}_{session_id}"
+    
+    def _is_question_used_recently(self, user_id, question_hash, days_limit=30):
+        """Soru son günlerde kullanıcı tarafından kullanıldı mı kontrol et"""
+        if user_id not in self.user_history:
+            return False
+            
+        current_time = datetime.now()
+        for record in self.user_history[user_id]:
+            if record['question_hash'] == question_hash:
+                time_diff = current_time - record['timestamp']
+                if time_diff.days < days_limit:
+                    return True
+        return False
+    
+    def _add_question_to_history(self, user_id, question_hash, session_id):
+        """Soru kullanımını kullanıcı geçmişine ekle"""
+        if user_id not in self.user_history:
+            self.user_history[user_id] = []
+            
+        self.user_history[user_id].append({
+            'question_hash': question_hash,
+            'timestamp': datetime.now(),
+            'session_id': session_id
+        })
+        
+        # Eski kayıtları temizle (90 günden eski)
+        cutoff_date = datetime.now() - timedelta(days=90)
+        self.user_history[user_id] = [
+            record for record in self.user_history[user_id] 
+            if record['timestamp'] > cutoff_date
+        ]
+    
+    def _get_diverse_questions_from_pool(self, num_questions, difficulty='mixed', user_id=None, session_id=None):
+        """Havuzdan çeşitli sorular seç - kullanıcı geçmişini dikkate al"""
+        if not self.question_pool.get(self.interest):
+            return []
+            
+        available_questions = []
+        
+        # Zorluk seviyesine göre soruları filtrele
+        if difficulty == 'mixed':
+            available_questions = self.question_pool[self.interest]
+        else:
+            available_questions = [
+                q for q in self.question_pool[self.interest] 
+                if q.get('difficulty', 'intermediate') == difficulty
+            ]
+        
+        # Kullanıcı geçmişini kontrol et
+        if user_id:
+            filtered_questions = []
+            for q in available_questions:
+                question_hash = self._generate_question_hash(q['question'])
+                if not self._is_question_used_recently(user_id, question_hash):
+                    filtered_questions.append(q)
+            available_questions = filtered_questions
+        
+        # Eğer yeterli soru yoksa, yeni sorular üret
+        if len(available_questions) < num_questions:
+            new_questions = self._generate_new_questions_for_pool(num_questions - len(available_questions), difficulty)
+            available_questions.extend(new_questions)
+        
+        # Çeşitlilik için farklı kategorilerden sorular seç
+        selected_questions = self._select_diverse_questions(available_questions, num_questions)
+        
+        # Seçilen soruları kullanıcı geçmişine ekle
+        if user_id:
+            for q in selected_questions:
+                question_hash = self._generate_question_hash(q['question'])
+                self._add_question_to_history(user_id, question_hash, session_id)
+        
+        return selected_questions
+    
+    def _select_diverse_questions(self, questions, num_questions):
+        """Çeşitli kategorilerden sorular seç"""
+        if len(questions) <= num_questions:
+            return random.sample(questions, len(questions))
+        
+        # Kategorilere göre grupla
+        categories = {}
+        for q in questions:
+            category = q.get('category', 'Genel')
+            if category not in categories:
+                categories[category] = []
+            categories[category].append(q)
+        
+        # Her kategoriden eşit sayıda soru seç
+        selected = []
+        questions_per_category = max(1, num_questions // len(categories))
+        
+        for category, cat_questions in categories.items():
+            if len(cat_questions) >= questions_per_category:
+                selected.extend(random.sample(cat_questions, questions_per_category))
+            else:
+                selected.extend(cat_questions)
+        
+        # Eğer hâlâ yeterli soru yoksa, rastgele ekle
+        if len(selected) < num_questions:
+            remaining = [q for q in questions if q not in selected]
+            if remaining:
+                additional_needed = num_questions - len(selected)
+                selected.extend(random.sample(remaining, min(additional_needed, len(remaining))))
+        
+        return selected[:num_questions]
+    
+    def _generate_new_questions_for_pool(self, num_questions, difficulty):
+        """Havuz için yeni sorular üret"""
+        new_questions = self._generate_questions_internal(num_questions, difficulty)
+        
+        # Havuzu güncelle
+        if self.interest not in self.question_pool:
+            self.question_pool[self.interest] = []
+        
+        # Yeni soruları havuza ekle (duplicate kontrolü ile)
+        for q in new_questions:
+            question_hash = self._generate_question_hash(q['question'])
+            if not any(self._generate_question_hash(existing_q['question']) == question_hash 
+                      for existing_q in self.question_pool[self.interest]):
+                self.question_pool[self.interest].append(q)
+        
+        return new_questions
+    
+    def _generate_questions_internal(self, num_questions, difficulty):
+        """İç soru üretim fonksiyonu"""
         prompt = f"""
         {self.interest} alanında geliştiriciler için {num_questions} adet çoktan seçmeli sınav sorusu üret. 
         Zorluk seviyesi: {difficulty} (beginner, intermediate, advanced, mixed)
+        
+        ÖNEMLİ: Her seferinde tamamen farklı ve özgün sorular üret. Önceki soruları tekrarlama.
         
         Sorular şu konuları kapsamalı:
         - Temel kavramlar ve terminoloji
@@ -23,6 +161,7 @@ class TestAIAgent:
         - Best practices ve design patterns
         - Problem çözme becerileri
         - Güncel teknolojiler ve yaklaşımlar
+        - {self.interest} alanına özel spesifik konular
         
         Her soru için JSON formatında yanıt ver:
         {{
@@ -39,7 +178,9 @@ class TestAIAgent:
                     "correct_answer": "A",
                     "explanation": "Doğru cevabın açıklaması",
                     "difficulty": "intermediate",
-                    "category": "Temel Kavramlar"
+                    "category": "Temel Kavramlar",
+                    "topic": "Spesifik alt konu",
+                    "created_at": "{datetime.now().isoformat()}"
                 }}
             ]
         }}
@@ -49,10 +190,9 @@ class TestAIAgent:
         
         try:
             response = self.model.generate_content(prompt)
-            # JSON parse etmeye çalış
             response_text = response.text.strip()
             
-            # JSON başlangıç ve bitiş noktalarını bul
+            # JSON parse etmeye çalış
             start_idx = response_text.find('{')
             end_idx = response_text.rfind('}') + 1
             
@@ -66,11 +206,15 @@ class TestAIAgent:
                     if 'id' not in q:
                         q['id'] = i + 1
                     if 'difficulty' not in q:
-                        q['difficulty'] = 'intermediate'
+                        q['difficulty'] = difficulty
                     if 'category' not in q:
                         q['category'] = self.interest
                     if 'explanation' not in q:
                         q['explanation'] = ''
+                    if 'topic' not in q:
+                        q['topic'] = self.interest
+                    if 'created_at' not in q:
+                        q['created_at'] = datetime.now().isoformat()
                     
                     # Seçenekleri standart formata çevir
                     if 'options' in q:
@@ -88,7 +232,166 @@ class TestAIAgent:
             print(f"JSON parse hatası: {e}")
             # Fallback: Eski metod
             return self._generate_questions_fallback(num_questions)
+    
+    def generate_questions(self, num_questions=10, difficulty='mixed', user_id=None, session_id=None):
+        """
+        Kullanıcı için soru üret - geçmiş ve çeşitlilik dikkate alınarak
+        
+        Args:
+            num_questions: Üretilecek soru sayısı
+            difficulty: Zorluk seviyesi (beginner, intermediate, advanced, mixed)
+            user_id: Kullanıcı ID'si (geçmiş takibi için)
+            session_id: Seans ID'si (benzersiz seans için)
+        """
+        # Önce havuzdan mevcut soruları kontrol et
+        pool_questions = self._get_diverse_questions_from_pool(
+            num_questions, difficulty, user_id, session_id
+        )
+        
+        # Eğer havuzda yeterli soru yoksa, yeni sorular üret
+        if len(pool_questions) < num_questions:
+            additional_needed = num_questions - len(pool_questions)
+            new_questions = self._generate_new_questions_for_pool(additional_needed, difficulty)
+            pool_questions.extend(new_questions)
+        
+        # Son kontrol: yeterli soru var mı
+        if len(pool_questions) < num_questions:
+            # Acil durum: direkt yeni sorular üret
+            emergency_questions = self._generate_questions_internal(num_questions, difficulty)
+            return emergency_questions[:num_questions]
+        
+        return pool_questions[:num_questions]
+    
+    def generate_adaptive_questions(self, user_id, session_id, previous_performance=None, num_questions=10):
+        """
+        Kullanıcının önceki performansına göre adaptif sorular üret
+        
+        Args:
+            user_id: Kullanıcı ID'si
+            session_id: Seans ID'si
+            previous_performance: Önceki test sonuçları
+            num_questions: Soru sayısı
+        """
+        if not previous_performance:
+            # İlk test: karışık zorluk seviyesi
+            return self.generate_questions(num_questions, 'mixed', user_id, session_id)
+        
+        # Performansa göre zorluk seviyesi belirle
+        success_rate = previous_performance.get('success_rate', 50)
+        
+        if success_rate >= 80:
+            difficulty = 'advanced'
+        elif success_rate >= 60:
+            difficulty = 'intermediate'
+        else:
+            difficulty = 'beginner'
+        
+        # Zayıf alanlara odaklan
+        weak_areas = previous_performance.get('weak_areas', [])
+        if weak_areas:
+            # Zayıf alanlardan daha fazla soru üret
+            weak_area_questions = self._generate_questions_for_weak_areas(
+                weak_areas, min(6, num_questions), user_id, session_id
+            )
             
+            # Kalan soruları genel havuzdan al
+            remaining_questions = self.generate_questions(
+                num_questions - len(weak_area_questions), 
+                difficulty, user_id, session_id
+            )
+            
+            # Soruları karıştır
+            all_questions = weak_area_questions + remaining_questions
+            random.shuffle(all_questions)
+            return all_questions[:num_questions]
+        
+        return self.generate_questions(num_questions, difficulty, user_id, session_id)
+    
+    def _generate_questions_for_weak_areas(self, weak_areas, num_questions, user_id, session_id):
+        """Zayıf alanlar için özel sorular üret"""
+        questions = []
+        
+        for area in weak_areas[:3]:  # En fazla 3 zayıf alan
+            area_name = area.get('category', 'Genel')
+            area_questions = self._generate_questions_internal(
+                max(1, num_questions // len(weak_areas)), 
+                'beginner'  # Zayıf alanlar için başlangıç seviyesi
+            )
+            
+            # Alan adını güncelle
+            for q in area_questions:
+                q['category'] = area_name
+                q['topic'] = area_name
+            
+            questions.extend(area_questions)
+        
+        return questions[:num_questions]
+    
+    def get_question_statistics(self, user_id=None):
+        """Soru havuzu ve kullanıcı istatistikleri"""
+        stats = {
+            'total_questions_in_pool': len(self.question_pool.get(self.interest, [])),
+            'interest_area': self.interest,
+            'pool_categories': {},
+            'pool_difficulties': {},
+            'user_history': {}
+        }
+        
+        # Havuz istatistikleri
+        if self.interest in self.question_pool:
+            for q in self.question_pool[self.interest]:
+                category = q.get('category', 'Bilinmeyen')
+                difficulty = q.get('difficulty', 'intermediate')
+                
+                stats['pool_categories'][category] = stats['pool_categories'].get(category, 0) + 1
+                stats['pool_difficulties'][difficulty] = stats['pool_difficulties'].get(difficulty, 0) + 1
+        
+        # Kullanıcı geçmişi istatistikleri
+        if user_id and user_id in self.user_history:
+            user_stats = {
+                'total_questions_answered': len(self.user_history[user_id]),
+                'questions_by_session': {},
+                'recent_activity': []
+            }
+            
+            for record in self.user_history[user_id]:
+                session_id = record['session_id']
+                user_stats['questions_by_session'][session_id] = user_stats['questions_by_session'].get(session_id, 0) + 1
+                
+                # Son aktiviteler
+                if len(user_stats['recent_activity']) < 10:
+                    user_stats['recent_activity'].append({
+                        'timestamp': record['timestamp'].isoformat(),
+                        'session_id': session_id
+                    })
+            
+            stats['user_history'] = user_stats
+        
+        return stats
+    
+    def refresh_question_pool(self, force_refresh=False):
+        """Soru havuzunu yenile - eski soruları temizle ve yenilerini ekle"""
+        if not force_refresh and self.interest in self.question_pool:
+            # Havuzda yeterli soru varsa yenileme
+            if len(self.question_pool[self.interest]) >= 50:
+                return False
+        
+        # Havuzu temizle
+        if self.interest in self.question_pool:
+            del self.question_pool[self.interest]
+        
+        # Yeni sorular üret (farklı zorluk seviyelerinde)
+        difficulties = ['beginner', 'intermediate', 'advanced']
+        questions_per_difficulty = 20
+        
+        for difficulty in difficulties:
+            new_questions = self._generate_questions_internal(questions_per_difficulty, difficulty)
+            if self.interest not in self.question_pool:
+                self.question_pool[self.interest] = []
+            self.question_pool[self.interest].extend(new_questions)
+        
+        return True
+
     def _generate_questions_fallback(self, num_questions):
         """Gemini JSON döndüremezse eski yöntemle soru üret"""
         prompt = f"""
@@ -121,7 +424,9 @@ class TestAIAgent:
                     'correct_answer': '',
                     'difficulty': 'intermediate',
                     'category': self.interest,
-                    'explanation': ''
+                    'explanation': '',
+                    'topic': self.interest,
+                    'created_at': datetime.now().isoformat()
                 }
             elif line.startswith(('A)', 'B)', 'C)', 'D)')):
                 if 'options' in current:

@@ -773,10 +773,83 @@ def test_your_skill():
     data = request.json
     num_questions = data.get('num_questions', 10)
     difficulty = data.get('difficulty', 'mixed')
+    use_adaptive = data.get('use_adaptive', False)  # Yeni: adaptif soru üretimi
     
     try:
         agent = TestAIAgent(user.interest)
-        questions = agent.generate_questions(num_questions, difficulty)
+        
+        # Benzersiz session ID oluştur
+        session_id = f"test_{int(time.time())}_{user.username}_{hash(str(datetime.utcnow()))}"
+        
+        # Kullanıcının önceki performansını al (adaptif soru üretimi için)
+        previous_performance = None
+        if use_adaptive:
+            # Son test sonuçlarını veritabanından al
+            recent_tests = TestSession.query.filter(
+                TestSession.username == user.username,
+                TestSession.status == 'completed'
+            ).order_by(TestSession.start_time.desc()).limit(3).all()
+            
+            if recent_tests:
+                # Son testlerin ortalamasını hesapla
+                total_success_rate = 0
+                weak_areas = {}
+                test_count = 0
+                
+                for test in recent_tests:
+                    if test.results:
+                        try:
+                            results_data = json.loads(test.results)
+                            success_rate = results_data.get('summary', {}).get('success_rate', 0)
+                            total_success_rate += success_rate
+                            
+                            # Zayıf alanları topla
+                            weak_areas_data = results_data.get('weak_areas', [])
+                            for area in weak_areas_data:
+                                category = area.get('category', 'Genel')
+                                if category not in weak_areas:
+                                    weak_areas[category] = {'total': 0, 'correct': 0}
+                                weak_areas[category]['total'] += area.get('questions_count', 1)
+                                weak_areas[category]['correct'] += area.get('questions_count', 1) - 1  # Yanlış sayısı
+                            
+                            test_count += 1
+                        except:
+                            continue
+                
+                if test_count > 0:
+                    avg_success_rate = total_success_rate / test_count
+                    weak_areas_list = []
+                    
+                    for category, stats in weak_areas.items():
+                        if stats['total'] > 0:
+                            success_rate = (stats['correct'] / stats['total']) * 100
+                            if success_rate < 60:  # %60'ın altında başarı
+                                weak_areas_list.append({
+                                    'category': category,
+                                    'success_rate': success_rate,
+                                    'questions_count': stats['total']
+                                })
+                    
+                    previous_performance = {
+                        'success_rate': avg_success_rate,
+                        'weak_areas': weak_areas_list
+                    }
+        
+        # Soru üretimi (adaptif veya normal)
+        if use_adaptive and previous_performance:
+            questions = agent.generate_adaptive_questions(
+                user_id=user.username,
+                session_id=session_id,
+                previous_performance=previous_performance,
+                num_questions=num_questions
+            )
+        else:
+            questions = agent.generate_questions(
+                num_questions=num_questions, 
+                difficulty=difficulty,
+                user_id=user.username,
+                session_id=session_id
+            )
         
         # Test sessionu oluştur
         test_session_id = f"test_{int(time.time())}_{user.username}"
@@ -818,7 +891,9 @@ def test_your_skill():
             'questions': questions_for_frontend,
             'test_session_id': test_session_id,
             'duration': 30 * 60,  # 30 dakika
-            'total_questions': len(questions_for_frontend)
+            'total_questions': len(questions_for_frontend),
+            'is_adaptive': use_adaptive and previous_performance is not None,
+            'session_id': session_id
         })
         
     except Exception as e:
@@ -2865,6 +2940,201 @@ def extract_text_from_pdf(file_path):
         return ""
     
     return text.strip()
+
+# Yeni endpoint: Soru havuzu istatistikleri
+@app.route('/test_your_skill/statistics', methods=['GET'])
+@login_required
+def get_test_statistics():
+    """Kullanıcının test istatistiklerini ve soru havuzu bilgilerini döndür"""
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    try:
+        agent = TestAIAgent(user.interest)
+        stats = agent.get_question_statistics(user_id=user.username)
+        
+        # Kullanıcının test geçmişi istatistikleri
+        user_test_stats = {
+            'total_tests_taken': 0,
+            'average_success_rate': 0,
+            'total_questions_answered': 0,
+            'favorite_difficulty': 'mixed',
+            'recent_performance': []
+        }
+        
+        # Veritabanından test istatistiklerini al
+        user_tests = TestSession.query.filter_by(
+            username=user.username,
+            status='completed'
+        ).order_by(TestSession.start_time.desc()).limit(10).all()
+        
+        if user_tests:
+            user_test_stats['total_tests_taken'] = len(user_tests)
+            total_success = 0
+            total_questions = 0
+            difficulty_counts = {}
+            
+            for test in user_tests:
+                if test.results:
+                    try:
+                        results_data = json.loads(test.results)
+                        success_rate = results_data.get('summary', {}).get('success_rate', 0)
+                        total_success += success_rate
+                        total_questions += test.num_questions
+                        
+                        # Zorluk seviyesi sayımı
+                        difficulty = test.difficulty
+                        difficulty_counts[difficulty] = difficulty_counts.get(difficulty, 0) + 1
+                        
+                        # Son performans
+                        if len(user_test_stats['recent_performance']) < 5:
+                            user_test_stats['recent_performance'].append({
+                                'date': test.start_time.isoformat(),
+                                'success_rate': success_rate,
+                                'difficulty': difficulty,
+                                'questions_count': test.num_questions
+                            })
+                    except:
+                        continue
+            
+            if user_test_stats['total_tests_taken'] > 0:
+                user_test_stats['average_success_rate'] = total_success / user_test_stats['total_tests_taken']
+                user_test_stats['total_questions_answered'] = total_questions
+                
+                # En çok kullanılan zorluk seviyesi
+                if difficulty_counts:
+                    user_test_stats['favorite_difficulty'] = max(difficulty_counts, key=difficulty_counts.get)
+        
+        return jsonify({
+            'success': True,
+            'question_pool_stats': stats,
+            'user_test_stats': user_test_stats,
+            'interest_area': user.interest
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'İstatistik alma hatası: {str(e)}'}), 500
+
+# Yeni endpoint: Soru havuzu yenileme
+@app.route('/test_your_skill/refresh_pool', methods=['POST'])
+@login_required
+def refresh_question_pool():
+    """Soru havuzunu yenile - admin veya gelişmiş kullanıcılar için"""
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    data = request.json
+    force_refresh = data.get('force_refresh', False)
+    
+    try:
+        agent = TestAIAgent(user.interest)
+        refresh_result = agent.refresh_question_pool(force_refresh=force_refresh)
+        
+        if refresh_result:
+            # Yenileme sonrası istatistikleri al
+            new_stats = agent.get_question_statistics(user_id=user.username)
+            return jsonify({
+                'success': True,
+                'message': 'Soru havuzu başarıyla yenilendi.',
+                'new_stats': new_stats
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'Soru havuzu zaten güncel. Yenileme gerekmiyor.',
+                'current_stats': agent.get_question_statistics(user_id=user.username)
+            })
+        
+    except Exception as e:
+        return jsonify({'error': f'Havuz yenileme hatası: {str(e)}'}), 500
+
+# Yeni endpoint: Adaptif test önerisi
+@app.route('/test_your_skill/recommend_adaptive', methods=['GET'])
+@login_required
+def recommend_adaptive_test():
+    """Kullanıcıya adaptif test önerisi yap"""
+    user = User.query.filter_by(username=session['username']).first()
+    if not user.interest:
+        return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
+    try:
+        # Son test sonuçlarını analiz et
+        recent_tests = TestSession.query.filter_by(
+            username=user.username,
+            status='completed'
+        ).order_by(TestSession.start_time.desc()).limit(3).all()
+        
+        recommendation = {
+            'should_use_adaptive': False,
+            'reason': '',
+            'suggested_difficulty': 'mixed',
+            'focus_areas': []
+        }
+        
+        if len(recent_tests) >= 2:
+            # Son testlerin analizi
+            total_success = 0
+            weak_areas = {}
+            test_count = 0
+            
+            for test in recent_tests:
+                if test.results:
+                    try:
+                        results_data = json.loads(test.results)
+                        success_rate = results_data.get('summary', {}).get('success_rate', 0)
+                        total_success += success_rate
+                        
+                        # Zayıf alanları topla
+                        weak_areas_data = results_data.get('weak_areas', [])
+                        for area in weak_areas_data:
+                            category = area.get('category', 'Genel')
+                            if category not in weak_areas:
+                                weak_areas[category] = {'total': 0, 'correct': 0}
+                            weak_areas[category]['total'] += area.get('questions_count', 1)
+                            weak_areas[category]['correct'] += area.get('questions_count', 1) - 1
+                        
+                        test_count += 1
+                    except:
+                        continue
+            
+            if test_count > 0:
+                avg_success_rate = total_success / test_count
+                
+                # Adaptif test önerisi
+                if avg_success_rate < 70:  # %70'in altında başarı
+                    recommendation['should_use_adaptive'] = True
+                    recommendation['reason'] = f'Son testlerde ortalama %{avg_success_rate:.1f} başarı. Zayıf alanlara odaklanmak için adaptif test önerilir.'
+                    
+                    # Zorluk seviyesi önerisi
+                    if avg_success_rate < 50:
+                        recommendation['suggested_difficulty'] = 'beginner'
+                    elif avg_success_rate < 60:
+                        recommendation['suggested_difficulty'] = 'intermediate'
+                    else:
+                        recommendation['suggested_difficulty'] = 'mixed'
+                    
+                    # Odaklanılacak alanlar
+                    for category, stats in weak_areas.items():
+                        if stats['total'] > 0:
+                            success_rate = (stats['correct'] / stats['total']) * 100
+                            if success_rate < 60:
+                                recommendation['focus_areas'].append({
+                                    'category': category,
+                                    'current_success_rate': success_rate,
+                                    'priority': 'high' if success_rate < 40 else 'medium'
+                                })
+                else:
+                    recommendation['reason'] = f'Son testlerde ortalama %{avg_success_rate:.1f} başarı. Mevcut seviyede devam edebilirsiniz.'
+        
+        return jsonify({
+            'success': True,
+            'recommendation': recommendation
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
