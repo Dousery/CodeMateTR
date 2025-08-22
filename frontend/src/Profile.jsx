@@ -14,6 +14,7 @@ import ForumIcon from '@mui/icons-material/Forum';
 import StarIcon from '@mui/icons-material/Star';
 import CommentIcon from '@mui/icons-material/Comment';
 import CodeIcon from '@mui/icons-material/Code';
+import PsychologyIcon from '@mui/icons-material/Psychology';
 import axios from 'axios';
 import API_ENDPOINTS from './config.js';
 
