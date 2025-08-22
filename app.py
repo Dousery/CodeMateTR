@@ -19,6 +19,7 @@ from agents.code_agent import CodeAIAgent
 
 from utils.code_formatter import code_indenter
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import text
 import json
 from functools import wraps
 import logging
@@ -345,7 +346,6 @@ def init_app():
             
             # Migration: password_hash sütununu güncelle
             try:
-                from sqlalchemy import text
                 with db.engine.connect() as conn:
                     conn.execute(text("""
                         ALTER TABLE "user" 
@@ -435,7 +435,8 @@ def login():
     try:
         # Database connection'ı kontrol et
         try:
-            db.engine.execute("SELECT 1")
+            with db.engine.connect() as conn:
+                conn.execute(db.text("SELECT 1"))
         except Exception as db_error:
             print(f"Database connection error: {db_error}")
             return jsonify({'error': 'Veritabanı bağlantı hatası. Lütfen daha sonra tekrar deneyin.'}), 503
@@ -532,7 +533,8 @@ def health_check():
     import os
     try:
         # Database connection'ı test et
-        db.engine.execute("SELECT 1")
+        with db.engine.connect() as conn:
+            conn.execute(db.text("SELECT 1"))
         db_status = "connected"
     except Exception as e:
         db_status = f"error: {str(e)}"
@@ -553,7 +555,8 @@ def database_test():
     """Database connection test endpoint'i"""
     try:
         # Database connection'ı test et
-        result = db.engine.execute("SELECT 1 as test").fetchone()
+        with db.engine.connect() as conn:
+            result = conn.execute(db.text("SELECT 1 as test")).fetchone()
         
         # Pool bilgilerini al
         pool_info = {
