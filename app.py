@@ -493,11 +493,9 @@ def login():
         # Username'i temizle
         username = username.strip()
         
-        # Database query'yi optimize et - sadece gerekli alanları çek
+        # Database query - tüm User model'ini çek (method'lar için gerekli)
         try:
-            user = User.query.filter_by(username=username).with_entities(
-                User.id, User.username, User.password_hash, User.interest
-            ).first()
+            user = User.query.filter_by(username=username).first()
         except Exception as query_error:
             print(f"Database query error: {query_error}")
             return jsonify({'error': 'Veritabanı sorgu hatası. Lütfen daha sonra tekrar deneyin.'}), 500
