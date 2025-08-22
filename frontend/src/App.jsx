@@ -10,7 +10,7 @@ import AutoInterview from './AutoInterview';
 import Forum from './Forum';
 import Header from './Header';
 import Profile from './Profile';
-import SmartJobFinder from './SmartJobFinder';
+
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 
 const theme = createTheme({
@@ -97,7 +97,9 @@ function App() {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-          }
+          },
+          // Timeout süresini artır
+          signal: AbortSignal.timeout(30000) // 30 saniye
         });
 
         if (response.ok) {
@@ -197,7 +199,7 @@ function App() {
               <Route path="/test" element={<ProtectedRoute><Test /></ProtectedRoute>} />
               <Route path="/code" element={<ProtectedRoute><Code /></ProtectedRoute>} />
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
-              <Route path="/smart-job-finder" element={<ProtectedRoute><SmartJobFinder /></ProtectedRoute>} />
+
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
               {/* Catch-all route for 404 handling */}

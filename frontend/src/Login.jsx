@@ -23,7 +23,7 @@ export default function Login({ setIsLoggedIn }) {
     try {
       const res = await axios.post(API_ENDPOINTS.LOGIN, form, { 
         withCredentials: true,
-        timeout: 10000 // 10 saniye timeout
+        timeout: 30000 // 30 saniye timeout - Render için artırıldı
       });
       
       if (res.data.message === 'Giriş başarılı.') {
@@ -31,10 +31,10 @@ export default function Login({ setIsLoggedIn }) {
         
         // Session durumunu kontrol et
         try {
-          const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
-            withCredentials: true,
-            timeout: 5000
-          });
+                  const sessionRes = await axios.get(API_ENDPOINTS.SESSION_STATUS, { 
+          withCredentials: true,
+          timeout: 15000 // 15 saniye timeout
+        });
           console.log('Session status:', sessionRes.data);
         } catch (sessionErr) {
           console.warn('Session status check failed:', sessionErr);
@@ -44,7 +44,7 @@ export default function Login({ setIsLoggedIn }) {
         try {
           const profileRes = await axios.get(API_ENDPOINTS.PROFILE, { 
             withCredentials: true,
-            timeout: 5000
+            timeout: 15000 // 15 saniye timeout
           });
           if (profileRes.data.interest) {
             localStorage.setItem('interest', profileRes.data.interest);

@@ -6,7 +6,7 @@ import CodeIcon from '@mui/icons-material/Code';
 import QuizIcon from '@mui/icons-material/Quiz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
-import WorkIcon from '@mui/icons-material/Work';
+
 import ForumIcon from '@mui/icons-material/Forum';
 import axios from 'axios';
 import API_ENDPOINTS from './config.js';
@@ -33,13 +33,7 @@ const modules = [
     path: '/auto-interview',
     tags: ['AI Recruiter', 'Sesli Mülakat']
   },
-  {
-    title: 'Akıllı İş Bulma',
-    desc: 'CV\'ni analiz et, ideal işleri keşfet.',
-    icon: <WorkIcon fontSize="large" color="secondary" />, 
-    path: '/smart-job-finder',
-    tags: ['AI CV Analizi', 'Kariyer Önerileri']
-  },
+
 
 ];
 

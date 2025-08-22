@@ -10,7 +10,7 @@ import { useAuth } from './App';
 import QuizIcon from '@mui/icons-material/Quiz';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import ForumIcon from '@mui/icons-material/Forum';
-import WorkIcon from '@mui/icons-material/Work';
+
 import StarIcon from '@mui/icons-material/Star';
 import CommentIcon from '@mui/icons-material/Comment';
 import CodeIcon from '@mui/icons-material/Code';
@@ -285,12 +285,12 @@ export default function Profile({ setIsLoggedIn }) {
                       border: '1px solid rgba(255,255,255,0.1)',
                       textAlign: 'center'
                     }}>
-                      <WorkIcon sx={{ color: userStats?.stats?.has_cv ? '#4caf50' : '#f44336', fontSize: 35, mb: 1 }} />
+                      <PsychologyIcon sx={{ color: userStats?.stats?.has_cv ? '#4caf50' : '#f44336', fontSize: 35, mb: 1 }} />
                       <Typography variant="h6" fontWeight={700} color="white" mb={0.5}>
-                        CV Analizi
+                        Profil Durumu
                       </Typography>
                       <Chip 
-                        label={userStats?.stats?.has_cv ? 'Yüklenmiş' : 'Yüklenmemiş'}
+                        label={userStats?.stats?.has_cv ? 'Aktif' : 'Pasif'}
                         size="small"
                         sx={{ 
                           bgcolor: userStats?.stats?.has_cv ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)',

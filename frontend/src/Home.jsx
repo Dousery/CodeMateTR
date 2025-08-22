@@ -204,7 +204,7 @@ export default function Home() {
               lineHeight: 1.6
             }}
           >
-            AI destekli testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Akıllı iş bulma sistemi ile hayalindeki kariyere adım at. Modern, şık ve interaktif bir deneyim seni bekliyor!
+            AI destekli testler, kodlama ve mülakat simülasyonları ile kendini geliştir. Modern, şık ve interaktif bir deneyim seni bekliyor!
           </Typography>
         </motion.div>
         

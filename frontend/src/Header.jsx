@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button, Badge, Typography, Divider, Chip, keyframes, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
 import API_ENDPOINTS from './config.js';
 import QuizIcon from '@mui/icons-material/Quiz';
-import WorkIcon from '@mui/icons-material/Work';
+
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import CodeIcon from '@mui/icons-material/Code';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
@@ -21,7 +21,7 @@ const menuItems = [
   { icon: <QuizIcon />, label: 'Test Çöz', route: '/test' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
-  { icon: <WorkIcon />, label: 'Akıllı İş Bulma', route: '/smart-job-finder' },
+
   { icon: <ForumIcon />, label: 'Forum', route: '/forum' },
 ];
 
