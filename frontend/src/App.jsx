@@ -10,6 +10,7 @@ import AutoInterview from './AutoInterview';
 import Forum from './Forum';
 import Header from './Header';
 import Profile from './Profile';
+import AdminPanel from './AdminPanel';
 
 import { Box, CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 
@@ -202,6 +203,7 @@ function App() {
 
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><AdminPanel /></ProtectedRoute>} />
               {/* Catch-all route for 404 handling */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -277,30 +277,7 @@ export default function Profile({ setIsLoggedIn }) {
                     </Box>
                   </Grid>
 
-                  {/* CV Durumu */}
-                  <Grid item xs={12} sm={6} md={4}>
-                    <Box sx={{ 
-                      p: 2, 
-                      borderRadius: 3, 
-                      bgcolor: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      textAlign: 'center'
-                    }}>
-                      <PsychologyIcon sx={{ color: userStats?.stats?.has_cv ? '#4caf50' : '#f44336', fontSize: 35, mb: 1 }} />
-                      <Typography variant="h6" fontWeight={700} color="white" mb={0.5}>
-                        Profil Durumu
-                      </Typography>
-                      <Chip 
-                        label={userStats?.stats?.has_cv ? 'Aktif' : 'Pasif'}
-                        size="small"
-                        sx={{ 
-                          bgcolor: userStats?.stats?.has_cv ? 'rgba(76, 175, 80, 0.3)' : 'rgba(244, 67, 54, 0.3)',
-                          color: userStats?.stats?.has_cv ? '#4caf50' : '#f44336',
-                          fontWeight: 600
-                        }}
-                      />
-                    </Box>
-                  </Grid>
+
 
                 </Grid>
               </Box>

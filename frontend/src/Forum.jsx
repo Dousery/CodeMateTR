@@ -51,7 +51,8 @@ import {
   StarBorder as StarBorderIcon,
   AddComment as AddCommentIcon,
   Send as SendIcon,
-  Delete as DeleteIcon
+  Delete as DeleteIcon,
+  Restore as RestoreIcon
 } from '@mui/icons-material';
 
 const Forum = () => {
@@ -76,6 +77,7 @@ const Forum = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [postTypeFilter, setPostTypeFilter] = useState('all');
   const [sortBy, setSortBy] = useState('latest');
+  const [interestFilter, setInterestFilter] = useState('all');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [leaderboard, setLeaderboard] = useState([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
@@ -92,6 +94,7 @@ const Forum = () => {
   const [showSolutionDialog, setShowSolutionDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const postTypes = [
     { value: 'discussion', label: 'Tartışma' },
@@ -110,7 +113,22 @@ const Forum = () => {
     fetchPosts();
     fetchStats();
     fetchLeaderboard();
-  }, [currentPage, searchTerm, postTypeFilter, sortBy]);
+    checkAdminStatus();
+  }, [currentPage, searchTerm, postTypeFilter, sortBy, interestFilter]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.PROFILE, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const userData = await response.json();
+        setIsAdmin(userData.is_admin || false);
+      }
+    } catch (error) {
+      console.error('Admin status check error:', error);
+    }
+  };
 
 
 
@@ -258,6 +276,39 @@ const Forum = () => {
     }
   };
 
+  const handleRestorePost = async (postId) => {
+    try {
+      const response = await fetch(API_ENDPOINTS.ADMIN_RESTORE_POST, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({ post_id: postId })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gönderi geri yüklenemedi');
+      }
+
+      setSnackbar({
+        open: true,
+        message: 'Gönderi başarıyla geri yüklendi!',
+        severity: 'success'
+      });
+
+      fetchPosts();
+      fetchStats();
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.message,
+        severity: 'error'
+      });
+    }
+  };
+
   const fetchPosts = async () => {
     try {
       setLoading(true);
@@ -268,6 +319,11 @@ const Forum = () => {
         sort: sortBy,
         search: searchTerm
       });
+
+      // Admin ise interest filter ekle
+      if (isAdmin && interestFilter !== 'all') {
+        params.append('interest', interestFilter);
+      }
 
       const response = await fetch(`${API_ENDPOINTS.FORUM_POSTS}?${params}`, {
         credentials: 'include'
@@ -748,7 +804,7 @@ const Forum = () => {
                     sx={{
                       color: 'white',
                       '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
                       background: 'rgba(255,255,255,0.05)',
                       borderRadius: 1
                     }}
@@ -760,7 +816,34 @@ const Forum = () => {
                   </Select>
                 </FormControl>
               </Grid>
-              <Grid item xs={12} md={3}>
+              
+              {/* Admin için interest filter */}
+              {isAdmin && (
+                <Grid item xs={12} md={2}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Alan</InputLabel>
+                    <Select
+                      value={interestFilter}
+                      onChange={(e) => setInterestFilter(e.target.value)}
+                      sx={{
+                        color: 'white',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 1
+                      }}
+                    >
+                      <MenuItem value="all">Tüm Alanlar</MenuItem>
+                      <MenuItem value="AI">AI</MenuItem>
+                      <MenuItem value="Data Science">Data Science</MenuItem>
+                      <MenuItem value="Web Development">Web Development</MenuItem>
+                      <MenuItem value="Mobile">Mobile</MenuItem>
+                      <MenuItem value="Cyber Security">Cyber Security</MenuItem>
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
+              <Grid item xs={12} md={2}>
                 <FormControl fullWidth>
                   <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sıralama</InputLabel>
                   <Select
@@ -814,7 +897,7 @@ const Forum = () => {
         transition={{ duration: 0.6, delay: 0.4 }}
       >
         <Box sx={{ mb: 3 }}>
-          {posts.map((post, index) => (
+          {posts.filter(post => !post.is_removed || isAdmin).map((post, index) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, y: 20 }}
@@ -829,20 +912,25 @@ const Forum = () => {
             key={post.id}
             sx={{
               mb: 2,
-              background: post.is_solved ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.05)',
+              background: post.is_removed ? 'rgba(244, 67, 54, 0.05)' : 
+                         post.is_solved ? 'rgba(76, 175, 80, 0.05)' : 'rgba(255,255,255,0.05)',
               backdropFilter: 'blur(20px)',
-              border: post.is_solved ? '2px solid #4CAF50' : '1px solid rgba(255,255,255,0.1)',
-              cursor: 'pointer',
+              border: post.is_removed ? '2px solid #f44336' : 
+                     post.is_solved ? '2px solid #4CAF50' : '1px solid rgba(255,255,255,0.1)',
+              cursor: post.is_removed ? 'default' : 'pointer',
               transition: 'all 0.3s ease',
               boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+              opacity: post.is_removed ? 0.6 : 1,
               '&:hover': {
-                background: post.is_solved ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.08)',
-                transform: 'translateY(-4px)',
+                background: post.is_removed ? 'rgba(244, 67, 54, 0.08)' :
+                           post.is_solved ? 'rgba(76, 175, 80, 0.08)' : 'rgba(255,255,255,0.08)',
+                transform: post.is_removed ? 'none' : 'translateY(-4px)',
                 boxShadow: '0 12px 40px rgba(0,0,0,0.4)',
-                border: post.is_solved ? '2px solid #66BB6A' : '1px solid rgba(255,255,255,0.2)'
+                border: post.is_removed ? '2px solid #f44336' :
+                       post.is_solved ? '2px solid #66BB6A' : '1px solid rgba(255,255,255,0.2)'
               }
             }}
-            onClick={() => handlePostClick(post)}
+            onClick={() => !post.is_removed && handlePostClick(post)}
           >
             <CardContent>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
@@ -851,6 +939,32 @@ const Forum = () => {
                     <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
                       {post.title}
                     </Typography>
+                    {post.is_admin_author && (
+                      <Chip
+                        label="👑 ADMIN"
+                        size="small"
+                        sx={{
+                          background: 'linear-gradient(45deg, #ff9800 0%, #f57c00 100%)',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '0.7rem',
+                          boxShadow: '0 2px 8px rgba(255, 152, 0, 0.3)'
+                        }}
+                      />
+                    )}
+                    {post.is_removed && (
+                      <Chip
+                        label="🚫 KALDIRILDI"
+                        size="small"
+                        sx={{
+                          background: 'linear-gradient(45deg, #f44336 0%, #d32f2f 100%)',
+                          color: 'white',
+                          fontWeight: 'bold',
+                          fontSize: '0.7rem',
+                          boxShadow: '0 2px 8px rgba(244, 67, 54, 0.3)'
+                        }}
+                      />
+                    )}
                     {post.is_solved && (
                       <Chip
                         label="✅ Çözüldü"
@@ -995,6 +1109,29 @@ const Forum = () => {
                     >
                       <ReportIcon />
                     </IconButton>
+                  )}
+                  
+                  {/* Admin için geri yükleme butonu */}
+                  {isAdmin && post.is_removed && (
+                    <Tooltip title="Gönderiyi Geri Yükle">
+                      <IconButton
+                        size="small"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRestorePost(post.id);
+                        }}
+                        sx={{ 
+                          color: '#4caf50',
+                          '&:hover': { 
+                            bgcolor: 'rgba(76, 175, 80, 0.1)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        <RestoreIcon />
+                      </IconButton>
+                    </Tooltip>
                   )}
                   
                   {/* Sadece gönderi sahibi silebilir */}

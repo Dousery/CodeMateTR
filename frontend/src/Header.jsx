@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { AppBar, Toolbar, IconButton, Menu, MenuItem, Avatar, Box, Tooltip, Stack, Button, Badge, Typography, Divider, Chip, keyframes, Dialog, DialogTitle, DialogContent, DialogActions, TextField, Alert } from '@mui/material';
 import API_ENDPOINTS from './config.js';
 import QuizIcon from '@mui/icons-material/Quiz';
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import CodeIcon from '@mui/icons-material/Code';
@@ -21,8 +22,12 @@ const menuItems = [
   { icon: <QuizIcon />, label: 'Test Çöz', route: '/test' },
   { icon: <CodeIcon />, label: 'Kodlama Odası', route: '/code' },
   { icon: <RecordVoiceOverIcon />, label: 'Otomatik Mülakat', route: '/auto-interview' },
-
   { icon: <ForumIcon />, label: 'Forum', route: '/forum' },
+];
+
+// Admin menü öğeleri
+const adminMenuItems = [
+  { icon: <AdminPanelSettingsIcon />, label: 'Admin Paneli', route: '/admin' },
 ];
 
 function CodeMateLogo({ onClick }) {
@@ -55,10 +60,32 @@ export default function Header() {
   const [passwordChangeError, setPasswordChangeError] = useState('');
   const [passwordChangeSuccess, setPasswordChangeSuccess] = useState('');
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const navigate = useNavigate();
   const { isLoggedIn } = useAuth();
   const username = isLoggedIn ? localStorage.getItem('username') : null;
+
+  // Admin kontrolü
+  useEffect(() => {
+    if (isLoggedIn && username) {
+      checkAdminStatus();
+    }
+  }, [isLoggedIn, username]);
+
+  const checkAdminStatus = async () => {
+    try {
+      const response = await fetch(API_ENDPOINTS.PROFILE, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const userData = await response.json();
+        setIsAdmin(userData.is_admin || false);
+      }
+    } catch (error) {
+      console.error('Admin status check error:', error);
+    }
+  };
 
   const handleMenu = (event) => {
     setAnchorEl(event.currentTarget);
@@ -327,6 +354,40 @@ export default function Header() {
                         transform: 'scale(1.1)',
                         border: '1px solid rgba(255,255,255,0.2)',
                         boxShadow: '0 4px 15px rgba(0,0,0,0.2)',
+                      },
+                      '& .MuiSvgIcon-root': {
+                        fontSize: '1.3rem'
+                      }
+                    }}
+                    size="medium"
+                  >
+                    {item.icon}
+                  </IconButton>
+                </Tooltip>
+              ))}
+              
+              {/* Admin menü öğeleri */}
+              {isAdmin && adminMenuItems.map((item) => (
+                <Tooltip title={item.label} key={item.label} arrow>
+                  <IconButton
+                    onClick={() => navigate(item.route)}
+                    sx={{
+                      color: '#ff9800',
+                      opacity: 0.9,
+                      borderRadius: 2,
+                      transition: 'all 0.3s ease',
+                      mx: 0.5,
+                      background: 'rgba(255, 152, 0, 0.1)',
+                      border: '1px solid rgba(255, 152, 0, 0.3)',
+                      width: 45,
+                      height: 45,
+                      p: 1,
+                      '&:hover': {
+                        bgcolor: 'rgba(255, 152, 0, 0.2)',
+                        color: '#ff9800',
+                        transform: 'scale(1.1)',
+                        border: '1px solid rgba(255, 152, 0, 0.5)',
+                        boxShadow: '0 4px 15px rgba(255, 152, 0, 0.2)',
                       },
                       '& .MuiSvgIcon-root': {
                         fontSize: '1.3rem'

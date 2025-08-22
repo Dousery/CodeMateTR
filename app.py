@@ -152,6 +152,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)  # scrypt hash için daha uzun alan
     interest = db.Column(db.String(80), nullable=True)
     cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
+    is_admin = db.Column(db.Boolean, default=False)  # Admin yetkisi
 
     def set_password(self, password):
         # Daha kısa hash için method belirt
@@ -212,6 +213,10 @@ class ForumPost(db.Model):
     solved_by = db.Column(db.String(80), nullable=True)  # Kim çözdü?
     solved_at = db.Column(db.DateTime, nullable=True)
     bounty_points = db.Column(db.Integer, default=0)  # Ödül puanları
+    is_removed = db.Column(db.Boolean, default=False)  # Admin tarafından kaldırıldı mı?
+    removed_by = db.Column(db.String(80), nullable=True)  # Kim kaldırdı?
+    removed_at = db.Column(db.DateTime, nullable=True)
+    removal_reason = db.Column(db.Text, nullable=True)  # Kaldırılma sebebi
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -246,18 +251,20 @@ class ForumNotification(db.Model):
     is_read = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+# Şikayet sistemi için yeni model
 class ForumReport(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    reporter_username = db.Column(db.String(80), nullable=False)
-    reported_username = db.Column(db.String(80), nullable=False)
-    post_id = db.Column(db.Integer, db.ForeignKey('forum_post.id'), nullable=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('forum_post.id'), nullable=False)
     comment_id = db.Column(db.Integer, db.ForeignKey('forum_comment.id'), nullable=True)
-    reason = db.Column(db.String(100), nullable=False)  # spam, inappropriate, duplicate, other
-    description = db.Column(db.Text, nullable=True)
-    status = db.Column(db.String(20), default='pending')  # pending, reviewed, resolved, dismissed
-    moderator_username = db.Column(db.String(80), nullable=True)
+    reporter_username = db.Column(db.String(80), nullable=False)
+    report_reason = db.Column(db.String(100), nullable=False)  # spam, inappropriate, offensive, other
+    report_details = db.Column(db.Text, nullable=True)
+    status = db.Column(db.String(20), default='pending')  # pending, reviewed, resolved
+    reviewed_by = db.Column(db.String(80), nullable=True)
+    reviewed_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    resolved_at = db.Column(db.DateTime, nullable=True)
+
+
 
 class UserBadge(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -301,6 +308,19 @@ class TestPerformance(db.Model):
 users = {}  # username: {password_hash, interest}
 
 
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return jsonify({'error': 'Oturum açmanız gerekiyor'}), 401
+        
+        user = User.query.filter_by(username=session['username']).first()
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Admin yetkisi gerekiyor'}), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
 
 def allowed_file(filename):
     return '.' in filename and \
@@ -398,14 +418,6 @@ def init_app():
             print(f"Veritabanı tabloları zaten mevcut veya oluşturulamadı: {e}")
             # Hata durumunda devam et
             pass
-        # Veritabanı tablolarını oluştur (eğer yoksa)
-        try:
-            print("🔍 Second db.create_all() call...")
-            db.create_all()
-            print("✅ Veritabanı tabloları kontrol edildi ve oluşturuldu!")
-        except Exception as e:
-            print(f"❌ Veritabanı oluşturma hatası: {e}")
-        
         # Session cleanup'i geçici olarak devre dışı bırak
         print("ℹ️ Session cleanup skipped for now")
 
@@ -2046,14 +2058,15 @@ def get_auto_interview_status():
 @app.route('/forum/posts', methods=['GET'])
 @login_required
 def get_forum_posts():
-    """İlgi alanına göre forum gönderilerini getirir"""
+    """İlgi alanına göre forum gönderilerini getirir (Admin tüm alanları görebilir)"""
     try:
         user = User.query.filter_by(username=session['username']).first()
         if not user:
             print(f"WARNING: User not found in forum posts: {session['username']}")
             return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
         
-        if not user.interest:
+        # Admin ise tüm alanları görebilir
+        if not user.is_admin and not user.interest:
             return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     except Exception as e:
         print(f"ERROR in forum posts endpoint: {str(e)}")
@@ -2065,9 +2078,20 @@ def get_forum_posts():
     post_type = request.args.get('type', 'all')
     sort_by = request.args.get('sort', 'latest')  # latest, popular, most_commented
     search = request.args.get('search', '')
+    interest_filter = request.args.get('interest', '')
     
-    # Base query - kullanıcının ilgi alanına göre
-    query = ForumPost.query.filter_by(interest=user.interest)
+    # Base query - admin ise tüm alanları, değilse sadece kendi alanını
+    if user.is_admin:
+        if interest_filter:
+            query = ForumPost.query.filter_by(interest=interest_filter)
+        else:
+            query = ForumPost.query
+    else:
+        query = ForumPost.query.filter_by(interest=user.interest)
+    
+    # Kaldırılan gönderileri filtrele (admin hariç)
+    if not user.is_admin:
+        query = query.filter_by(is_removed=False)
     
     # Post type filtresi
     if post_type != 'all':
@@ -2107,11 +2131,16 @@ def get_forum_posts():
             post_id=post.id
         ).first() is not None
         
+        # Admin bilgisini kontrol et
+        author_user = User.query.filter_by(username=post.author_username).first()
+        is_admin_author = author_user.is_admin if author_user else False
+        
         posts_data.append({
             'id': post.id,
             'title': post.title,
             'content': post.content[:200] + '...' if len(post.content) > 200 else post.content,
             'author': post.author_username,
+            'is_admin_author': is_admin_author,
             'post_type': post.post_type,
             'tags': json.loads(post.tags) if post.tags else [],
             'views': post.views,
@@ -2121,6 +2150,8 @@ def get_forum_posts():
             'solved_by': post.solved_by,
             'solved_at': post.solved_at.strftime('%Y-%m-%d %H:%M') if post.solved_at else None,
             'user_liked': user_liked,
+            'is_removed': post.is_removed,
+            'removal_reason': post.removal_reason,
             'created_at': post.created_at.strftime('%Y-%m-%d %H:%M'),
             'updated_at': post.updated_at.strftime('%Y-%m-%d %H:%M')
         })
@@ -2613,32 +2644,30 @@ def delete_notification(notification_id):
 def report_content():
     """İçerik raporlar"""
     data = request.json
-    reported_username = data.get('reported_username')
     post_id = data.get('post_id')
     comment_id = data.get('comment_id')
-    reason = data.get('reason')
-    description = data.get('description')
+    report_reason = data.get('reason')
+    report_details = data.get('description')
     
-    if not reported_username or not reason:
-        return jsonify({'error': 'Gerekli alanlar eksik.'}), 400
+    if not post_id or not report_reason:
+        return jsonify({'error': 'Post ID ve rapor sebebi gerekli.'}), 400
     
     try:
         new_report = ForumReport(
             reporter_username=session['username'],
-            reported_username=reported_username,
             post_id=post_id,
             comment_id=comment_id,
-            reason=reason,
-            description=description
+            report_reason=report_reason,
+            report_details=report_details
         )
         
         db.session.add(new_report)
         db.session.commit()
         
-        return jsonify({'message': 'Rapor başarıyla gönderildi.'})
+        return jsonify({'message': 'Şikayet başarıyla gönderildi.'})
         
     except Exception as e:
-        return jsonify({'error': f'Rapor hatası: {str(e)}'}), 500
+        return jsonify({'error': f'Şikayet hatası: {str(e)}'}), 500
 
 @app.route('/forum/badges/<username>', methods=['GET'])
 @login_required
@@ -3012,6 +3041,214 @@ def get_forum_analytics():
         
     except Exception as e:
         return jsonify({'error': f'Analitik hatası: {str(e)}'}), 500
+
+# ==================== ADMIN ENDPOINTS ====================
+
+@app.route('/admin/reports', methods=['GET'])
+@admin_required
+def get_admin_reports():
+    """Admin için şikayet edilen gönderileri getirir"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        reports = ForumReport.query.filter_by(status='pending')\
+            .order_by(ForumReport.created_at.desc())\
+            .paginate(page=page, per_page=per_page, error_out=False)
+        
+        reports_data = []
+        for report in reports.items:
+            post = ForumPost.query.get(report.post_id)
+            if post:
+                reports_data.append({
+                    'id': report.id,
+                    'post_id': report.post_id,
+                    'post_title': post.title,
+                    'post_author': post.author_username,
+                    'post_interest': post.interest,
+                    'reporter_username': report.reporter_username,
+                    'report_reason': report.report_reason,
+                    'report_details': report.report_details,
+                    'status': report.status,
+                    'created_at': report.created_at.isoformat()
+                })
+        
+        return jsonify({
+            'reports': reports_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': reports.total,
+                'pages': reports.pages
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Şikayet listesi hatası: {str(e)}'}), 500
+
+@app.route('/admin/posts/remove', methods=['POST'])
+@admin_required
+def admin_remove_post():
+    """Admin tarafından gönderi kaldırma"""
+    try:
+        data = request.get_json()
+        post_id = data.get('post_id')
+        removal_reason = data.get('removal_reason', 'Uygunsuz içerik')
+        
+        post = ForumPost.query.get(post_id)
+        if not post:
+            return jsonify({'error': 'Gönderi bulunamadı'}), 404
+        
+        post.is_removed = True
+        post.removed_by = session['username']
+        post.removed_at = datetime.utcnow()
+        post.removal_reason = removal_reason
+        
+        # Şikayetleri çözüldü olarak işaretle
+        ForumReport.query.filter_by(post_id=post_id).update({
+            'status': 'resolved',
+            'reviewed_by': session['username'],
+            'reviewed_at': datetime.utcnow()
+        })
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Gönderi başarıyla kaldırıldı'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gönderi kaldırma hatası: {str(e)}'}), 500
+
+@app.route('/admin/posts/restore', methods=['POST'])
+@admin_required
+def admin_restore_post():
+    """Admin tarafından gönderi geri yükleme"""
+    try:
+        data = request.get_json()
+        post_id = data.get('post_id')
+        
+        post = ForumPost.query.get(post_id)
+        if not post:
+            return jsonify({'error': 'Gönderi bulunamadı'}), 404
+        
+        post.is_removed = False
+        post.removed_by = None
+        post.removed_at = None
+        post.removal_reason = None
+        
+        db.session.commit()
+        
+        return jsonify({'message': 'Gönderi başarıyla geri yüklendi'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gönderi geri yükleme hatası: {str(e)}'}), 500
+
+@app.route('/admin/announcement', methods=['POST'])
+@admin_required
+def admin_create_announcement():
+    """Admin tarafından duyuru oluşturma"""
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        content = data.get('content')
+        interest = data.get('interest', 'all')  # 'all' tüm alanlar için
+        
+        if not title or not content:
+            return jsonify({'error': 'Başlık ve içerik gerekli'}), 400
+        
+        # Duyuru gönderisi oluştur
+        announcement = ForumPost(
+            title=title,
+            content=content,
+            author_username=session['username'],
+            interest=interest,
+            post_type='announcement'
+        )
+        
+        db.session.add(announcement)
+        db.session.commit()
+        
+        # Tüm kullanıcılara bildirim gönder
+        users = User.query.all()
+        for user in users:
+            notification = ForumNotification(
+                username=user.username,
+                notification_type='announcement',
+                title=f'Yeni Duyuru: {title}',
+                message=content[:100] + '...' if len(content) > 100 else content,
+                related_post_id=announcement.id
+            )
+            db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Duyuru başarıyla oluşturuldu',
+            'announcement_id': announcement.id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Duyuru oluşturma hatası: {str(e)}'}), 500
+
+@app.route('/admin/stats', methods=['GET'])
+@admin_required
+def get_admin_stats():
+    """Admin için genel forum istatistikleri"""
+    try:
+        # Toplam istatistikler
+        total_posts = ForumPost.query.count()
+        total_comments = ForumComment.query.count()
+        total_users = User.query.count()
+        total_reports = ForumReport.query.filter_by(status='pending').count()
+        
+        # Kaldırılan gönderiler
+        removed_posts = ForumPost.query.filter_by(is_removed=True).count()
+        
+        # Son 7 günün aktivitesi
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        recent_posts = ForumPost.query.filter(
+            ForumPost.created_at >= seven_days_ago
+        ).count()
+        
+        recent_comments = ForumComment.query.filter(
+            ForumComment.created_at >= seven_days_ago
+        ).count()
+        
+        # En çok şikayet edilen gönderiler
+        top_reported = db.session.query(
+            ForumPost.id,
+            ForumPost.title,
+            ForumPost.author_username,
+            db.func.count(ForumReport.id).label('report_count')
+        ).join(ForumReport, ForumPost.id == ForumReport.post_id)\
+         .group_by(ForumPost.id)\
+         .order_by(db.func.count(ForumReport.id).desc())\
+         .limit(5).all()
+        
+        top_reported_data = []
+        for post_id, title, author, count in top_reported:
+            top_reported_data.append({
+                'post_id': post_id,
+                'title': title,
+                'author': author,
+                'report_count': count
+            })
+        
+        return jsonify({
+            'total_posts': total_posts,
+            'total_comments': total_comments,
+            'total_users': total_users,
+            'pending_reports': total_reports,
+            'removed_posts': removed_posts,
+            'recent_posts': recent_posts,
+            'recent_comments': recent_comments,
+            'top_reported_posts': top_reported_data
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Admin istatistik hatası: {str(e)}'}), 500
 
 
 
