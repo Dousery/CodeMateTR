@@ -21,11 +21,30 @@ from utils.code_formatter import code_indenter
 from flask_sqlalchemy import SQLAlchemy
 import json
 from functools import wraps
+import logging
 
 # Load environment variables
 load_dotenv()
 
-app = Flask(__name__, static_folder='static')
+# App başlangıcı
+app = Flask(__name__)
+
+# Debug logging ekle
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Environment variables'ları logla
+logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
+logger.info(f"DATABASE_URL: {os.getenv('DATABASE_URL')}")
+logger.info(f"SECRET_KEY: {'SET' if os.getenv('SECRET_KEY') else 'NOT SET'}")
+logger.info(f"GEMINI_API_KEY: {'SET' if os.getenv('GEMINI_API_KEY') else 'NOT SET'}")
+
+# CORS ayarları
+CORS(app, supports_credentials=True, origins=[
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://codematetr.onrender.com'
+])
 
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
@@ -414,20 +433,45 @@ def register():
 @app.route('/login', methods=['POST'])
 def login():
     try:
+        # Database connection'ı kontrol et
+        try:
+            db.engine.execute("SELECT 1")
+        except Exception as db_error:
+            print(f"Database connection error: {db_error}")
+            return jsonify({'error': 'Veritabanı bağlantı hatası. Lütfen daha sonra tekrar deneyin.'}), 503
+        
         data = request.json
+        if not data:
+            return jsonify({'error': 'Geçersiz istek formatı.'}), 400
+            
         username = data.get('username')
         password = data.get('password')
         
         if not username or not password:
             return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
         
-        # Database query'yi optimize et - sadece gerekli alanları çek
-        user = User.query.filter_by(username=username).with_entities(
-            User.id, User.username, User.password_hash, User.interest
-        ).first()
+        # Username'i temizle
+        username = username.strip()
         
-        if not user or not user.check_password(password):
+        # Database query'yi optimize et - sadece gerekli alanları çek
+        try:
+            user = User.query.filter_by(username=username).with_entities(
+                User.id, User.username, User.password_hash, User.interest
+            ).first()
+        except Exception as query_error:
+            print(f"Database query error: {query_error}")
+            return jsonify({'error': 'Veritabanı sorgu hatası. Lütfen daha sonra tekrar deneyin.'}), 500
+        
+        if not user:
             return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
+        
+        # Password kontrolü
+        try:
+            if not user.check_password(password):
+                return jsonify({'error': 'Geçersiz kullanıcı adı veya şifre.'}), 401
+        except Exception as password_error:
+            print(f"Password check error: {password_error}")
+            return jsonify({'error': 'Şifre doğrulama hatası. Lütfen daha sonra tekrar deneyin.'}), 500
         
         # Session'ı kalıcı yap
         session.permanent = True
@@ -448,6 +492,8 @@ def login():
         
     except Exception as e:
         print(f"Login error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': 'Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.'}), 500
 
 @app.route('/logout', methods=['POST'])
