@@ -1064,6 +1064,7 @@ export default function Test() {
           </Grid>
         </Grid>
       </Box>
+      )}
       
       {/* Adaptif Test Önerisi Modal */}
       {showAdaptiveRecommendation && adaptiveRecommendation && (
@@ -1263,32 +1264,30 @@ export default function Test() {
                   </Box>
                   
                   <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
-                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Ortalama Başarı
-                      </Typography>
-                      <Typography variant="h6">
-                        %{statistics.user_test_stats.average_success_rate.toFixed(1)}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Toplam Soru
-                      </Typography>
-                      <Typography variant="h6">
-                        {statistics.user_test_stats.total_questions_answered}
-                      </Typography>
-                    </Box>
-                    
-                    <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Favori Zorluk
-                      </Typography>
-                      <Typography variant="h6">
-                        {statistics.user_test_stats.favorite_difficulty}
-                      </Typography>
-                    </Box>
+                    <Typography variant="body2" color="text.secondary">
+                      Ortalama Başarı
+                    </Typography>
+                    <Typography variant="h6">
+                      %{statistics.user_test_stats.average_success_rate.toFixed(1)}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Toplam Soru
+                    </Typography>
+                    <Typography variant="h6">
+                      {statistics.user_test_stats.total_questions_answered}
+                    </Typography>
+                  </Box>
+                  
+                  <Box sx={{ p: 2, border: '1px solid rgba(0,0,0,0.1)', borderRadius: 1 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Favori Zorluk
+                    </Typography>
+                    <Typography variant="h6">
+                      {statistics.user_test_stats.favorite_difficulty}
+                    </Typography>
                   </Box>
                 </Stack>
               </Grid>
@@ -1316,6 +1315,4 @@ export default function Test() {
           </Paper>
         </Box>
       )}
-    </Box>
-  );
 } 
