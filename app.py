@@ -86,12 +86,21 @@ if os.getenv('FLASK_ENV') == 'production':
 else:
     CORS_ORIGINS = [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:5173']
 
-CORS(app, 
-     origins=CORS_ORIGINS,
-     supports_credentials=True,
-     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-     allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
-     expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
+# Production'da CORS ayarlarını güçlendir
+if os.getenv('FLASK_ENV') == 'production':
+    CORS(app, 
+         origins=['https://codematetr.onrender.com', 'https://btk-project-frontend.onrender.com'],
+         supports_credentials=True,
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
+         expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
+else:
+    CORS(app, 
+         origins=CORS_ORIGINS,
+         supports_credentials=True,
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
+         expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
 
 # Database configuration
 DATABASE_URL = os.getenv('DATABASE_URL')
@@ -445,8 +454,16 @@ def register():
     session['username'] = username
     return jsonify({'message': 'Kayıt başarılı.'}), 201
 
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
+    if request.method == 'OPTIONS':
+        # Preflight request için CORS header'ları
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', 'https://codematetr.onrender.com')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
     try:
         # Database connection'ı kontrol et
         try:
