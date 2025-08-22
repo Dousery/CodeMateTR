@@ -10,6 +10,10 @@ def migrate_database():
     """Migrate database to add admin and report system columns"""
     with app.app_context():
         try:
+            # Veritabanı bağlantısını test et
+            db.engine.connect().close()
+            print("✅ Database connection successful")
+            
             with db.engine.connect() as conn:
                 # 1. User tablosuna is_admin kolonu ekle
                 try:
