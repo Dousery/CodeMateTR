@@ -2549,25 +2549,28 @@ def get_forum_stats():
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     try:
-        # Kullanıcının ilgi alanındaki istatistikler
-        total_posts = ForumPost.query.filter_by(interest=user.interest).count()
+        # Kullanıcının ilgi alanındaki istatistikler (kaldırılmamış gönderiler)
+        total_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False).count()
         total_comments = ForumComment.query.join(ForumPost).filter(
-            ForumPost.interest == user.interest
+            ForumPost.interest == user.interest,
+            ForumPost.is_removed == False
         ).count()
         
-        # Kullanıcının kendi istatistikleri
+        # Kullanıcının kendi istatistikleri (kaldırılmamış gönderiler)
         user_posts = ForumPost.query.filter_by(
             author_username=session['username'],
-            interest=user.interest
+            interest=user.interest,
+            is_removed=False
         ).count()
         
         user_comments = ForumComment.query.join(ForumPost).filter(
             ForumComment.author_username == session['username'],
-            ForumPost.interest == user.interest
+            ForumPost.interest == user.interest,
+            ForumPost.is_removed == False
         ).count()
         
-        # En popüler gönderiler
-        popular_posts = ForumPost.query.filter_by(interest=user.interest)\
+        # En popüler gönderiler (kaldırılmamış gönderiler)
+        popular_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False)\
             .order_by(ForumPost.likes_count.desc(), ForumPost.views.desc())\
             .limit(5).all()
         
@@ -2839,12 +2842,13 @@ def get_user_activity(username):
 def get_leaderboard():
     """Liderlik tablosunu getirir - En iyi çözüm seçilen 3 kullanıcı"""
     try:
-        # En iyi çözüm seçilen kullanıcıları hesapla
+        # En iyi çözüm seçilen kullanıcıları hesapla (kaldırılmamış gönderiler)
         solution_leaders = db.session.query(
             ForumComment.author_username,
             db.func.count(ForumComment.id).label('solution_count')
-        ).filter(
-            ForumComment.is_solution == True
+        ).join(ForumPost).filter(
+            ForumComment.is_solution == True,
+            ForumPost.is_removed == False
         ).group_by(
             ForumComment.author_username
         ).order_by(
@@ -2892,8 +2896,8 @@ def advanced_search():
     date_to = request.args.get('date_to', '')
     
     try:
-        # Base query
-        search_query = ForumPost.query.filter_by(interest=user.interest)
+        # Base query (kaldırılmamış gönderiler)
+        search_query = ForumPost.query.filter_by(interest=user.interest, is_removed=False)
         
         # Arama terimi
         if query:
@@ -3001,36 +3005,41 @@ def get_forum_analytics():
         # Son 30 günün istatistikleri
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         
-        # Gönderi istatistikleri
-        total_posts = ForumPost.query.filter_by(interest=user.interest).count()
+        # Gönderi istatistikleri (kaldırılmamış gönderiler)
+        total_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False).count()
         recent_posts = ForumPost.query.filter(
             ForumPost.interest == user.interest,
-            ForumPost.created_at >= thirty_days_ago
+            ForumPost.created_at >= thirty_days_ago,
+            ForumPost.is_removed == False
         ).count()
         
-        # Yorum istatistikleri
+        # Yorum istatistikleri (kaldırılmamış gönderiler)
         total_comments = ForumComment.query.join(ForumPost).filter(
-            ForumPost.interest == user.interest
+            ForumPost.interest == user.interest,
+            ForumPost.is_removed == False
         ).count()
         recent_comments = ForumComment.query.join(ForumPost).filter(
             ForumPost.interest == user.interest,
-            ForumComment.created_at >= thirty_days_ago
+            ForumComment.created_at >= thirty_days_ago,
+            ForumPost.is_removed == False
         ).count()
         
-        # Çözülen sorular
+        # Çözülen sorular (kaldırılmamış gönderiler)
         solved_questions = ForumPost.query.filter(
             ForumPost.interest == user.interest,
             ForumPost.post_type == 'question',
-            ForumPost.is_solved == True
+            ForumPost.is_solved == True,
+            ForumPost.is_removed == False
         ).count()
         
-        # En aktif kullanıcılar
+        # En aktif kullanıcılar (kaldırılmamış gönderiler)
         active_users = db.session.query(
             ForumPost.author_username,
             db.func.count(ForumPost.id).label('post_count')
         ).filter(
             ForumPost.interest == user.interest,
-            ForumPost.created_at >= thirty_days_ago
+            ForumPost.created_at >= thirty_days_ago,
+            ForumPost.is_removed == False
         ).group_by(ForumPost.author_username)\
          .order_by(db.func.count(ForumPost.id).desc())\
          .limit(5).all()
