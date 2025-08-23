@@ -14,17 +14,4 @@ with app.app_context():
     print('Database initialized successfully')
 "
 
-# Run admin migration
-python -c "
-from app import app
-from migrations.add_admin_column import upgrade
-with app.app_context():
-    try:
-        upgrade()
-        print('Admin migration completed successfully')
-    except Exception as e:
-        print(f'Admin migration error: {e}')
-        # Migration hatası kritik değil, devam et
-"
-
 echo "Build completed successfully" 
