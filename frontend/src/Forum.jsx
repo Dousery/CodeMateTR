@@ -910,7 +910,7 @@ const interestTypes = [
                     </Typography>
                     {post.is_admin_post && (
                       <Chip
-                        label="👑 ADMIN"
+                        label="ADMIN"
                         size="small"
                         sx={{
                           background: 'linear-gradient(45deg, #FFD700 0%, #FFA500 100%)',
@@ -985,7 +985,7 @@ const interestTypes = [
                     fontWeight: post.author_is_admin ? 'bold' : 500 
                   }}>
                     {post.author}
-                    {post.author_is_admin && ' 👑'}
+                    {post.author_is_admin}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>

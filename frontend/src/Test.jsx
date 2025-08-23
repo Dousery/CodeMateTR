@@ -319,35 +319,7 @@ export default function Test() {
           
           {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
           
-          {/* İstatistik ve Öneri Butonları */}
-          <Stack direction="row" spacing={2} mb={3}>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={getAdaptiveRecommendation}
-              disabled={loading}
-              sx={{
-                color: 'rgba(255,255,255,0.8)',
-                borderColor: 'rgba(255,255,255,0.3)',
-                flex: 1
-              }}
-            >
-              💡 Adaptif Öneri
-            </Button>
-            <Button
-              variant="outlined"
-              size="small"
-              onClick={getTestStatistics}
-              disabled={loading}
-              sx={{
-                color: 'rgba(255,255,255,0.8)',
-                borderColor: 'rgba(255,255,255,0.3)',
-                flex: 1
-              }}
-            >
-              📊 İstatistikler
-            </Button>
-          </Stack>
+
           
           <Button 
             variant="contained" 

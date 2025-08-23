@@ -2110,11 +2110,18 @@ def get_forum_posts():
     sort_by = request.args.get('sort', 'latest')  # latest, popular, most_commented
     search = request.args.get('search', '')
     
-    # Base query - admin tüm gönderileri, normal kullanıcı sadece kendi interest'ındakileri görebilir
+    # Base query - admin tüm gönderileri, normal kullanıcı kendi interest'ındakileri + admin postlarını görebilir
     if user.is_admin:
         query = ForumPost.query.filter(ForumPost.is_removed == False)
     else:
-        query = ForumPost.query.filter_by(interest=user.interest, is_removed=False)
+        # Normal kullanıcı: kendi interest'ındaki gönderiler + admin postları
+        query = ForumPost.query.filter(
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
+            ForumPost.is_removed == False
+        )
     
     # Post type filtresi
     if post_type != 'all':
@@ -2562,10 +2569,20 @@ def get_forum_stats():
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     try:
-        # Kullanıcının ilgi alanındaki istatistikler (kaldırılmamış gönderiler)
-        total_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False).count()
+        # Kullanıcının ilgi alanındaki istatistikler + admin postları (kaldırılmamış gönderiler)
+        total_posts = ForumPost.query.filter(
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
+            ForumPost.is_removed == False
+        ).count()
+        
         total_comments = ForumComment.query.join(ForumPost).filter(
-            ForumPost.interest == user.interest,
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumPost.is_removed == False
         ).count()
         
@@ -2582,9 +2599,14 @@ def get_forum_stats():
             ForumPost.is_removed == False
         ).count()
         
-        # En popüler gönderiler (kaldırılmamış gönderiler)
-        popular_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False)\
-            .order_by(ForumPost.likes_count.desc(), ForumPost.views.desc())\
+        # En popüler gönderiler + admin postları (kaldırılmamış gönderiler)
+        popular_posts = ForumPost.query.filter(
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
+            ForumPost.is_removed == False
+        ).order_by(ForumPost.likes_count.desc(), ForumPost.views.desc())\
             .limit(5).all()
         
         popular_posts_data = []
@@ -3018,39 +3040,62 @@ def get_forum_analytics():
         # Son 30 günün istatistikleri
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         
-        # Gönderi istatistikleri (kaldırılmamış gönderiler)
-        total_posts = ForumPost.query.filter_by(interest=user.interest, is_removed=False).count()
+        # Gönderi istatistikleri + admin postları (kaldırılmamış gönderiler)
+        total_posts = ForumPost.query.filter(
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
+            ForumPost.is_removed == False
+        ).count()
+        
         recent_posts = ForumPost.query.filter(
+            db.or_(
             ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumPost.created_at >= thirty_days_ago,
             ForumPost.is_removed == False
         ).count()
         
-        # Yorum istatistikleri (kaldırılmamış gönderiler)
+        # Yorum istatistikleri + admin postları (kaldırılmamış gönderiler)
         total_comments = ForumComment.query.join(ForumPost).filter(
-            ForumPost.interest == user.interest,
+            db.or_(
+                ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumPost.is_removed == False
         ).count()
+        
         recent_comments = ForumComment.query.join(ForumPost).filter(
+            db.or_(
             ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumComment.created_at >= thirty_days_ago,
             ForumPost.is_removed == False
         ).count()
         
-        # Çözülen sorular (kaldırılmamış gönderiler)
+        # Çözülen sorular + admin postları (kaldırılmamış gönderiler)
         solved_questions = ForumPost.query.filter(
+            db.or_(
             ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumPost.post_type == 'question',
             ForumPost.is_solved == True,
             ForumPost.is_removed == False
         ).count()
         
-        # En aktif kullanıcılar (kaldırılmamış gönderiler)
+        # En aktif kullanıcılar + admin postları (kaldırılmamış gönderiler)
         active_users = db.session.query(
             ForumPost.author_username,
             db.func.count(ForumPost.id).label('post_count')
         ).filter(
+            db.or_(
             ForumPost.interest == user.interest,
+                ForumPost.is_admin_post == True
+            ),
             ForumPost.created_at >= thirty_days_ago,
             ForumPost.is_removed == False
         ).group_by(ForumPost.author_username)\
