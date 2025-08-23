@@ -31,7 +31,7 @@ RUN pip install gunicorn
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads 
+RUN mkdir -p uploads static/audio flask_session 
 
 # Create non-root user
 RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
@@ -45,4 +45,4 @@ HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the application with gunicorn (optimized for memory)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "100", "--preload", "app:app"] 
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "2", "--timeout", "120", "--max-requests", "1000", "--max-requests-jitter", "100", "--preload", "--worker-class", "sync", "app:app"] 

@@ -725,6 +725,12 @@ def health_check():
     except Exception as e:
         db_status = f"error: {str(e)}"
     
+    # Bellek kullanımını kontrol et
+    memory_usage = get_memory_usage()
+    
+    # Geçici dosyaları temizle
+    temp_files_cleaned = cleanup_temp_files()
+    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
@@ -733,7 +739,9 @@ def health_check():
         'database_status': db_status,
         'database_pool_size': db.engine.pool.size() if hasattr(db.engine.pool, 'size') else 'N/A',
         'database_checked_in': db.engine.pool.checkedin() if hasattr(db.engine.pool, 'checkedin') else 'N/A',
-        'gemini_api_key': bool(get_user_api_key())
+        'gemini_api_key': bool(get_user_api_key()),
+        'memory_usage': memory_usage,
+        'temp_files_cleaned': temp_files_cleaned
     })
 
 @app.route('/db-test', methods=['GET'])
@@ -3771,34 +3779,7 @@ def recommend_adaptive_test():
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
 
-# Health check endpoint
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Sistem sağlık durumunu kontrol eder"""
-    try:
-        # Database bağlantısını kontrol et
-        db.session.execute(text('SELECT 1'))
-        
-        # Bellek kullanımını kontrol et
-        memory_usage = get_memory_usage()
-        
-        # Geçici dosyaları temizle
-        temp_files_cleaned = cleanup_temp_files()
-        
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'memory_usage': memory_usage,
-            'temp_files_cleaned': temp_files_cleaned,
-            'database': 'connected'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
+
 
 # Debug endpoint'leri
 @app.route('/debug/memory_status', methods=['GET'])
