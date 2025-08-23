@@ -264,9 +264,6 @@ class ForumComment(db.Model):
     likes_count = db.Column(db.Integer, default=0)
     is_solution = db.Column(db.Boolean, default=False)  # Bu yorum çözüm mü?
     is_accepted = db.Column(db.Boolean, default=False)  # Çözüm kabul edildi mi?
-    is_removed = db.Column(db.Boolean, default=False)  # Yorum kaldırıldı mı?
-    removed_by = db.Column(db.String(80), nullable=True)  # Kim kaldırdı?
-    removed_at = db.Column(db.DateTime, nullable=True)  # Ne zaman kaldırıldı?
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -2283,19 +2280,17 @@ def get_forum_post(post_id):
         post_id=post.id
     ).first() is not None
     
-    # Yorumları getir (kaldırılanlar hariç)
-    comments = ForumComment.query.filter(
-        ForumComment.post_id == post.id,
-        ForumComment.parent_comment_id == None,  # Sadece ana yorumlar
-        ForumComment.is_removed == False  # Kaldırılan yorumları gösterme
+    # Yorumları getir
+    comments = ForumComment.query.filter_by(
+        post_id=post.id,
+        parent_comment_id=None  # Sadece ana yorumlar
     ).order_by(ForumComment.created_at.asc()).all()
     
     comments_data = []
     for comment in comments:
-        # Alt yorumları getir (kaldırılanlar hariç)
-        replies = ForumComment.query.filter(
-            ForumComment.parent_comment_id == comment.id,
-            ForumComment.is_removed == False  # Kaldırılan yorumları gösterme
+        # Alt yorumları getir
+        replies = ForumComment.query.filter_by(
+            parent_comment_id=comment.id
         ).order_by(ForumComment.created_at.asc()).all()
         
         # Kullanıcının bu yorumu beğenip beğenmediğini kontrol et
@@ -2400,25 +2395,6 @@ def create_forum_comment(post_id):
     
     if len(content) > 2000:
         return jsonify({'error': 'Yorum 2000 karakterden uzun olamaz.'}), 400
-    
-    # Spam engelleme - son 1 dakikada aynı kullanıcıdan aynı içerik
-    recent_comment = ForumComment.query.filter(
-        ForumComment.author_username == session['username'],
-        ForumComment.content == content,
-        ForumComment.created_at >= datetime.utcnow() - timedelta(minutes=1)
-    ).first()
-    
-    if recent_comment:
-        return jsonify({'error': 'Çok hızlı yorum yapıyorsunuz. Lütfen bekleyin.'}), 429
-    
-    # Spam engelleme - son 5 dakikada aynı kullanıcıdan 5'ten fazla yorum
-    recent_comments_count = ForumComment.query.filter(
-        ForumComment.author_username == session['username'],
-        ForumComment.created_at >= datetime.utcnow() - timedelta(minutes=5)
-    ).count()
-    
-    if recent_comments_count >= 5:
-        return jsonify({'error': 'Çok fazla yorum yapıyorsunuz. Lütfen bekleyin.'}), 429
     
     # Parent comment kontrolü
     if parent_comment_id:
@@ -2580,39 +2556,6 @@ def like_forum_comment(comment_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Beğeni işlemi hatası: {str(e)}'}), 500
-
-@app.route('/forum/comments/<int:comment_id>', methods=['DELETE'])
-@login_required
-def delete_forum_comment(comment_id):
-    """Forum yorumunu siler"""
-    comment = ForumComment.query.get_or_404(comment_id)
-    
-    # Sadece yazar veya admin silebilir
-    user = User.query.filter_by(username=session['username']).first()
-    if not user:
-        return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
-    
-    if comment.author_username != session['username'] and not user.is_admin:
-        return jsonify({'error': 'Bu yorumu silme yetkiniz yok.'}), 403
-    
-    try:
-        # Soft delete - yorumu tamamen silme, sadece gizle
-        comment.is_removed = True
-        comment.removed_by = session['username']
-        comment.removed_at = datetime.utcnow()
-        
-        # Post'un yorum sayısını azalt
-        post = ForumPost.query.get(comment.post_id)
-        if post:
-            post.comments_count = max(0, post.comments_count - 1)
-        
-        db.session.commit()
-        
-        return jsonify({'message': 'Yorum başarıyla kaldırıldı.'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Yorum silme hatası: {str(e)}'}), 500
 
 @app.route('/forum/stats', methods=['GET'])
 @login_required
@@ -2852,10 +2795,6 @@ def mark_post_solved(post_id):
         if comment_id:
             comment = ForumComment.query.get(comment_id)
             if comment:
-                # Kullanıcı kendi yorumunu çözüm yapamaz
-                if comment.author_username == session['username']:
-                    return jsonify({'error': 'Kendi yorumunuzu çözüm olarak işaretleyemezsiniz.'}), 400
-                
                 comment.is_solution = True
                 comment.is_accepted = True
         
@@ -3438,8 +3377,6 @@ def admin_get_stats():
         active_posts = total_posts - removed_posts
         
         total_comments = ForumComment.query.count()
-        removed_comments = ForumComment.query.filter_by(is_removed=True).count()
-        active_comments = total_comments - removed_comments
         
         # Son 7 günün aktivitesi
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
@@ -3468,114 +3405,6 @@ def admin_get_stats():
         
     except Exception as e:
         return jsonify({'error': f'Admin istatistik hatası: {str(e)}'}), 500
-
-@app.route('/admin/comments', methods=['GET'])
-@admin_required
-def admin_get_comments():
-    """Admin tüm yorumları görür"""
-    try:
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 20, type=int)
-        status = request.args.get('status', 'all')  # all, active, removed
-        
-        query = ForumComment.query
-        
-        # Status filtreleme
-        if status == 'active':
-            query = query.filter_by(is_removed=False)
-        elif status == 'removed':
-            query = query.filter_by(is_removed=True)
-        
-        # Sayfalama
-        pagination = query.order_by(ForumComment.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        
-        comments_data = []
-        for comment in pagination.items:
-            post = ForumPost.query.get(comment.post_id)
-            comments_data.append({
-                'id': comment.id,
-                'content': comment.content,
-                'author': comment.author_username,
-                'post_id': comment.post_id,
-                'post_title': post.title if post else 'Silinmiş Gönderi',
-                'is_solution': comment.is_solution,
-                'is_accepted': comment.is_accepted,
-                'is_removed': comment.is_removed,
-                'removed_by': comment.removed_by,
-                'removed_at': comment.removed_at.strftime('%Y-%m-%d %H:%M') if comment.removed_at else None,
-                'likes_count': comment.likes_count,
-                'created_at': comment.created_at.strftime('%Y-%m-%d %H:%M'),
-                'updated_at': comment.updated_at.strftime('%Y-%m-%d %H:%M')
-            })
-        
-        return jsonify({
-            'comments': comments_data,
-            'pagination': {
-                'page': page,
-                'per_page': per_page,
-                'total': pagination.total,
-                'pages': pagination.pages
-            }
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Yorum listeleme hatası: {str(e)}'}), 500
-
-@app.route('/admin/comments/<int:comment_id>/remove', methods=['POST'])
-@admin_required
-def admin_remove_comment(comment_id):
-    """Admin yorumu kaldırır"""
-    try:
-        comment = ForumComment.query.get_or_404(comment_id)
-        
-        if comment.is_removed:
-            return jsonify({'error': 'Yorum zaten kaldırılmış.'}), 400
-        
-        comment.is_removed = True
-        comment.removed_by = session['username']
-        comment.removed_at = datetime.utcnow()
-        
-        # Post'un yorum sayısını azalt
-        post = ForumPost.query.get(comment.post_id)
-        if post:
-            post.comments_count = max(0, post.comments_count - 1)
-        
-        db.session.commit()
-        
-        return jsonify({'message': 'Yorum başarıyla kaldırıldı.'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Yorum kaldırma hatası: {str(e)}'}), 500
-
-@app.route('/admin/comments/<int:comment_id>/restore', methods=['POST'])
-@admin_required
-def admin_restore_comment(comment_id):
-    """Admin yorumu geri yükler"""
-    try:
-        comment = ForumComment.query.get_or_404(comment_id)
-        
-        if not comment.is_removed:
-            return jsonify({'error': 'Yorum zaten aktif.'}), 400
-        
-        comment.is_removed = False
-        comment.removed_by = None
-        comment.removed_at = None
-        
-        # Post'un yorum sayısını artır
-        post = ForumPost.query.get(comment.post_id)
-        if post:
-            post.comments_count += 1
-        
-        db.session.commit()
-        
-        return jsonify({'message': 'Yorum başarıyla geri yüklendi.'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Yorum geri yükleme hatası: {str(e)}'}), 500
 
 # ==================== ADMIN ENDPOINT'LERİ SONU ====================
 
