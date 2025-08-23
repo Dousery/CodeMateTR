@@ -3910,27 +3910,6 @@ def recommend_adaptive_test():
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
 
-# Health check endpoint - Basitleştirilmiş versiyon
-@app.route('/health', methods=['GET'])
-def health_check():
-    """Sistem sağlık durumunu kontrol eder"""
-    try:
-        # Database bağlantısını kontrol et
-        with db.engine.connect() as conn:
-            conn.execute(db.text("SELECT 1"))
-        
-        return jsonify({
-            'status': 'healthy',
-            'timestamp': datetime.utcnow().isoformat(),
-            'database': 'connected'
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'status': 'unhealthy',
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat()
-        }), 500
 
 # Debug endpoint'leri
 @app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
