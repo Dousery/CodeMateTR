@@ -6,23 +6,13 @@ import tempfile
 import os
 import base64
 from dotenv import load_dotenv
-import gc
-import time
-import logging
 
 load_dotenv()
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 class InterviewAIAgent:
     def __init__(self, interest, api_key=None):
         self.interest = interest
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
-        self.temp_files = []  # Track temporary files for cleanup
-        self.last_cleanup = time.time()
-        self.cleanup_interval = 300  # Cleanup every 5 minutes
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
@@ -32,105 +22,15 @@ class InterviewAIAgent:
         try:
             self.client = google_genai_new.Client(api_key=self.api_key)
         except Exception as e:
-            logger.error(f"Google GenAI client initialization error: {e}")
+            print(f"Google GenAI client initialization error: {e}")
             # Fallback: Set environment variable
             if self.api_key:
                 os.environ['GOOGLE_API_KEY'] = self.api_key
             try:
                 self.client = google_genai_new.Client()
             except Exception as e2:
-                logger.error(f"Fallback client initialization error: {e2}")
+                print(f"Fallback client initialization error: {e2}")
                 self.client = None
-
-    def __del__(self):
-        """Destructor to ensure cleanup"""
-        self.cleanup_temp_files()
-        self._force_garbage_collection()
-
-    def cleanup_temp_files(self):
-        """Clean up all temporary files created by this agent"""
-        try:
-            for temp_file in self.temp_files:
-                if os.path.exists(temp_file):
-                    try:
-                        os.unlink(temp_file)
-                        logger.info(f"Cleaned up temporary file: {temp_file}")
-                    except Exception as e:
-                        logger.warning(f"Failed to delete temp file {temp_file}: {e}")
-            self.temp_files.clear()
-        except Exception as e:
-            logger.error(f"Error during temp file cleanup: {e}")
-
-    def _force_garbage_collection(self):
-        """Force garbage collection to free memory"""
-        try:
-            gc.collect()
-            logger.info("Forced garbage collection completed")
-        except Exception as e:
-            logger.error(f"Garbage collection error: {e}")
-
-    def _auto_cleanup(self):
-        """Automatic cleanup if enough time has passed"""
-        current_time = time.time()
-        if current_time - self.last_cleanup > self.cleanup_interval:
-            self.cleanup_temp_files()
-            self._force_garbage_collection()
-            self.last_cleanup = current_time
-
-    def _create_temp_file(self, suffix='.wav'):
-        """Create a tracked temporary file"""
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        self.temp_files.append(temp_file.name)
-        return temp_file.name
-
-    def _cleanup_old_audio_files(self, max_age_hours=24):
-        """Clean up old audio files from static/audio directory"""
-        try:
-            audio_dir = os.path.join(os.path.dirname(__file__), '..', 'static', 'audio')
-            if not os.path.exists(audio_dir):
-                return
-            
-            current_time = time.time()
-            max_age_seconds = max_age_hours * 3600
-            
-            for filename in os.listdir(audio_dir):
-                if filename.startswith('auto_interview_') and filename.endswith('.wav'):
-                    file_path = os.path.join(audio_dir, filename)
-                    try:
-                        file_age = current_time - os.path.getmtime(file_path)
-                        if file_age > max_age_seconds:
-                            os.unlink(file_path)
-                            logger.info(f"Cleaned up old audio file: {filename}")
-                    except Exception as e:
-                        logger.warning(f"Failed to clean up old audio file {filename}: {e}")
-        except Exception as e:
-            logger.error(f"Error during old audio file cleanup: {e}")
-
-    def _monitor_memory_usage(self):
-        """Monitor memory usage and log if it's getting high"""
-        try:
-            import psutil
-            process = psutil.Process()
-            memory_info = process.memory_info()
-            memory_mb = memory_info.rss / 1024 / 1024
-            
-            if memory_mb > 500:  # 500MB threshold
-                logger.warning(f"High memory usage detected: {memory_mb:.2f} MB")
-                self._force_garbage_collection()
-                self.cleanup_temp_files()
-            
-            logger.debug(f"Current memory usage: {memory_mb:.2f} MB")
-        except ImportError:
-            # psutil not available, skip memory monitoring
-            pass
-        except Exception as e:
-            logger.error(f"Memory monitoring error: {e}")
-
-    def _post_operation_cleanup(self):
-        """Perform cleanup after major operations"""
-        self._auto_cleanup()
-        self._monitor_memory_usage()
-        self._cleanup_old_audio_files(max_age_hours=1)  # Clean up files older than 1 hour
 
     def generate_dynamic_question(self, previous_questions=None, user_answers=None, conversation_context=None):
         """
@@ -164,13 +64,10 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
             # Fallback soru
-            self._post_operation_cleanup()
             return f"{self.interest} alanında çalışırken en büyük zorlukla nasıl karşılaştınız?"
 
     def generate_dynamic_speech_question(self, previous_questions=None, user_answers=None, conversation_context=None, voice_name='Kore'):
@@ -199,47 +96,39 @@ class InterviewAIAgent:
                     )
                     
                     audio_data = response.candidates[0].content.parts[0].inline_data.data
-                    temp_file = self._create_temp_file(suffix='.wav')
-                    self._save_wave_file(temp_file, audio_data)
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                    self._save_wave_file(temp_file.name, audio_data)
                     
-                    result = {
-                        'audio_file': temp_file,
+                    return {
+                        'audio_file': temp_file.name,
                         'question_text': question_text,
                         'audio_data': audio_data
                     }
-                    self._post_operation_cleanup()
-                    return result
                 except Exception as audio_error:
-                    logger.error(f"Audio generation error: {audio_error}")
-                    result = {
+                    print(f"Audio generation error: {audio_error}")
+                    return {
                         'audio_file': None,
                         'question_text': question_text,
                         'audio_data': None,
                         'error': f'Ses üretilemedi: {str(audio_error)}'
                     }
-                    self._post_operation_cleanup()
-                    return result
             else:
-                result = {
+                return {
                     'audio_file': None,
                     'question_text': question_text,
                     'audio_data': None,
                     'error': 'Sesli özellik kullanılamıyor'
                 }
-                self._post_operation_cleanup()
-                return result
             
         except Exception as e:
             # Hata durumunda sadece metin döndür
             question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
-            result = {
+            return {
                 'audio_file': None,
                 'question_text': question_text,
                 'audio_data': None,
                 'error': str(e)
             }
-            self._post_operation_cleanup()
-            return result
 
     def generate_cv_based_question(self, cv_analysis):
         """
@@ -256,12 +145,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"{self.interest} alanında deneyiminiz hakkında ne söyleyebilirsiniz?"
 
     def generate_cv_based_speech_question(self, cv_analysis, voice_name='Kore'):
@@ -290,16 +176,16 @@ class InterviewAIAgent:
                     )
                     
                     audio_data = response.candidates[0].content.parts[0].inline_data.data
-                    temp_file = self._create_temp_file(suffix='.wav')
-                    self._save_wave_file(temp_file, audio_data)
+                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+                    self._save_wave_file(temp_file.name, audio_data)
                     
                     return {
-                        'audio_file': temp_file,
+                        'audio_file': temp_file.name,
                         'question_text': question_text,
                         'audio_data': audio_data
                     }
                 except Exception as audio_error:
-                    logger.error(f"Audio generation error: {audio_error}")
+                    print(f"Audio generation error: {audio_error}")
                     return {
                         'audio_file': None,
                         'question_text': question_text,
@@ -424,27 +310,25 @@ class InterviewAIAgent:
             )
             
             audio_data = response.candidates[0].content.parts[0].inline_data.data
-            temp_file = self._create_temp_file(suffix='.wav')
-            self._save_wave_file(temp_file, audio_data)
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
+            self._save_wave_file(temp_file.name, audio_data)
             
-            result = {
-                'audio_file': temp_file,
+            return {
+                'audio_file': temp_file.name,
                 'feedback_text': text_feedback,
                 'audio_data': audio_data
             }
-            self._post_operation_cleanup()
-            return result
             
         except Exception as e:
-            logger.error(f"Speech feedback generation error: {e}")
-            # Hata durumında sadece metin geri bildirim döndür
+            print(f"Speech feedback generation error: {e}")
+            # Hata durumunda sadece metin geri bildirim döndür
             try:
                 if cv_context:
                     text_feedback = self.evaluate_cv_answer(question, user_answer, cv_context)
                 else:
                     text_feedback = self.evaluate_answer(question, user_answer)
             except Exception as eval_error:
-                logger.error(f"Text feedback generation error: {eval_error}")
+                print(f"Text feedback generation error: {eval_error}")
                 text_feedback = f"Cevap değerlendirilemedi: {str(eval_error)}"
                 
             return {
@@ -472,12 +356,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"Cevap değerlendirilemedi: {str(e)}"
 
     def evaluate_cv_answer(self, question, user_answer, cv_context):
@@ -500,12 +381,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"CV bağlamında değerlendirme yapılamadı: {str(e)}"
 
     def evaluate_speech_answer(self, question, audio_file_path, additional_text="", cv_context=None, voice_name="Enceladus"):
@@ -529,7 +407,7 @@ class InterviewAIAgent:
             return result
             
         except Exception as e:
-            logger.error(f"Speech answer evaluation error: {e}")
+            print(f"Speech answer evaluation error: {e}")
             # Transcript edilemezse sadece ek metni kullan
             try:
                 if additional_text:
@@ -545,10 +423,12 @@ class InterviewAIAgent:
                         'error': f'Sesli cevap değerlendirilemedi: {str(e)}'
                     }
             except Exception as feedback_error:
-                logger.error(f"Feedback generation error: {feedback_error}")
+                print(f"Feedback generation error: {feedback_error}")
                 return {
                     'audio_file': None,
                     'feedback_text': f"Ses değerlendirilemedi: {str(e)}",
+                    'audio_data': None,
+                    'transcribed_text': f"Ses transcript edilemedi: {str(e)}",
                     'error': f'Sesli cevap değerlendirilemedi: {str(e)}. Geri bildirim hatası: {str(feedback_error)}'
                 }
 
@@ -582,12 +462,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"Mülakat değerlendirmesi yapılamadı: {str(e)}"
 
     def generate_final_evaluation(self, questions, answers, conversation_summary=None):
@@ -636,12 +513,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"Genel değerlendirme yapılamadı: {str(e)}"
 
     def _transcribe_audio(self, audio_file_path):
@@ -660,7 +534,7 @@ class InterviewAIAgent:
                 return "Ses dosyası boş veya okunamadı."
             
             file_size_mb = len(audio_data) / (1024 * 1024)
-            logger.info(f"Audio file size for transcription: {file_size_mb:.2f} MB")
+            print(f"Audio file size for transcription: {file_size_mb:.2f} MB")
             
             if file_size_mb > 20:  # 20MB limit for transcription
                 return "Ses dosyası transcript için çok büyük. Daha kısa kayıt yapın."
@@ -673,7 +547,7 @@ class InterviewAIAgent:
             
             for i, mime_type in enumerate(mime_types):
                 try:
-                    logger.info(f"Trying transcription with MIME type: {mime_type} (attempt {i+1})")
+                    print(f"Trying transcription with MIME type: {mime_type} (attempt {i+1})")
                     
                     response = self.model.generate_content([
                         {
@@ -685,10 +559,10 @@ class InterviewAIAgent:
                     
                     result = response.text.strip()
                     if result and not result.lower().startswith('hata') and len(result) > 3:
-                        logger.info(f"Transcription successful with {mime_type}")
+                        print(f"Transcription successful with {mime_type}")
                         return result
                 except Exception as e:
-                    logger.warning(f"MIME type {mime_type} failed: {e}")
+                    print(f"MIME type {mime_type} failed: {e}")
                     if i == len(mime_types) - 1:  # Son deneme
                         break
                     continue
@@ -697,11 +571,11 @@ class InterviewAIAgent:
             return "Ses transcript edilemedi. Lütfen daha net konuşun veya metin ile cevap verin."
             
         except FileNotFoundError:
-            logger.error(f"Audio file not found: {audio_file_path}")
+            print(f"Audio file not found: {audio_file_path}")
             return "Ses dosyası bulunamadı."
         except Exception as e:
-            logger.error(f"Transcription error: {e}")
-            logger.error(f"Audio file path: {audio_file_path}")
+            print(f"Transcription error: {e}")
+            print(f"Audio file path: {audio_file_path}")
             return f"Ses transcript hatası: {str(e)}. Manuel cevap yazabilirsiniz."
 
     def _save_wave_file(self, filename, pcm_data, channels=1, rate=24000, sample_width=2):
@@ -766,12 +640,9 @@ class InterviewAIAgent:
             """
             
             response = self.model.generate_content(prompt)
-            result = response.text.strip()
-            self._post_operation_cleanup()
-            return result
+            return response.text.strip()
             
         except Exception as e:
-            self._post_operation_cleanup()
             return f"CV analizi yapılamadı: {str(e)}"
 
 def extract_text_from_file(file_data, mime_type):
