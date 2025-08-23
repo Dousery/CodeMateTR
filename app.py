@@ -3910,27 +3910,18 @@ def recommend_adaptive_test():
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
 
-<<<<<<< HEAD
-=======
-# Health check endpoint
+# Health check endpoint - Basitleştirilmiş versiyon
 @app.route('/health', methods=['GET'])
 def health_check():
     """Sistem sağlık durumunu kontrol eder"""
     try:
         # Database bağlantısını kontrol et
-        db.session.execute(text('SELECT 1'))
-        
-        # Bellek kullanımını kontrol et
-        memory_usage = get_memory_usage()
-        
-        # Geçici dosyaları temizle
-        temp_files_cleaned = cleanup_temp_files()
+        with db.engine.connect() as conn:
+            conn.execute(db.text("SELECT 1"))
         
         return jsonify({
             'status': 'healthy',
             'timestamp': datetime.utcnow().isoformat(),
-            'memory_usage': memory_usage,
-            'temp_files_cleaned': temp_files_cleaned,
             'database': 'connected'
         })
         
@@ -3942,23 +3933,6 @@ def health_check():
         }), 500
 
 # Debug endpoint'leri
-@app.route('/debug/memory_status', methods=['GET'])
-@admin_required
-def get_memory_status():
-    """Bellek durumunu döndürür (Admin only)"""
-    try:
-        memory_usage = get_memory_usage()
-        temp_files_cleaned = cleanup_temp_files()
-        
-        return jsonify({
-            'memory_usage': memory_usage,
-            'temp_files_cleaned': temp_files_cleaned,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Bellek durumu alınamadı: {str(e)}'}), 500
-
 @app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
 @admin_required
 def clear_auto_interview_sessions():
@@ -3981,8 +3955,6 @@ def clear_auto_interview_sessions():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Session temizleme hatası: {str(e)}'}), 500
-
->>>>>>> parent of f4cb90b (final)
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
     port = int(os.environ.get('PORT', 5000))
