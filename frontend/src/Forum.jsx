@@ -65,6 +65,7 @@ const Forum = () => {
     title: '',
     content: '',
     post_type: 'discussion',
+    interest: '',
     tags: []
   });
   const [newComment, setNewComment] = useState({
@@ -75,6 +76,7 @@ const Forum = () => {
   const [stats, setStats] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [postTypeFilter, setPostTypeFilter] = useState('all');
+  const [interestFilter, setInterestFilter] = useState('all');
   const [sortBy, setSortBy] = useState('latest');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' });
   const [leaderboard, setLeaderboard] = useState([]);
@@ -92,13 +94,23 @@ const Forum = () => {
   const [showSolutionDialog, setShowSolutionDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [postToDelete, setPostToDelete] = useState(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const postTypes = [
-    { value: 'discussion', label: 'Tartışma' },
-    { value: 'question', label: 'Soru' },
-    { value: 'resource', label: 'Kaynak' },
-    { value: 'announcement', label: 'Duyuru' }
-  ];
+  { value: 'discussion', label: 'Tartışma' },
+  { value: 'question', label: 'Soru' },
+  { value: 'resource', label: 'Kaynak' },
+  { value: 'announcement', label: 'Duyuru' }
+];
+
+const interestTypes = [
+  { value: 'Data Science', label: 'Data Science' },
+  { value: 'Web Development', label: 'Web Development' },
+  { value: 'Mobile Development', label: 'Mobile Development' },
+  { value: 'AI/ML', label: 'AI/ML' },
+  { value: 'Cybersecurity', label: 'Cybersecurity' },
+  { value: 'DevOps', label: 'DevOps' }
+];
 
   const sortOptions = [
     { value: 'latest', label: 'En Yeni' },
@@ -110,7 +122,26 @@ const Forum = () => {
     fetchPosts();
     fetchStats();
     fetchLeaderboard();
-  }, [currentPage, searchTerm, postTypeFilter, sortBy]);
+  }, [currentPage, searchTerm, postTypeFilter, interestFilter, sortBy]);
+
+  // Admin kontrolü
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      try {
+        const response = await fetch('/api/profile', {
+          credentials: 'include'
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setIsAdmin(data.is_admin || false);
+        }
+      } catch (error) {
+        console.error('Admin status check error:', error);
+      }
+    };
+    
+    checkAdminStatus();
+  }, []);
 
 
 
@@ -265,6 +296,7 @@ const Forum = () => {
         page: currentPage,
         per_page: 10,
         type: postTypeFilter,
+        interest: interestFilter,
         sort: sortBy,
         search: searchTerm
       });
@@ -338,6 +370,7 @@ const Forum = () => {
         title: '',
         content: '',
         post_type: 'discussion',
+        interest: '',
         tags: []
       });
       fetchPosts();
@@ -760,6 +793,30 @@ const Forum = () => {
                   </Select>
                 </FormControl>
               </Grid>
+              {/* Admin için Interest Filter */}
+              {isAdmin && (
+                <Grid item xs={12} md={3}>
+                  <FormControl fullWidth>
+                    <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>İlgi Alanı</InputLabel>
+                    <Select
+                      value={interestFilter}
+                      onChange={(e) => setInterestFilter(e.target.value)}
+                      sx={{
+                        color: 'white',
+                        '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                        background: 'rgba(255,255,255,0.05)',
+                        borderRadius: 1
+                      }}
+                    >
+                      <MenuItem value="all">Tümü</MenuItem>
+                      {interestTypes.map(interest => (
+                        <MenuItem key={interest.value} value={interest.value}>{interest.label}</MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                </Grid>
+              )}
               <Grid item xs={12} md={3}>
                 <FormControl fullWidth>
                   <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>Sıralama</InputLabel>
@@ -1156,6 +1213,29 @@ const Forum = () => {
               ))}
             </Select>
           </FormControl>
+
+          {/* Admin için Interest Seçimi */}
+          {isAdmin && (
+            <FormControl fullWidth margin="normal">
+              <InputLabel sx={{ color: 'rgba(255,255,255,0.7)' }}>İlgi Alanı</InputLabel>
+              <Select
+                value={newPost.interest}
+                onChange={(e) => setNewPost(prev => ({ ...prev, interest: e.target.value }))}
+                sx={{
+                  color: 'white',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.5)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#4f46e5' },
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: 1
+                }}
+              >
+                {interestTypes.map(interest => (
+                  <MenuItem key={interest.value} value={interest.value}>{interest.label}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
           
         </DialogContent>
         <DialogActions sx={{ 

@@ -2096,7 +2096,7 @@ def get_forum_posts():
             print(f"WARNING: User not found in forum posts: {session['username']}")
             return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
         
-        if not user.interest:
+        if not user.interest and not user.is_admin:
             return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     except Exception as e:
         print(f"ERROR in forum posts endpoint: {str(e)}")
@@ -2106,15 +2106,23 @@ def get_forum_posts():
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 10, type=int)
     post_type = request.args.get('type', 'all')
+    interest = request.args.get('interest', 'all')  # Admin için interest filter
     sort_by = request.args.get('sort', 'latest')  # latest, popular, most_commented
     search = request.args.get('search', '')
     
-    # Base query - kullanıcının ilgi alanına göre ve kaldırılmamış gönderiler
-    query = ForumPost.query.filter_by(interest=user.interest, is_removed=False)
+    # Base query - admin tüm gönderileri, normal kullanıcı sadece kendi interest'ındakileri görebilir
+    if user.is_admin:
+        query = ForumPost.query.filter(ForumPost.is_removed == False)
+    else:
+        query = ForumPost.query.filter_by(interest=user.interest, is_removed=False)
     
     # Post type filtresi
     if post_type != 'all':
         query = query.filter_by(post_type=post_type)
+    
+    # Interest filtresi (admin için)
+    if user.is_admin and interest != 'all':
+        query = query.filter_by(interest=interest)
     
     # Arama filtresi
     if search:
@@ -2162,6 +2170,7 @@ def get_forum_posts():
             'author_is_admin': author_user.is_admin if author_user else False,
             'is_admin_post': is_admin_post,
             'is_removed': post.is_removed,
+            'interest': post.interest,
             'post_type': post.post_type,
             'tags': json.loads(post.tags) if post.tags else [],
             'views': post.views,
@@ -2195,7 +2204,7 @@ def create_forum_post():
     if not user:
         return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
     
-    if not user.interest:
+    if not user.interest and not user.is_admin:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     data = request.json
@@ -2203,6 +2212,7 @@ def create_forum_post():
     content = data.get('content')
     post_type = data.get('post_type', 'discussion')
     tags = data.get('tags', [])
+    interest = data.get('interest')  # Admin için interest seçimi
     
     if not title or not content:
         return jsonify({'error': 'Başlık ve içerik gerekli.'}), 400
@@ -2219,7 +2229,7 @@ def create_forum_post():
             title=title,
             content=content,
             author_username=session['username'],
-            interest=user.interest,
+            interest=interest if user.is_admin and interest else user.interest,
             post_type=post_type,
             tags=json.dumps(tags),
             is_admin_post=user.is_admin  # Admin gönderisi mi?
