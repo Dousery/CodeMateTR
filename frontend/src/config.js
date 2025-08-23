@@ -7,6 +7,9 @@ export const getAudioUrl = (audioPath) => {
 };
 
 export const API_ENDPOINTS = {
+  // Base URL
+  BASE_URL: API_BASE_URL,
+  
   // Auth endpoints
   LOGIN: `${API_BASE_URL}/login`,
   REGISTER: `${API_BASE_URL}/register`,
@@ -65,6 +68,12 @@ export const API_ENDPOINTS = {
   FORUM_NOTIFICATIONS: `${API_BASE_URL}/forum/notifications`,
   FORUM_NOTIFICATIONS_MARK_READ: `${API_BASE_URL}/forum/notifications/mark-read`,
   FORUM_REPORT: `${API_BASE_URL}/forum/report`,
+
+  // Admin endpoints
+  ADMIN_SEND_NOTIFICATION: `${API_BASE_URL}/admin/send-notification`,
+  ADMIN_FORUM_POSTS: `${API_BASE_URL}/admin/forum/posts`,
+  ADMIN_USERS: `${API_BASE_URL}/admin/users`,
+  ADMIN_STATS: `${API_BASE_URL}/admin/stats`,
 
 
 

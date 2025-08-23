@@ -851,6 +851,19 @@ const Forum = () => {
                     <Typography variant="h6" sx={{ color: 'white', fontWeight: 'bold' }}>
                       {post.title}
                     </Typography>
+                    {post.is_admin_post && (
+                      <Chip
+                        label="👑 ADMIN"
+                        size="small"
+                        sx={{
+                          background: 'linear-gradient(45deg, #FFD700 0%, #FFA500 100%)',
+                          color: 'black',
+                          fontWeight: 'bold',
+                          fontSize: '0.7rem',
+                          boxShadow: '0 2px 8px rgba(255, 215, 0, 0.3)'
+                        }}
+                      />
+                    )}
                     {post.is_solved && (
                       <Chip
                         label="✅ Çözüldü"
@@ -902,13 +915,20 @@ const Forum = () => {
                   <Avatar sx={{ 
                     width: 28, 
                     height: 28, 
-                    background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
-                    fontWeight: 'bold'
+                    background: post.author_is_admin 
+                      ? 'linear-gradient(45deg, #FFD700 0%, #FFA500 100%)' 
+                      : 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+                    fontWeight: 'bold',
+                    border: post.author_is_admin ? '2px solid #FFD700' : 'none'
                   }}>
                     {post.author.charAt(0).toUpperCase()}
                   </Avatar>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.8)', fontWeight: 500 }}>
+                  <Typography variant="body2" sx={{ 
+                    color: post.author_is_admin ? '#FFD700' : 'rgba(255,255,255,0.8)', 
+                    fontWeight: post.author_is_admin ? 'bold' : 500 
+                  }}>
                     {post.author}
+                    {post.author_is_admin && ' 👑'}
                   </Typography>
                 </Box>
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>

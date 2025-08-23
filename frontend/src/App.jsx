@@ -8,6 +8,7 @@ import Test from './Test';
 import Code from './Code';
 import AutoInterview from './AutoInterview';
 import Forum from './Forum';
+import Admin from './Admin';
 import Header from './Header';
 import Profile from './Profile';
 
@@ -201,6 +202,7 @@ function App() {
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
 
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
+              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
               {/* Catch-all route for 404 handling */}
               <Route path="*" element={<Navigate to="/" replace />} />

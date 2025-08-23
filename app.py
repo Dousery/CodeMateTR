@@ -24,6 +24,21 @@ import json
 from functools import wraps
 import logging
 
+# Admin yetki kontrolü için decorator
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'username' not in session:
+            return jsonify({'error': 'Giriş yapılmamış'}), 401
+        
+        # Kullanıcının admin olup olmadığını kontrol et
+        user = User.query.filter_by(username=session['username']).first()
+        if not user or not user.is_admin:
+            return jsonify({'error': 'Admin yetkisi gerekli'}), 403
+        
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Load environment variables
 load_dotenv()
 
@@ -152,6 +167,8 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)  # scrypt hash için daha uzun alan
     interest = db.Column(db.String(80), nullable=True)
     cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
+    is_admin = db.Column(db.Boolean, default=False)  # Admin yetkisi
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
         # Daha kısa hash için method belirt
@@ -212,6 +229,10 @@ class ForumPost(db.Model):
     solved_by = db.Column(db.String(80), nullable=True)  # Kim çözdü?
     solved_at = db.Column(db.DateTime, nullable=True)
     bounty_points = db.Column(db.Integer, default=0)  # Ödül puanları
+    is_admin_post = db.Column(db.Boolean, default=False)  # Admin gönderisi mi?
+    is_removed = db.Column(db.Boolean, default=False)  # Gönderi kaldırıldı mı?
+    removed_by = db.Column(db.String(80), nullable=True)  # Kim kaldırdı?
+    removed_at = db.Column(db.DateTime, nullable=True)  # Ne zaman kaldırıldı?
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -238,12 +259,14 @@ class ForumLike(db.Model):
 class ForumNotification(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), nullable=False)
-    notification_type = db.Column(db.String(50), nullable=False)  # like, comment, mention, solution_accepted
+    notification_type = db.Column(db.String(50), nullable=False)  # like, comment, mention, solution_accepted, admin_message
     title = db.Column(db.String(200), nullable=False)
     message = db.Column(db.Text, nullable=False)
     related_post_id = db.Column(db.Integer, db.ForeignKey('forum_post.id'), nullable=True)
     related_comment_id = db.Column(db.Integer, db.ForeignKey('forum_comment.id'), nullable=True)
     is_read = db.Column(db.Boolean, default=False)
+    is_admin_message = db.Column(db.Boolean, default=False)  # Admin mesajı mı?
+    admin_username = db.Column(db.String(80), nullable=True)  # Hangi admin gönderdi?
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class ForumReport(db.Model):
@@ -2107,11 +2130,17 @@ def get_forum_posts():
             post_id=post.id
         ).first() is not None
         
+        # Admin bilgilerini al
+        author_user = User.query.filter_by(username=post.author_username).first()
+        is_admin_post = post.is_admin_post or (author_user and author_user.is_admin)
+        
         posts_data.append({
             'id': post.id,
             'title': post.title,
             'content': post.content[:200] + '...' if len(post.content) > 200 else post.content,
             'author': post.author_username,
+            'author_is_admin': author_user.is_admin if author_user else False,
+            'is_admin_post': is_admin_post,
             'post_type': post.post_type,
             'tags': json.loads(post.tags) if post.tags else [],
             'views': post.views,
@@ -2171,7 +2200,8 @@ def create_forum_post():
             author_username=session['username'],
             interest=user.interest,
             post_type=post_type,
-            tags=json.dumps(tags)
+            tags=json.dumps(tags),
+            is_admin_post=user.is_admin  # Admin gönderisi mi?
         )
         
         db.session.add(new_post)
@@ -3013,13 +3043,282 @@ def get_forum_analytics():
     except Exception as e:
         return jsonify({'error': f'Analitik hatası: {str(e)}'}), 500
 
+# ==================== ADMIN ENDPOINT'LERİ ====================
 
+@app.route('/admin/send-notification', methods=['POST'])
+@admin_required
+def admin_send_notification():
+    """Admin tüm kullanıcılara bildirim gönderir"""
+    try:
+        data = request.get_json()
+        title = data.get('title')
+        message = data.get('message')
+        target_username = data.get('target_username')  # Belirli kullanıcıya veya None (tüm kullanıcılar)
+        
+        if not title or not message:
+            return jsonify({'error': 'Başlık ve mesaj gerekli'}), 400
+        
+        admin_username = session['username']
+        
+        if target_username:
+            # Belirli kullanıcıya gönder
+            user = User.query.filter_by(username=target_username).first()
+            if not user:
+                return jsonify({'error': 'Kullanıcı bulunamadı'}), 404
+            
+            notification = ForumNotification(
+                username=target_username,
+                notification_type='admin_message',
+                title=title,
+                message=message,
+                is_admin_message=True,
+                admin_username=admin_username
+            )
+            db.session.add(notification)
+        else:
+            # Tüm kullanıcılara gönder
+            users = User.query.all()
+            for user in users:
+                if user.username != admin_username:  # Admin kendine göndermesin
+                    notification = ForumNotification(
+                        username=user.username,
+                        notification_type='admin_message',
+                        title=title,
+                        message=message,
+                        is_admin_message=True,
+                        admin_username=admin_username
+                    )
+                    db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Bildirim(ler) başarıyla gönderildi',
+            'target_count': 1 if target_username else len(User.query.all()) - 1
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Bildirim gönderme hatası: {str(e)}'}), 500
 
+@app.route('/admin/forum/posts', methods=['GET'])
+@admin_required
+def admin_get_all_forum_posts():
+    """Admin tüm forum gönderilerini görür (tüm interest'ler)"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        interest = request.args.get('interest')
+        post_type = request.args.get('post_type')
+        
+        query = ForumPost.query
+        
+        if interest:
+            query = query.filter_by(interest=interest)
+        if post_type:
+            query = query.filter_by(post_type=post_type)
+        
+        # Kaldırılan gönderileri de dahil et
+        posts = query.order_by(ForumPost.created_at.desc()).paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        posts_data = []
+        for post in posts.items:
+            author = User.query.filter_by(username=post.author_username).first()
+            posts_data.append({
+                'id': post.id,
+                'title': post.title,
+                'content': post.content[:200] + '...' if len(post.content) > 200 else post.content,
+                'author_username': post.author_username,
+                'author_is_admin': author.is_admin if author else False,
+                'interest': post.interest,
+                'post_type': post.post_type,
+                'tags': json.loads(post.tags) if post.tags else [],
+                'views': post.views,
+                'likes_count': post.likes_count,
+                'comments_count': post.comments_count,
+                'is_solved': post.is_solved,
+                'is_admin_post': post.is_admin_post,
+                'is_removed': post.is_removed,
+                'removed_by': post.removed_by,
+                'removed_at': post.removed_at.isoformat() if post.removed_at else None,
+                'created_at': post.created_at.isoformat(),
+                'updated_at': post.updated_at.isoformat()
+            })
+        
+        return jsonify({
+            'posts': posts_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': posts.total,
+                'pages': posts.pages,
+                'has_next': posts.has_next,
+                'has_prev': posts.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Admin forum gönderileri hatası: {str(e)}'}), 500
 
+@app.route('/admin/forum/posts/<int:post_id>/remove', methods=['POST'])
+@admin_required
+def admin_remove_forum_post(post_id):
+    """Admin forum gönderisini kaldırır"""
+    try:
+        post = ForumPost.query.get_or_404(post_id)
+        admin_username = session['username']
+        
+        # Gönderiyi kaldır
+        post.is_removed = True
+        post.removed_by = admin_username
+        post.removed_at = datetime.utcnow()
+        
+        # Gönderi sahibine bildirim gönder
+        if post.author_username != admin_username:
+            notification = ForumNotification(
+                username=post.author_username,
+                notification_type='admin_message',
+                title='Gönderiniz Kaldırıldı',
+                message=f'"{post.title}" başlıklı gönderiniz admin tarafından kaldırılmıştır. Lütfen forum kurallarına uygun içerik paylaşın.',
+                related_post_id=post.id,
+                is_admin_message=True,
+                admin_username=admin_username
+            )
+            db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Gönderi başarıyla kaldırıldı',
+            'post_id': post_id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gönderi kaldırma hatası: {str(e)}'}), 500
 
+@app.route('/admin/forum/posts/<int:post_id>/restore', methods=['POST'])
+@admin_required
+def admin_restore_forum_post(post_id):
+    """Admin kaldırılan forum gönderisini geri yükler"""
+    try:
+        post = ForumPost.query.get_or_404(post_id)
+        admin_username = session['username']
+        
+        # Gönderiyi geri yükle
+        post.is_removed = False
+        post.removed_by = None
+        post.removed_at = None
+        
+        # Gönderi sahibine bildirim gönder
+        if post.author_username != admin_username:
+            notification = ForumNotification(
+                username=post.author_username,
+                notification_type='admin_message',
+                title='Gönderiniz Geri Yüklendi',
+                message=f'"{post.title}" başlıklı gönderiniz admin tarafından geri yüklenmiştir.',
+                related_post_id=post.id,
+                is_admin_message=True,
+                admin_username=admin_username
+            )
+            db.session.add(notification)
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Gönderi başarıyla geri yüklendi',
+            'post_id': post_id
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Gönderi geri yükleme hatası: {str(e)}'}), 500
 
+@app.route('/admin/users', methods=['GET'])
+@admin_required
+def admin_get_users():
+    """Admin tüm kullanıcıları listeler"""
+    try:
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        
+        users = User.query.paginate(
+            page=page, per_page=per_page, error_out=False
+        )
+        
+        users_data = []
+        for user in users.items:
+            users_data.append({
+                'id': user.id,
+                'username': user.username,
+                'interest': user.interest,
+                'is_admin': user.is_admin,
+                'created_at': user.created_at.isoformat() if user.created_at else None
+            })
+        
+        return jsonify({
+            'users': users_data,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': users.total,
+                'pages': users.pages,
+                'has_next': users.has_next,
+                'has_prev': users.has_prev
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Kullanıcı listesi hatası: {str(e)}'}), 500
 
+@app.route('/admin/stats', methods=['GET'])
+@admin_required
+def admin_get_stats():
+    """Admin sistem istatistiklerini görür"""
+    try:
+        # Kullanıcı istatistikleri
+        total_users = User.query.count()
+        admin_users = User.query.filter_by(is_admin=True).count()
+        regular_users = total_users - admin_users
+        
+        # Forum istatistikleri
+        total_posts = ForumPost.query.count()
+        removed_posts = ForumPost.query.filter_by(is_removed=True).count()
+        active_posts = total_posts - removed_posts
+        
+        total_comments = ForumComment.query.count()
+        
+        # Son 7 günün aktivitesi
+        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        recent_posts = ForumPost.query.filter(
+            ForumPost.created_at >= seven_days_ago
+        ).count()
+        recent_comments = ForumComment.query.filter(
+            ForumComment.created_at >= seven_days_ago
+        ).count()
+        
+        return jsonify({
+            'users': {
+                'total': total_users,
+                'admins': admin_users,
+                'regular': regular_users
+            },
+            'forum': {
+                'total_posts': total_posts,
+                'active_posts': active_posts,
+                'removed_posts': removed_posts,
+                'total_comments': total_comments,
+                'recent_posts': recent_posts,
+                'recent_comments': recent_comments
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Admin istatistik hatası: {str(e)}'}), 500
 
+# ==================== ADMIN ENDPOINT'LERİ SONU ====================
 
 def extract_text_from_pdf(file_path):
     """PDF dosyasından metin çıkarır"""
