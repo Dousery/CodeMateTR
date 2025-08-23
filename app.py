@@ -23,73 +23,6 @@ from sqlalchemy import text
 import json
 from functools import wraps
 import logging
-import gc
-
-# psutil import'unu try-except ile güvenli hale getir
-try:
-    import psutil
-    PSUTIL_AVAILABLE = True
-except ImportError:
-    PSUTIL_AVAILABLE = False
-    print("Warning: psutil not available. Memory monitoring will be disabled.")
-
-# Bellek yönetimi fonksiyonları
-def get_memory_usage():
-    """Mevcut bellek kullanımını döndürür"""
-    if not PSUTIL_AVAILABLE:
-        return {'rss': 0, 'vms': 0, 'percent': 0}
-    
-    try:
-        process = psutil.Process(os.getpid())
-        memory_info = process.memory_info()
-        return {
-            'rss': memory_info.rss / 1024 / 1024,  # MB
-            'vms': memory_info.vms / 1024 / 1024,  # MB
-            'percent': process.memory_percent()
-        }
-    except Exception as e:
-        print(f"Memory usage check failed: {e}")
-        return {'rss': 0, 'vms': 0, 'percent': 0}
-
-def cleanup_memory():
-    """Bellek temizliği yapar"""
-    try:
-        # Garbage collection'ı zorla
-        collected = gc.collect()
-        print(f"Garbage collection completed: {collected} objects collected")
-        
-        # Bellek kullanımını logla
-        memory_usage = get_memory_usage()
-        print(f"Memory usage after cleanup: {memory_usage}")
-        
-        return memory_usage
-    except Exception as e:
-        print(f"Memory cleanup failed: {e}")
-        return None
-
-def cleanup_temp_files():
-    """Geçici dosyaları temizler"""
-    try:
-        temp_dir = tempfile.gettempdir()
-        cleaned_count = 0
-        
-        # .wav ve .webm dosyalarını ara ve temizle
-        for pattern in ['*.wav', '*.webm']:
-            import glob
-            for temp_file in glob.glob(os.path.join(temp_dir, pattern)):
-                try:
-                    # 1 saatten eski dosyaları sil
-                    if time.time() - os.path.getmtime(temp_file) > 3600:
-                        os.unlink(temp_file)
-                        cleaned_count += 1
-                except Exception as e:
-                    print(f"Error cleaning temp file {temp_file}: {e}")
-        
-        print(f"Cleaned {cleaned_count} temporary files")
-        return cleaned_count
-    except Exception as e:
-        print(f"Temp file cleanup failed: {e}")
-        return 0
 
 # Admin yetki kontrolü için decorator
 def admin_required(f):
@@ -469,6 +402,86 @@ def get_file_mimetype(filename):
         return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
     return 'application/octet-stream'
 
+# Auto-interview cleanup fonksiyonu
+def start_auto_interview_cleanup():
+    """Auto-interview session'larını ve eski audio dosyalarını temizler"""
+    import threading
+    import time
+    import os
+    import shutil
+    
+    def cleanup_worker():
+        while True:
+            try:
+                with app.app_context():
+                    # Eski auto-interview session'larını temizle (24 saatten eski)
+                    old_sessions = AutoInterviewSession.query.filter(
+                        AutoInterviewSession.status.in_(['completed', 'expired']),
+                        AutoInterviewSession.end_time < (datetime.utcnow() - timedelta(hours=24))
+                    ).all()
+                    
+                    for old_session in old_sessions:
+                        try:
+                            db.session.delete(old_session)
+                            print(f"🧹 Cleaned up old auto-interview session: {old_session.session_id}")
+                        except Exception as e:
+                            print(f"⚠️ Failed to delete old session {old_session.session_id}: {e}")
+                    
+                    # Eski audio dosyalarını temizle (1 saatten eski)
+                    audio_dir = os.path.join(app.static_folder, 'audio')
+                    if os.path.exists(audio_dir):
+                        current_time = time.time()
+                        for filename in os.listdir(audio_dir):
+                            if filename.startswith('auto_interview_') and filename.endswith('.wav'):
+                                file_path = os.path.join(audio_dir, filename)
+                                try:
+                                    file_age = current_time - os.path.getmtime(file_path)
+                                    if file_age > 3600:  # 1 saat
+                                        os.unlink(file_path)
+                                        print(f"🧹 Cleaned up old audio file: {filename}")
+                                except Exception as e:
+                                    print(f"⚠️ Failed to delete old audio file {filename}: {e}")
+                    
+                    # Test session'larını da temizle (24 saatten eski)
+                    old_test_sessions = TestSession.query.filter(
+                        TestSession.status.in_(['completed', 'expired']),
+                        TestSession.start_time < (datetime.utcnow() - timedelta(hours=24))
+                    ).all()
+                    
+                    for old_session in old_test_sessions:
+                        try:
+                            db.session.delete(old_session)
+                            print(f"🧹 Cleaned up old test session: {old_session.session_id}")
+                        except Exception as e:
+                            print(f"⚠️ Failed to delete old test session {old_session.session_id}: {e}")
+                    
+                    # UserHistory'yi de temizle (7 günden eski)
+                    old_history = UserHistory.query.filter(
+                        UserHistory.created_at < (datetime.utcnow() - timedelta(days=7))
+                    ).all()
+                    
+                    for old_record in old_history:
+                        try:
+                            db.session.delete(old_record)
+                            print(f"🧹 Cleaned up old user history record: {old_record.id}")
+                        except Exception as e:
+                            print(f"⚠️ Failed to delete old history record {old_record.id}: {e}")
+                    
+                    # Değişiklikleri commit et
+                    db.session.commit()
+                    print(f"✅ Cleanup completed: {len(old_sessions)} sessions, {len(old_test_sessions)} test sessions, {len(old_history)} history records")
+                    
+            except Exception as e:
+                print(f"❌ Cleanup error: {e}")
+            
+            # 1 saat bekle
+            time.sleep(3600)
+    
+    # Cleanup thread'ini başlat
+    cleanup_thread = threading.Thread(target=cleanup_worker, daemon=True)
+    cleanup_thread.start()
+    print("🧹 Auto-interview cleanup thread started")
+
 # Uygulama context'i oluşturulduktan sonra test session'larını temizle
 def init_app():
     with app.app_context():
@@ -517,6 +530,9 @@ def init_app():
         
         # Session cleanup'i geçici olarak devre dışı bırak
         print("ℹ️ Session cleanup skipped for now")
+        
+        # Auto-interview cleanup fonksiyonunu başlat
+        start_auto_interview_cleanup()
 
 # Session yüklemeyi app başladığında değil, route çağrıldığında yap
 # load_sessions_from_db()
@@ -725,12 +741,6 @@ def health_check():
     except Exception as e:
         db_status = f"error: {str(e)}"
     
-    # Bellek kullanımını kontrol et
-    memory_usage = get_memory_usage()
-    
-    # Geçici dosyaları temizle
-    temp_files_cleaned = cleanup_temp_files()
-    
     return jsonify({
         'status': 'healthy',
         'timestamp': datetime.utcnow().isoformat(),
@@ -739,9 +749,7 @@ def health_check():
         'database_status': db_status,
         'database_pool_size': db.engine.pool.size() if hasattr(db.engine.pool, 'size') else 'N/A',
         'database_checked_in': db.engine.pool.checkedin() if hasattr(db.engine.pool, 'checkedin') else 'N/A',
-        'gemini_api_key': bool(get_user_api_key()),
-        'memory_usage': memory_usage,
-        'temp_files_cleaned': temp_files_cleaned
+        'gemini_api_key': bool(get_user_api_key())
     })
 
 @app.route('/db-test', methods=['GET'])
@@ -1338,10 +1346,6 @@ def interview_speech_evaluation():
             # Geçici dosyayı sil
             os.unlink(temp_audio_path)
             
-            # Bellek temizliği yap
-            cleanup_memory()
-            cleanup_temp_files()
-            
             if result.get('audio_file'):
                 audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
                 audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
@@ -1389,10 +1393,6 @@ def interview_speech_evaluation():
             cv_context = user.cv_analysis if user.cv_analysis else None
             
             result = agent.generate_speech_feedback(question, user_answer, cv_context, voice_name)
-            
-            # Bellek temizliği yap
-            cleanup_memory()
-            cleanup_temp_files()
             
             if result.get('audio_file'):
                 audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
@@ -2028,10 +2028,6 @@ def submit_auto_interview_answer():
             
             # Geçici dosyayı sil
             os.unlink(temp_audio_path)
-            
-            # Bellek temizliği yap
-            cleanup_memory()
-            cleanup_temp_files()
             
             # Transcript edilen metni cevap olarak kullan
             answer = transcribed_text
@@ -3560,6 +3556,88 @@ def admin_get_stats():
 
 # ==================== ADMIN ENDPOINT'LERİ SONU ====================
 
+@app.route('/admin/cleanup', methods=['POST'])
+@admin_required
+def admin_manual_cleanup():
+    """Admin manuel cleanup yapar"""
+    try:
+        import os
+        import time
+        
+        cleanup_stats = {
+            'sessions_deleted': 0,
+            'audio_files_deleted': 0,
+            'history_records_deleted': 0,
+            'disk_space_freed_mb': 0
+        }
+        
+        # Eski auto-interview session'larını temizle
+        old_sessions = AutoInterviewSession.query.filter(
+            AutoInterviewSession.status.in_(['completed', 'expired']),
+            AutoInterviewSession.end_time < (datetime.utcnow() - timedelta(hours=1))
+        ).all()
+        
+        for old_session in old_sessions:
+            try:
+                db.session.delete(old_session)
+                cleanup_stats['sessions_deleted'] += 1
+            except Exception as e:
+                print(f"⚠️ Failed to delete old session {old_session.session_id}: {e}")
+        
+        # Eski test session'larını temizle
+        old_test_sessions = TestSession.query.filter(
+            TestSession.status.in_(['completed', 'expired']),
+            TestSession.start_time < (datetime.utcnow() - timedelta(hours=1))
+        ).all()
+        
+        for old_session in old_test_sessions:
+            try:
+                db.session.delete(old_session)
+                cleanup_stats['sessions_deleted'] += 1
+            except Exception as e:
+                print(f"⚠️ Failed to delete old test session {old_session.session_id}: {e}")
+        
+        # Eski user history'yi temizle
+        old_history = UserHistory.query.filter(
+            UserHistory.created_at < (datetime.utcnow() - timedelta(days=1))
+        ).all()
+        
+        for old_record in old_history:
+            try:
+                db.session.delete(old_record)
+                cleanup_stats['history_records_deleted'] += 1
+            except Exception as e:
+                print(f"⚠️ Failed to delete old history record {old_record.id}: {e}")
+        
+        # Eski audio dosyalarını temizle
+        audio_dir = os.path.join(app.static_folder, 'audio')
+        if os.path.exists(audio_dir):
+            current_time = time.time()
+            for filename in os.listdir(audio_dir):
+                if filename.startswith('auto_interview_') and filename.endswith('.wav'):
+                    file_path = os.path.join(audio_dir, filename)
+                    try:
+                        file_age = current_time - os.path.getmtime(file_path)
+                        if file_age > 1800:  # 30 dakika
+                            file_size = os.path.getsize(file_path) / (1024 * 1024)  # MB
+                            os.unlink(file_path)
+                            cleanup_stats['audio_files_deleted'] += 1
+                            cleanup_stats['disk_space_freed_mb'] += file_size
+                    except Exception as e:
+                        print(f"⚠️ Failed to delete old audio file {filename}: {e}")
+        
+        # Değişiklikleri commit et
+        db.session.commit()
+        
+        return jsonify({
+            'message': 'Cleanup başarıyla tamamlandı',
+            'stats': cleanup_stats
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Cleanup hatası: {str(e)}'}), 500
+
 def extract_text_from_pdf(file_path):
     """PDF dosyasından metin çıkarır"""
     text = ""
@@ -3778,60 +3856,6 @@ def recommend_adaptive_test():
         
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
-
-
-
-# Debug endpoint'leri
-@app.route('/debug/memory_status', methods=['GET'])
-@admin_required
-def get_memory_status():
-    """Bellek durumunu döndürür (Admin only)"""
-    try:
-        memory_usage = get_memory_usage()
-        temp_files_cleaned = cleanup_temp_files()
-        
-        return jsonify({
-            'memory_usage': memory_usage,
-            'temp_files_cleaned': temp_files_cleaned,
-            'timestamp': datetime.utcnow().isoformat()
-        })
-        
-    except Exception as e:
-        return jsonify({'error': f'Bellek durumu alınamadı: {str(e)}'}), 500
-
-@app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
-@login_required
-def clear_auto_interview_sessions():
-    """Kullanıcının aktif auto interview session'ını temizler"""
-    try:
-        # Kullanıcının aktif session'ını bul
-        active_session = AutoInterviewSession.query.filter_by(
-            username=session['username'],
-            status='active'
-        ).first()
-        
-        if not active_session:
-            return jsonify({
-                'message': 'Aktif oturum bulunamadı',
-                'cleared_count': 0
-            })
-        
-        # Session'ı tamamla
-        active_session.status = 'completed'
-        active_session.end_time = datetime.utcnow()
-        active_session.final_evaluation = 'Session manually cleared by user'
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Aktif oturum başarıyla temizlendi',
-            'cleared_count': 1,
-            'session_id': active_session.session_id
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Session temizleme hatası: {str(e)}'}), 500
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
