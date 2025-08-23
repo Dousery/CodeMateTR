@@ -72,6 +72,70 @@ function ProtectedRoute({ children }) {
   return isLoggedIn ? children : <Navigate to="/login" replace />;
 }
 
+function AdminRoute({ children }) {
+  const { isLoggedIn, isLoading } = useAuth();
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
+  
+  useEffect(() => {
+    const checkAdminStatus = async () => {
+      if (!isLoggedIn) {
+        setIsCheckingAdmin(false);
+        return;
+      }
+      
+      try {
+        const response = await fetch('https://btk-project-backend.onrender.com/profile', {
+          credentials: 'include'
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setIsAdmin(data.is_admin || false);
+        }
+      } catch (error) {
+        console.error('Admin status check error:', error);
+        setIsAdmin(false);
+      } finally {
+        setIsCheckingAdmin(false);
+      }
+    };
+    
+    checkAdminStatus();
+  }, [isLoggedIn]);
+  
+  if (isLoading || isCheckingAdmin) {
+    return (
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: 'calc(100vh - 64px)',
+        background: 'linear-gradient(135deg, #0a0e27 0%, #1a1b3d 25%, #2d1b69 50%, #4a148c 75%, #6a1b9a 100%)'
+      }}>
+        <Box sx={{ 
+          width: 40, 
+          height: 40, 
+          border: '2px solid rgba(255,255,255,0.3)', 
+          borderTop: '2px solid #4f46e5', 
+          borderRadius: '50%', 
+          animation: 'spin 1s linear infinite' 
+        }} />
+      </Box>
+    );
+  }
+  
+  if (!isLoggedIn) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+  
+  return children;
+}
+
 function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -202,7 +266,7 @@ function App() {
               <Route path="/auto-interview" element={<ProtectedRoute><AutoInterview /></ProtectedRoute>} />
 
               <Route path="/forum" element={<ProtectedRoute><Forum /></ProtectedRoute>} />
-              <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+              <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
               <Route path="/profile" element={<ProtectedRoute><Profile setIsLoggedIn={setIsLoggedIn} /></ProtectedRoute>} />
               {/* Catch-all route for 404 handling */}
               <Route path="*" element={<Navigate to="/" replace />} />
