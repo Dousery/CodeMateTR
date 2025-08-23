@@ -31,6 +31,8 @@ export default function Profile({ setIsLoggedIn }) {
   const navigate = useNavigate();
   const [userStats, setUserStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [updatingApiKey, setUpdatingApiKey] = useState(false);
   const username = localStorage.getItem('username');
   const interest = localStorage.getItem('interest');
 
@@ -44,6 +46,7 @@ export default function Profile({ setIsLoggedIn }) {
         withCredentials: true
       });
       setUserStats(response.data);
+      setGeminiApiKey(response.data.GEMINI_API_KEY || '');
     } catch (error) {
       console.error('İstatistikler yüklenemedi:', error);
     } finally {
@@ -91,6 +94,31 @@ export default function Profile({ setIsLoggedIn }) {
     if (score >= 60) return '#ff9800';
     if (score >= 40) return '#2196f3';
     return '#f44336';
+  };
+
+  const handleUpdateGeminiApiKey = async () => {
+    if (!geminiApiKey.trim()) {
+      alert('Lütfen bir API key girin.');
+      return;
+    }
+
+    setUpdatingApiKey(true);
+    try {
+      const response = await axios.put(API_ENDPOINTS.PROINTS.PROFILE + '/gemini-api-key', {
+        GEMINI_API_KEY: geminiApiKey.trim()
+      }, {
+        withCredentials: true
+      });
+      
+      alert('Gemini API key başarıyla güncellendi!');
+      // Kullanıcı istatistiklerini yenile
+      fetchUserStats();
+    } catch (error) {
+      console.error('API key güncelleme hatası:', error);
+      alert(error.response?.data?.error || 'API key güncellenirken hata oluştu.');
+    } finally {
+      setUpdatingApiKey(false);
+    }
   };
 
   if (loading) {
@@ -151,6 +179,46 @@ export default function Profile({ setIsLoggedIn }) {
                     py: 0.25
                   }}
                 />
+                
+                {/* Gemini API Key Girişi */}
+                <Box sx={{ mt: 2, p: 2, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <Typography variant="body2" color="rgba(255,255,255,0.8)" mb={1}>
+                    🔑 Gemini API Key
+                  </Typography>
+                  <input
+                    type="password"
+                    placeholder="AIza..."
+                    value={geminiApiKey}
+                    onChange={(e) => setGeminiApiKey(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      backgroundColor: 'rgba(255,255,255,0.1)',
+                      color: 'white',
+                      fontSize: '14px',
+                      outline: 'none'
+                    }}
+                  />
+                  <button
+                    onClick={handleUpdateGeminiApiKey}
+                    disabled={updatingApiKey}
+                    style={{
+                      marginTop: '8px',
+                      padding: '6px 12px',
+                      backgroundColor: '#4f46e5',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: updatingApiKey ? 'not-allowed' : 'pointer',
+                      fontSize: '12px',
+                      opacity: updatingApiKey ? 0.6 : 1
+                    }}
+                  >
+                    {updatingApiKey ? 'Güncelleniyor...' : 'Güncelle'}
+                  </button>
+                </Box>
               </Box>
 
               {/* İstatistikler Bölümü */}

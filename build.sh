@@ -28,7 +28,14 @@ with app.app_context():
             \"\"\"))
             created_at_exists = result.fetchone() is not None
             
-            if not is_admin_exists or not created_at_exists:
+            # Check if gemini_api_key column exists
+            result = conn.execute(text(\"\"\"
+                SELECT column_name FROM information_schema.columns 
+                WHERE table_name = 'user' AND column_name = 'GEMINI_API_KEY'
+            \"\"\"))
+            gemini_api_key_exists = result.fetchone() is not None
+            
+            if not is_admin_exists or not created_at_exists or not gemini_api_key_exists:
                 print('Adding missing columns to user table...')
                 
                 # Add is_admin column if it doesn't exist
@@ -40,6 +47,11 @@ with app.app_context():
                 if not created_at_exists:
                     conn.execute(text('ALTER TABLE \"user\" ADD COLUMN created_at TIMESTAMP DEFAULT NOW()'))
                     print('Added created_at column')
+                
+                # Add gemini_api_key column if it doesn't exist
+                if not gemini_api_key_exists:
+                    conn.execute(text('ALTER TABLE \"user\" ADD COLUMN GEMINI_API_KEY TEXT'))
+                    print('Added gemini_api_key column')
                 
                 # Add admin post columns to forum_post table
                 result = conn.execute(text(\"\"\"
@@ -62,6 +74,17 @@ with app.app_context():
                     conn.execute(text('ALTER TABLE forum_notification ADD COLUMN is_admin_message BOOLEAN DEFAULT FALSE'))
                     conn.execute(text('ALTER TABLE forum_notification ADD COLUMN admin_username VARCHAR(80)'))
                     print('Added admin notification columns to forum_notification table')
+                
+                # Add comment removal columns to forum_comment table
+                result = conn.execute(text(\"\"\"
+                    SELECT column_name FROM information_schema.columns 
+                    WHERE table_name = 'forum_comment' AND column_name = 'is_removed'
+                \"\"\"))
+                if not result.fetchone():
+                    conn.execute(text('ALTER TABLE forum_comment ADD COLUMN is_removed BOOLEAN DEFAULT FALSE'))
+                    conn.execute(text('ALTER TABLE forum_comment ADD COLUMN removed_by VARCHAR(80)'))
+                    conn.execute(text('ALTER TABLE forum_comment ADD COLUMN removed_at TIMESTAMP'))
+                    print('Added comment removal columns to forum_comment table')
                 
                 conn.commit()
                 print('Database schema updated successfully')
