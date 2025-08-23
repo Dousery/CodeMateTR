@@ -2557,6 +2557,32 @@ def like_forum_comment(comment_id):
         db.session.rollback()
         return jsonify({'error': f'Beğeni işlemi hatası: {str(e)}'}), 500
 
+@app.route('/forum/comments/<int:comment_id>', methods=['DELETE'])
+@login_required
+def delete_forum_comment(comment_id):
+    """Forum yorumunu siler"""
+    comment = ForumComment.query.get_or_404(comment_id)
+    
+    # Kullanıcının yetkisini kontrol et
+    user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
+    
+    # Yorum sahibi veya admin olmalı
+    if comment.author_username != session['username'] and not user.is_admin:
+        return jsonify({'error': 'Bu yorumu silme yetkiniz yok.'}), 403
+    
+    try:
+        # Yorumu sil
+        db.session.delete(comment)
+        db.session.commit()
+        
+        return jsonify({'message': 'Yorum başarıyla silindi.'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Yorum silme hatası: {str(e)}'}), 500
+
 @app.route('/forum/stats', methods=['GET'])
 @login_required
 def get_forum_stats():

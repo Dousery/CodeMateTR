@@ -289,6 +289,41 @@ const interestTypes = [
     }
   };
 
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Bu yorumu silmek istediğinizden emin misiniz?')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/forum/comments/${commentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        setSnackbar({ open: true, message: 'Yorum başarıyla silindi!', severity: 'success' });
+        
+        // Yorum listesini yenile
+        if (selectedPost) {
+          const updatedComments = selectedPost.comments.filter(c => c.id !== commentId);
+          setSelectedPost({
+            ...selectedPost,
+            comments: updatedComments
+          });
+        }
+        
+        // İstatistikleri yenile
+        fetchStats();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Yorum silinemedi');
+      }
+    } catch (err) {
+      console.error('Yorum silinemedi:', err);
+      setSnackbar({ open: true, message: 'Yorum silinirken hata oluştu', severity: 'error' });
+    }
+  };
+
   const fetchPosts = async () => {
     try {
       setLoading(true);
@@ -1586,6 +1621,25 @@ const interestTypes = [
                         </Button>
                       )}
                       
+                            {/* Delete Button - Yorum sahibi veya admin */}
+                            {(comment.author === localStorage.getItem('username') || isAdmin) && (
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteComment(comment.id)}
+                                sx={{ 
+                                  color: 'rgba(255, 107, 107, 0.8)',
+                                  '&:hover': { 
+                                    bgcolor: 'rgba(255, 107, 107, 0.1)',
+                                    color: '#ff6b6b',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            )}
+                            
                             {/* Report Button */}
                       <IconButton
                         size="small"
