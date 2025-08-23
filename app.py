@@ -24,11 +24,21 @@ import json
 from functools import wraps
 import logging
 import gc
-import psutil
+
+# psutil import'unu try-except ile güvenli hale getir
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    print("Warning: psutil not available. Memory monitoring will be disabled.")
 
 # Bellek yönetimi fonksiyonları
 def get_memory_usage():
     """Mevcut bellek kullanımını döndürür"""
+    if not PSUTIL_AVAILABLE:
+        return {'rss': 0, 'vms': 0, 'percent': 0}
+    
     try:
         process = psutil.Process(os.getpid())
         memory_info = process.memory_info()
@@ -38,7 +48,7 @@ def get_memory_usage():
             'percent': process.memory_percent()
         }
     except Exception as e:
-        logger.error(f"Memory usage check failed: {e}")
+        print(f"Memory usage check failed: {e}")
         return {'rss': 0, 'vms': 0, 'percent': 0}
 
 def cleanup_memory():
@@ -46,15 +56,15 @@ def cleanup_memory():
     try:
         # Garbage collection'ı zorla
         collected = gc.collect()
-        logger.info(f"Garbage collection completed: {collected} objects collected")
+        print(f"Garbage collection completed: {collected} objects collected")
         
         # Bellek kullanımını logla
         memory_usage = get_memory_usage()
-        logger.info(f"Memory usage after cleanup: {memory_usage}")
+        print(f"Memory usage after cleanup: {memory_usage}")
         
         return memory_usage
     except Exception as e:
-        logger.error(f"Memory cleanup failed: {e}")
+        print(f"Memory cleanup failed: {e}")
         return None
 
 def cleanup_temp_files():
@@ -73,12 +83,12 @@ def cleanup_temp_files():
                         os.unlink(temp_file)
                         cleaned_count += 1
                 except Exception as e:
-                    logger.error(f"Error cleaning temp file {temp_file}: {e}")
+                    print(f"Error cleaning temp file {temp_file}: {e}")
         
-        logger.info(f"Cleaned {cleaned_count} temporary files")
+        print(f"Cleaned {cleaned_count} temporary files")
         return cleaned_count
     except Exception as e:
-        logger.error(f"Temp file cleanup failed: {e}")
+        print(f"Temp file cleanup failed: {e}")
         return 0
 
 # Admin yetki kontrolü için decorator

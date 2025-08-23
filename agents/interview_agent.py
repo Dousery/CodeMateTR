@@ -6,8 +6,15 @@ import tempfile
 import os
 import base64
 from dotenv import load_dotenv
-import atexit
 import glob
+
+# atexit import'unu try-except ile güvenli hale getir
+try:
+    import atexit
+    ATEXIT_AVAILABLE = True
+except ImportError:
+    ATEXIT_AVAILABLE = False
+    print("Warning: atexit not available. Automatic cleanup will be disabled.")
 
 load_dotenv()
 
@@ -36,7 +43,8 @@ class InterviewAIAgent:
                 self.client = None
         
         # Cleanup fonksiyonunu register et
-        atexit.register(self.cleanup_temp_files)
+        if ATEXIT_AVAILABLE:
+            atexit.register(self.cleanup_temp_files)
 
     def cleanup_temp_files(self):
         """Geçici dosyaları temizler"""
