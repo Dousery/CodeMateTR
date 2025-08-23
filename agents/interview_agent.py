@@ -8,19 +8,24 @@ import base64
 from dotenv import load_dotenv
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class InterviewAIAgent:
-    def __init__(self, interest):
+    def __init__(self, interest, api_key=None):
         self.interest = interest
+        self.api_key = api_key or os.getenv('GEMINI_API_KEY')
+        
+        if self.api_key:
+            genai.configure(api_key=self.api_key)
+        
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         # Configure the new client with API key
         try:
-            self.client = google_genai_new.Client(api_key=GEMINI_API_KEY)
+            self.client = google_genai_new.Client(api_key=self.api_key)
         except Exception as e:
             print(f"Google GenAI client initialization error: {e}")
             # Fallback: Set environment variable
-            os.environ['GOOGLE_API_KEY'] = GEMINI_API_KEY
+            if self.api_key:
+                os.environ['GOOGLE_API_KEY'] = self.api_key
             try:
                 self.client = google_genai_new.Client()
             except Exception as e2:

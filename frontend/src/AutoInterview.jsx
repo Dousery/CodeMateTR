@@ -93,6 +93,13 @@ export default function AutoInterview() {
 
   // Otomatik mülakat başlatma
   const startAutoInterview = async () => {
+    // API key kontrolü
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      setError('AI özellikleri için Gemini API key gerekli. Lütfen çıkış yapıp tekrar giriş yaparken API key\'inizi girin.');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
@@ -173,6 +180,13 @@ export default function AutoInterview() {
   const submitAnswer = async () => {
     if (!userAnswer.trim()) {
       setError('Lütfen bir cevap yazın.');
+      return;
+    }
+
+    // API key kontrolü
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      setError('AI özellikleri için Gemini API key gerekli. Lütfen çıkış yapıp tekrar giriş yaparken API key\'inizi girin.');
       return;
     }
 

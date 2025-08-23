@@ -28,7 +28,7 @@ services:
       - DATABASE_URL=postgresql://postgres:password@postgres:5432/btk_project
       - SECRET_KEY=your-secret-key-here
       - FRONTEND_URL=http://localhost:3000
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      # - GEMINI_API_KEY=${GEMINI_API_KEY} # Artık kullanılmıyor
       - JSEARCH_API_KEY=${JSEARCH_API_KEY}
     ports:
       - "8000:8000"

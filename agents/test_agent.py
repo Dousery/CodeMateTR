@@ -10,8 +10,11 @@ from datetime import datetime, timedelta
 from .topic_analysis_agent import TopicAnalysisAgent
 
 class TestAIAgent:
-    def __init__(self, interest):
+    def __init__(self, interest, api_key=None):
         self.interest = interest
+        self.api_key = api_key
+        if api_key:
+            genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         # Soru havuzu ve kullanıcı geçmişi için cache
         self.question_pool = {}
@@ -495,7 +498,7 @@ class TestAIAgent:
         
         # Yanlış sorular için topic analizi ve kaynak önerileri
         wrong_questions = [result for result in results if not result['is_correct']]
-        topic_analysis_agent = TopicAnalysisAgent(self.interest)
+        topic_analysis_agent = TopicAnalysisAgent(self.interest, getattr(self, 'api_key', None))
         wrong_question_resources = topic_analysis_agent.analyze_wrong_questions(wrong_questions)
         
         # Genel kaynak önerileri (zayıf alanlar için)

@@ -119,6 +119,13 @@ export default function Interview() {
   const fetchQuestion = async () => {
     if (loading) return; // Zaten loading varsa çık
     
+    // API key kontrolü
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      setError('AI özellikleri için Gemini API key gerekli. Lütfen çıkış yapıp tekrar giriş yaparken API key\'inizi girin.');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {
@@ -295,6 +302,13 @@ export default function Interview() {
     if (loading) return;
     if (!answer.trim()) {
       setError('Lütfen cevabınızı yazın.');
+      return;
+    }
+    
+    // API key kontrolü
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      setError('AI özellikleri için Gemini API key gerekli. Lütfen çıkış yapıp tekrar giriş yaparken API key\'inizi girin.');
       return;
     }
     

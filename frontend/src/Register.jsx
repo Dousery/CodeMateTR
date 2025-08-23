@@ -6,7 +6,7 @@ import axios from 'axios';
 import API_ENDPOINTS from './config.js';
 
 export default function Register({ setIsLoggedIn }) {
-  const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', interest: '' });
+  const [form, setForm] = useState({ username: '', password: '', confirmPassword: '', interest: '', geminiApiKey: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -48,6 +48,9 @@ export default function Register({ setIsLoggedIn }) {
       
       localStorage.setItem('username', form.username);
       localStorage.setItem('interest', form.interest);
+      if (form.geminiApiKey) {
+        localStorage.setItem('geminiApiKey', form.geminiApiKey);
+      }
       
       // localStorage değişikliğini tetikle
       window.dispatchEvent(new Event('localStorageChange'));
@@ -222,6 +225,40 @@ export default function Register({ setIsLoggedIn }) {
               <MenuItem value="Cyber Security">Cyber Security Specialist</MenuItem>
             </Select>
           </FormControl>
+          
+          <TextField
+            fullWidth
+            label="Gemini API Key (Opsiyonel)"
+            type="password"
+            value={form.geminiApiKey}
+            onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
+            placeholder="https://aistudio.google.com/app/apikey adresinden alın"
+            helperText="Kendi Gemini API key'inizi girin (ücretsiz) - https://aistudio.google.com/app/apikey adresinden alabilirsiniz"
+            sx={{
+              mb: 3,
+              '& .MuiOutlinedInput-root': {
+                color: 'white',
+                '& fieldset': {
+                  borderColor: 'rgba(255,255,255,0.3)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'rgba(255,255,255,0.5)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: '#4f46e5',
+                },
+                '& .MuiInputLabel-root': {
+                  color: 'rgba(255,255,255,0.7)',
+                },
+                '& .MuiInputLabel-root.Mui-focused': {
+                  color: '#4f46e5',
+                },
+                '& .MuiFormHelperText-root': {
+                  color: 'rgba(255,255,255,0.6)',
+                },
+              },
+            }}
+          />
           
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
           

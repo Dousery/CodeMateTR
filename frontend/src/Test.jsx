@@ -156,6 +156,13 @@ export default function Test() {
   }, [timeLeft]);
 
   const fetchQuestions = async () => {
+    // API key kontrolü
+    const apiKey = localStorage.getItem('geminiApiKey');
+    if (!apiKey) {
+      setError('AI özellikleri için Gemini API key gerekli. Lütfen çıkış yapıp tekrar giriş yaparken API key\'inizi girin.');
+      return;
+    }
+    
     setLoading(true);
     setError('');
     try {

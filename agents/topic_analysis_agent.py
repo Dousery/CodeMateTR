@@ -5,13 +5,15 @@ import re
 
 
 class TopicAnalysisAgent:
-    def __init__(self, interest):
+    def __init__(self, interest, api_key=None):
         self.interest = interest
+        if api_key:
+            genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-2.5-flash-lite')
         
         # Configure the client for grounding tool
         try:
-            self.client = genai.Client()
+            self.client = genai.Client(api_key=api_key) if api_key else genai.Client()
             self.grounding_tool = types.Tool(
                 google_search=types.GoogleSearch()
             )

@@ -7,19 +7,19 @@ from google import genai
 from google.genai import types
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 class CodeAIAgent:
-    def __init__(self, interest, language='python'):
+    def __init__(self, interest, language='python', api_key=None):
         self.interest = interest
         self.language = language
+        self.api_key = api_key or os.getenv('GEMINI_API_KEY')
         
         # Configure Gemini API with new client
-        if not GEMINI_API_KEY:
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
+        if not self.api_key:
+            raise ValueError("API key is required. Please provide your Gemini API key.")
         
         # Initialize the new client
-        self.client = genai.Client(api_key=GEMINI_API_KEY)
+        self.client = genai.Client(api_key=self.api_key)
         
         # Create chat session with code execution capabilities
         self.chat = self.client.chats.create(
@@ -31,7 +31,7 @@ class CodeAIAgent:
         
         # Fallback model for non-code execution tasks (using old API for compatibility)
         import google.generativeai as old_genai
-        old_genai.configure(api_key=GEMINI_API_KEY)
+        old_genai.configure(api_key=self.api_key)
         self.fallback_model = old_genai.GenerativeModel('gemini-2.0-flash-lite')
         
         # Dil konfigürasyonları

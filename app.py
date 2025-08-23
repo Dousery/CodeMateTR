@@ -72,7 +72,7 @@ logger = logging.getLogger(__name__)
 logger.info(f"FLASK_ENV: {os.getenv('FLASK_ENV')}")
 logger.info(f"DATABASE_URL: {os.getenv('DATABASE_URL')}")
 logger.info(f"SECRET_KEY: {'SET' if os.getenv('SECRET_KEY') else 'NOT SET'}")
-logger.info(f"GEMINI_API_KEY: {'SET' if os.getenv('GEMINI_API_KEY') else 'NOT SET'}")
+logger.info("GEMINI_API_KEY: Using user-provided API keys")
 
 # CORS ayarları
 CORS(app, supports_credentials=True, origins=[
@@ -455,9 +455,23 @@ def init_app():
 # load_sessions_from_db()
 
 load_dotenv()
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+# GEMINI_API_KEY artık environment variable'dan alınmıyor
+# Her kullanıcı kendi API key'ini kullanacak
 
-genai.configure(api_key=GEMINI_API_KEY)
+# API key helper fonksiyonu
+def get_user_api_key():
+    """Session'dan kullanıcının API key'ini al"""
+    return session.get('gemini_api_key')
+
+def check_api_key_required():
+    """API key gerekli endpoint'ler için kontrol"""
+    api_key = get_user_api_key()
+    if not api_key:
+        return jsonify({
+            'error': 'AI özellikleri için Gemini API key gerekli. Lütfen giriş yaparken API key\'inizi girin.',
+            'requires_api_key': True
+        }), 400
+    return None
 
 # Güvenlik dekoratörü
 def login_required(f):
@@ -528,6 +542,7 @@ def login():
             
         username = data.get('username')
         password = data.get('password')
+        gemini_api_key = data.get('geminiApiKey', '')  # API key'i al
         
         if not username or not password:
             return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
@@ -567,6 +582,10 @@ def login():
         session['username'] = username
         session['user_id'] = user.id
         
+        # API key'i session'da sakla (database'de değil)
+        if gemini_api_key:
+            session['gemini_api_key'] = gemini_api_key
+        
         # Session'ı hemen kaydet
         session.modified = True
         
@@ -598,6 +617,7 @@ def login():
 def logout():
     session.pop('username', None)
     session.pop('user_id', None)
+    session.pop('gemini_api_key', None)  # API key'i de temizle
     session.modified = True
     return jsonify({'message': 'Çıkış başarılı.'})
 
@@ -612,6 +632,7 @@ def session_status():
         return jsonify({
             'has_username': has_username,
             'has_user_id': has_user_id,
+            'has_api_key': bool(get_user_api_key()),
             'session_permanent': session.permanent,
             'session_modified': session.modified,
             'timestamp': datetime.utcnow().isoformat()
@@ -621,6 +642,7 @@ def session_status():
         return jsonify({
             'has_username': False,
             'has_user_id': False,
+            'has_api_key': False,
             'error': 'Session kontrolü sırasında hata oluştu'
         }), 500
 
@@ -644,7 +666,7 @@ def health_check():
         'database_status': db_status,
         'database_pool_size': db.engine.pool.size() if hasattr(db.engine.pool, 'size') else 'N/A',
         'database_checked_in': db.engine.pool.checkedin() if hasattr(db.engine.pool, 'checkedin') else 'N/A',
-        'gemini_api_key': bool(os.getenv('GEMINI_API_KEY'))
+        'gemini_api_key': bool(get_user_api_key())
     })
 
 @app.route('/db-test', methods=['GET'])
@@ -922,8 +944,13 @@ def test_your_skill():
     difficulty = data.get('difficulty', 'mixed')
     use_adaptive = data.get('use_adaptive', False)  # Yeni: adaptif soru üretimi
     
+    # API key kontrolü
+    api_key_check = check_api_key_required()
+    if api_key_check:
+        return api_key_check
+    
     try:
-        agent = TestAIAgent(user.interest)
+        agent = TestAIAgent(user.interest, get_user_api_key())
         
         # Benzersiz session ID oluştur
         session_id = f"test_{int(time.time())}_{user.username}_{hash(str(datetime.utcnow()))}"
@@ -1064,7 +1091,7 @@ def upload_cv():
             
             # CV'yi analiz et
             user = User.query.filter_by(username=session['username']).first()
-            agent = InterviewAIAgent(user.interest)
+            agent = InterviewAIAgent(user.interest, get_user_api_key())
             cv_analysis = agent.analyze_cv(cv_data, mime_type)
             
             # Analizi veritabanına kaydet
@@ -1089,7 +1116,7 @@ def interview_cv_based_question():
         return jsonify({'error': 'Önce CV yüklemelisiniz.'}), 400
     
     try:
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         question = agent.generate_cv_based_question(user.cv_analysis)
         
         return jsonify({
@@ -1112,7 +1139,7 @@ def interview_personalized_questions():
     difficulty = data.get('difficulty', 'orta')
     
     try:
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         questions = agent.generate_personalized_questions(user.cv_analysis, difficulty)
         
         return jsonify({
@@ -1135,7 +1162,7 @@ def interview_speech_question():
     voice_name = data.get('voice_name', 'Kore')
     
     try:
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         result = agent.generate_dynamic_speech_question(voice_name=voice_name)
         
         if result.get('audio_file'):
@@ -1175,7 +1202,7 @@ def interview_cv_speech_question():
     voice_name = data.get('voice_name', 'Kore')
     
     try:
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         result = agent.generate_cv_based_speech_question(user.cv_analysis, voice_name)
         
         if result.get('audio_file'):
@@ -1227,7 +1254,7 @@ def interview_speech_evaluation():
             temp_audio_path = temp_audio.name
         
         try:
-            agent = InterviewAIAgent(user.interest)
+            agent = InterviewAIAgent(user.interest, get_user_api_key())
             cv_context = user.cv_analysis if user.cv_analysis else None
             
             # Ses dosyasını transcript et ve değerlendir
@@ -1279,7 +1306,7 @@ def interview_speech_evaluation():
             return jsonify({'error': 'Soru ve cevap gerekli.'}), 400
         
         try:
-            agent = InterviewAIAgent(user.interest)
+            agent = InterviewAIAgent(user.interest, get_user_api_key())
             cv_context = user.cv_analysis if user.cv_analysis else None
             
             result = agent.generate_speech_feedback(question, user_answer, cv_context, voice_name)
@@ -1318,7 +1345,7 @@ def interview_simulation():
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     try:
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         question = agent.generate_question()
     except Exception as e:
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
@@ -1347,7 +1374,7 @@ def code_room():
     difficulty = data.get('difficulty', 'orta')  # Varsayılan olarak orta
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         coding_question = agent.generate_coding_question(difficulty)
         
         # Kodlama aktivitesi kaydet
@@ -1388,7 +1415,7 @@ def code_room_generate_solution():
         return jsonify({'error': 'Soru gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         solution = agent.generate_solution(question)
         return jsonify({
             'success': True,
@@ -1437,7 +1464,7 @@ def test_your_skill_evaluate():
     time_taken = session_age
     
     # Test değerlendirmesi
-    agent = TestAIAgent(user.interest)
+    agent = TestAIAgent(user.interest, get_user_api_key())
     evaluation_result = agent.evaluate_answers(user_answers, questions, time_taken)
     
     # Summary'yi al
@@ -1509,7 +1536,7 @@ def code_room_evaluate():
         return jsonify({'error': 'Kod gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         
         if use_execution:
             # Çalıştırarak değerlendir
@@ -1559,7 +1586,7 @@ def code_room_run():
         return jsonify({'error': 'Kod gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         result = agent.run_code(user_code)
         return jsonify({
             'success': True,
@@ -1584,7 +1611,7 @@ def code_room_run_simple():
         return jsonify({'error': 'Kod gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         
         # Sadece kod çalıştırma için basit prompt
         simple_prompt = f"""
@@ -1639,7 +1666,7 @@ def code_room_suggest_resources():
         return jsonify({'error': 'Konu gerekli.'}), 400
     
     try:
-        agent = CodeAIAgent(user.interest, language)
+        agent = CodeAIAgent(user.interest, language, get_user_api_key())
         resources = agent.suggest_resources(topic, num_resources)
         return jsonify({
             'success': True,
@@ -1709,7 +1736,7 @@ def interview_simulation_evaluate():
     if not question or not user_answer:
         return jsonify({'error': 'Soru ve cevap gerekli.'}), 400
     
-    agent = InterviewAIAgent(user.interest)
+                agent = InterviewAIAgent(user.interest, get_user_api_key())
     try:
         # CV analizi varsa, CV bağlamında değerlendirme yap
         if user.cv_analysis:
@@ -1810,7 +1837,7 @@ def start_auto_interview():
         
         # Yeni mülakat oturumu oluştur
         session_id = f"auto_interview_{int(time.time())}_{user.username}"
-        agent = InterviewAIAgent(user.interest)
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
         
         # Conversation context'i kullanıcının nickname'i ile oluştur
         conversation_context = f"Kullanıcının nickname: {user.username}"
@@ -1905,7 +1932,7 @@ def submit_auto_interview_answer():
                 temp_audio_path = temp_audio.name
             
             # Ses dosyasını transcript et
-            agent = InterviewAIAgent(auto_session.interest)
+            agent = InterviewAIAgent(auto_session.interest, get_user_api_key())
             transcribed_text = agent._transcribe_audio(temp_audio_path)
             
             # Geçici dosyayı sil
@@ -1942,7 +1969,7 @@ def submit_auto_interview_answer():
         # 5 cevap tamamlandı mı kontrol et (5 soru, 5 cevap)
         if len(answers) >= 5:
             # Final değerlendirme üret
-            agent = InterviewAIAgent(auto_session.interest)
+            agent = InterviewAIAgent(auto_session.interest, get_user_api_key())
             final_evaluation = agent.generate_final_evaluation(
                 questions, 
                 answers, 
@@ -1968,7 +1995,7 @@ def submit_auto_interview_answer():
         auto_session.current_question_index = len(answers)
         
         # Sonraki sesli soruyu üret
-        agent = InterviewAIAgent(auto_session.interest)
+        agent = InterviewAIAgent(auto_session.interest, get_user_api_key())
         
         # Dinamik sesli soru üret ve ses dosyası oluştur
         result = agent.generate_dynamic_speech_question(questions, answers, auto_session.conversation_context, voice_name)
@@ -2029,7 +2056,7 @@ def complete_auto_interview():
         questions = json.loads(interview_session.questions or '[]')
         answers = json.loads(interview_session.answers or '[]')
         
-        agent = InterviewAIAgent(interview_session.interest)
+        agent = InterviewAIAgent(interview_session.interest, get_user_api_key())
         final_evaluation = agent.generate_final_evaluation(
             questions, 
             answers, 
@@ -3442,7 +3469,7 @@ def get_test_statistics():
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
     
     try:
-        agent = TestAIAgent(user.interest)
+        agent = TestAIAgent(user.interest, get_user_api_key())
         stats = agent.get_question_statistics(user_id=user.username)
         
         # Kullanıcının test geçmişi istatistikleri
@@ -3520,7 +3547,7 @@ def refresh_question_pool():
     force_refresh = data.get('force_refresh', False)
     
     try:
-        agent = TestAIAgent(user.interest)
+        agent = TestAIAgent(user.interest, get_user_api_key())
         refresh_result = agent.refresh_question_pool(force_refresh=force_refresh)
         
         if refresh_result:

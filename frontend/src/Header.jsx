@@ -86,6 +86,7 @@ export default function Header() {
     // Local storage'ı temizle
     localStorage.removeItem('username');
     localStorage.removeItem('interest');
+    localStorage.removeItem('geminiApiKey');
     
     // localStorage değişikliğini tetikle
     window.dispatchEvent(new Event('localStorageChange'));

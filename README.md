@@ -105,7 +105,7 @@ docker-compose up --build
    - `SECRET_KEY=<your-secret-key>`
    - `DATABASE_URL=<postgresql-url>`
    - `FRONTEND_URL=<your-frontend-url>`
-   - `GEMINI_API_KEY=<your-gemini-api-key>`
+   ~~- `GEMINI_API_KEY=<your-gemini-api-key>`~~ (artık kullanılmıyor, kullanıcılar kendi API key'lerini giriyorlar)
 
 3. **Build ve start komutları:**
    - Build: `pip install -r requirements.txt`
@@ -123,7 +123,7 @@ export FLASK_ENV=production
 export DATABASE_URL=<your-database-url>
 export SECRET_KEY=<your-secret-key>
 export FRONTEND_URL=<your-frontend-url>
-export GEMINI_API_KEY=<your-gemini-api-key>
+# export GEMINI_API_KEY=<your-gemini-api-key> # Artık kullanılmıyor
 
 # Start with gunicorn
 gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 app:app
@@ -145,7 +145,7 @@ FLASK_ENV=development
 SECRET_KEY=your-secret-key-here
 DATABASE_URL=postgresql://username:password@localhost:5432/btk_project
 FRONTEND_URL=http://localhost:5173
-GEMINI_API_KEY=your-gemini-api-key-here
+# GEMINI_API_KEY=your-gemini-api-key-here # Artık kullanılmıyor
 ```
 
 ### Frontend (.env.production)

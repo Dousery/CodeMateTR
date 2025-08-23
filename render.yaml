@@ -17,8 +17,7 @@ services:
           property: connectionString
       - key: FRONTEND_URL
         value: https://codematetr.onrender.com
-      - key: GEMINI_API_KEY
-        sync: false
+
       - key: JSEARCH_API_KEY
         sync: false
 
