@@ -45,6 +45,25 @@ load_dotenv()
 # App başlangıcı
 app = Flask(__name__)
 
+# Encoding ayarları
+import sys
+import locale
+
+# Default encoding'i UTF-8 yap
+if sys.stdout.encoding != 'utf-8':
+    sys.stdout.reconfigure(encoding='utf-8')
+if sys.stderr.encoding != 'utf-8':
+    sys.stderr.reconfigure(encoding='utf-8')
+
+# Locale ayarları
+try:
+    locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+except:
+    try:
+        locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+    except:
+        pass
+
 # Debug logging ekle
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
