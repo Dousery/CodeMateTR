@@ -2202,6 +2202,59 @@ def get_auto_interview_status():
     except Exception as e:
         return jsonify({'error': f'Durum kontrolü hatası: {str(e)}'}), 500
 
+@app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
+@login_required
+def clear_auto_interview_sessions():
+    """Aktif auto-interview session'larını temizler"""
+    print(f"DEBUG: clear_auto_interview_sessions called by user: {session.get('username')}")
+    try:
+        # Kullanıcının aktif auto-interview session'larını bul
+        active_sessions = AutoInterviewSession.query.filter_by(
+            username=session['username'],
+            status='active'
+        ).all()
+        
+        cleared_count = 0
+        for session_record in active_sessions:
+            try:
+                # Session'ı expired olarak işaretle
+                session_record.status = 'expired'
+                session_record.end_time = datetime.utcnow()
+                cleared_count += 1
+                print(f"DEBUG: Marked session {session_record.session_id} as expired")
+            except Exception as e:
+                print(f"ERROR: Failed to mark session {session_record.session_id} as expired: {e}")
+        
+        # Test session'larını da temizle (eğer varsa)
+        test_sessions = TestSession.query.filter_by(
+            username=session['username'],
+            status='active'
+        ).all()
+        
+        for test_session in test_sessions:
+            try:
+                test_session.status = 'expired'
+                cleared_count += 1
+                print(f"DEBUG: Marked test session {test_session.session_id} as expired")
+            except Exception as e:
+                print(f"ERROR: Failed to mark test session {test_session.session_id} as expired: {e}")
+        
+        # Değişiklikleri commit et
+        db.session.commit()
+        
+        print(f"DEBUG: Successfully cleared {cleared_count} active sessions for user {session['username']}")
+        
+        return jsonify({
+            'message': f'{cleared_count} aktif oturum temizlendi',
+            'cleared_count': cleared_count,
+            'success': True
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"ERROR: Failed to clear auto-interview sessions: {e}")
+        return jsonify({'error': f'Oturum temizleme hatası: {str(e)}'}), 500
+
 # ==================== FORUM SİSTEMİ ====================
 
 @app.route('/forum/posts', methods=['GET'])
