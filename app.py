@@ -2108,8 +2108,8 @@ def get_forum_posts():
     sort_by = request.args.get('sort', 'latest')  # latest, popular, most_commented
     search = request.args.get('search', '')
     
-    # Base query - kullanıcının ilgi alanına göre
-    query = ForumPost.query.filter_by(interest=user.interest)
+    # Base query - kullanıcının ilgi alanına göre ve kaldırılmamış gönderiler
+    query = ForumPost.query.filter_by(interest=user.interest, is_removed=False)
     
     # Post type filtresi
     if post_type != 'all':
@@ -2160,6 +2160,7 @@ def get_forum_posts():
             'author': post.author_username,
             'author_is_admin': author_user.is_admin if author_user else False,
             'is_admin_post': is_admin_post,
+            'is_removed': post.is_removed,
             'post_type': post.post_type,
             'tags': json.loads(post.tags) if post.tags else [],
             'views': post.views,

@@ -814,7 +814,7 @@ const Forum = () => {
         transition={{ duration: 0.6, delay: 0.4 }}
       >
         <Box sx={{ mb: 3 }}>
-          {posts.map((post, index) => (
+          {posts.filter(post => !post.is_removed).map((post, index) => (
             <motion.div
               key={post.id}
               initial={{ opacity: 0, y: 20 }}
