@@ -153,10 +153,12 @@ export default function AutoInterview() {
     try {
       console.log('Clearing active session with:', API_ENDPOINTS.DEBUG_CLEAR_SESSIONS);
       
-      await axios.post(API_ENDPOINTS.DEBUG_CLEAR_SESSIONS, {}, { 
+      const res = await axios.post(API_ENDPOINTS.DEBUG_CLEAR_SESSIONS, {}, { 
         withCredentials: true,
         timeout: 10000
       });
+      
+      console.log('Session cleared successfully:', res.data);
       
       // Temizleme başarılı olduktan sonra yeni mülakat başlat
       await startAutoInterview();

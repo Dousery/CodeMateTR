@@ -3800,22 +3800,33 @@ def get_memory_status():
         return jsonify({'error': f'Bellek durumu alınamadı: {str(e)}'}), 500
 
 @app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
-@admin_required
+@login_required
 def clear_auto_interview_sessions():
-    """Tüm aktif auto interview session'larını temizler (Admin only)"""
+    """Kullanıcının aktif auto interview session'ını temizler"""
     try:
-        # Tüm aktif session'ları tamamla
-        active_sessions = AutoInterviewSession.query.filter_by(status='active').all()
-        for session in active_sessions:
-            session.status = 'completed'
-            session.end_time = datetime.utcnow()
-            session.final_evaluation = 'Session manually cleared by admin'
+        # Kullanıcının aktif session'ını bul
+        active_session = AutoInterviewSession.query.filter_by(
+            username=session['username'],
+            status='active'
+        ).first()
+        
+        if not active_session:
+            return jsonify({
+                'message': 'Aktif oturum bulunamadı',
+                'cleared_count': 0
+            })
+        
+        # Session'ı tamamla
+        active_session.status = 'completed'
+        active_session.end_time = datetime.utcnow()
+        active_session.final_evaluation = 'Session manually cleared by user'
         
         db.session.commit()
         
         return jsonify({
-            'message': f'{len(active_sessions)} aktif session temizlendi',
-            'cleared_count': len(active_sessions)
+            'message': 'Aktif oturum başarıyla temizlendi',
+            'cleared_count': 1,
+            'session_id': active_session.session_id
         })
         
     except Exception as e:

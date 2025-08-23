@@ -590,15 +590,61 @@ class InterviewAIAgent:
             if file_size_mb > 20:  # 20MB limit for transcription
                 return "Ses dosyası transcript için çok büyük. Daha kısa kayıt yapın."
             
-            # Gemini ile transcript et - daha kısa ve odaklı prompt
-            prompt = "Bu ses dosyasındaki konuşmayı metne dönüştür. Sadece konuşulan metni ver."
+            # Gemini ile transcript et - daha detaylı ve odaklı prompt
+            prompt = """
+            Bu ses dosyasındaki konuşmayı dikkatlice dinle ve metne dönüştür.
             
-            # Farklı MIME type'ları dene - hızlı failover
-            mime_types = ["audio/webm", "audio/wav", "audio/mpeg"]
+            Önemli noktalar:
+            1. Konuşulan her kelimeyi doğru şekilde yaz
+            2. Cümle yapısını koru
+            3. Teknik terimleri doğru yaz
+            4. Sadece konuşulan metni ver, ek açıklama ekleme
             
-            for i, mime_type in enumerate(mime_types):
+            Eğer ses net değilse veya anlaşılamıyorsa, "anlaşılamadı" yaz.
+            """
+            
+            # Dosya uzantısına göre MIME type'ı tespit et
+            file_extension = os.path.splitext(audio_file_path)[1].lower()
+            mime_type_map = {
+                '.webm': 'audio/webm',
+                '.wav': 'audio/wav',
+                '.mp3': 'audio/mpeg',
+                '.ogg': 'audio/ogg',
+                '.m4a': 'audio/mp4',
+                '.flac': 'audio/flac'
+            }
+            
+            # Önce dosya uzantısına göre dene
+            detected_mime = mime_type_map.get(file_extension)
+            if detected_mime:
                 try:
-                    print(f"Trying transcription with MIME type: {mime_type} (attempt {i+1})")
+                    print(f"Trying transcription with detected MIME type: {detected_mime}")
+                    
+                    response = self.model.generate_content([
+                        {
+                            "mime_type": detected_mime,
+                            "data": base64.b64encode(audio_data).decode()
+                        },
+                        prompt
+                    ])
+                    
+                    result = response.text.strip()
+                    if result and not result.lower().startswith('hata') and len(result) > 3:
+                        print(f"Transcription successful with detected MIME type: {detected_mime}")
+                        print(f"Transcribed text: {result[:100]}...")  # İlk 100 karakteri logla
+                        return result
+                except Exception as e:
+                    print(f"Detected MIME type {detected_mime} failed: {e}")
+            
+            # Fallback: Farklı MIME type'ları dene
+            fallback_mime_types = ["audio/webm", "audio/wav", "audio/mpeg", "audio/ogg"]
+            
+            for i, mime_type in enumerate(fallback_mime_types):
+                if mime_type == detected_mime:  # Zaten denendi
+                    continue
+                    
+                try:
+                    print(f"Trying transcription with fallback MIME type: {mime_type} (attempt {i+1})")
                     
                     response = self.model.generate_content([
                         {
@@ -610,15 +656,19 @@ class InterviewAIAgent:
                     
                     result = response.text.strip()
                     if result and not result.lower().startswith('hata') and len(result) > 3:
-                        print(f"Transcription successful with {mime_type}")
+                        print(f"Transcription successful with fallback MIME type: {mime_type}")
+                        print(f"Transcribed text: {result[:100]}...")  # İlk 100 karakteri logla
                         return result
                 except Exception as e:
-                    print(f"MIME type {mime_type} failed: {e}")
-                    if i == len(mime_types) - 1:  # Son deneme
-                        break
+                    print(f"Fallback MIME type {mime_type} failed: {e}")
                     continue
             
             # Hiçbir MIME type başarılı olmadıysa
+            print("All MIME types failed. Audio file details:")
+            print(f"  - File path: {audio_file_path}")
+            print(f"  - File size: {file_size_mb:.2f} MB")
+            print(f"  - File extension: {file_extension}")
+            
             return "Ses transcript edilemedi. Lütfen daha net konuşun veya metin ile cevap verin."
             
         except FileNotFoundError:
