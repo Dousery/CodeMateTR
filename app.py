@@ -3912,28 +3912,6 @@ def recommend_adaptive_test():
 
 
 # Debug endpoint'leri
-@app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
-@admin_required
-def clear_auto_interview_sessions():
-    """Tüm aktif auto interview session'larını temizler (Admin only)"""
-    try:
-        # Tüm aktif session'ları tamamla
-        active_sessions = AutoInterviewSession.query.filter_by(status='active').all()
-        for session in active_sessions:
-            session.status = 'completed'
-            session.end_time = datetime.utcnow()
-            session.final_evaluation = 'Session manually cleared by admin'
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': f'{len(active_sessions)} aktif session temizlendi',
-            'cleared_count': len(active_sessions)
-        })
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'Session temizleme hatası: {str(e)}'}), 500
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
     port = int(os.environ.get('PORT', 5000))
