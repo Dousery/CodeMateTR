@@ -2415,6 +2415,36 @@ def delete_forum_post(post_id):
         db.session.rollback()
         return jsonify({'error': f'Silme hatası: {str(e)}'}), 500
 
+@app.route('/admin/forum/posts/<int:post_id>/permanent_delete', methods=['DELETE'])
+@login_required
+@admin_required
+def permanent_delete_forum_post(post_id):
+    """Forum gönderisini tamamen siler (sadece admin)"""
+    post = ForumPost.query.get_or_404(post_id)
+    
+    try:
+        # İlişkili yorumları da sil
+        ForumComment.query.filter_by(post_id=post_id).delete()
+        
+        # İlişkili like'ları sil
+        ForumLike.query.filter_by(post_id=post_id).delete()
+        
+        # İlişkili notification'ları sil
+        ForumNotification.query.filter_by(related_post_id=post_id).delete()
+        
+        # İlişkili aktiviteleri sil
+        UserActivity.query.filter_by(related_post_id=post_id).delete()
+        
+        # Gönderiyi tamamen sil
+        db.session.delete(post)
+        db.session.commit()
+        
+        return jsonify({'message': 'Gönderi tamamen silindi.'})
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Kalıcı silme hatası: {str(e)}'}), 500
+
 @app.route('/forum/posts/<int:post_id>/comments', methods=['POST'])
 @login_required
 def create_forum_comment(post_id):

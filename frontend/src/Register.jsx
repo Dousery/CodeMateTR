@@ -228,12 +228,12 @@ export default function Register({ setIsLoggedIn }) {
           
           <TextField
             fullWidth
-            label="Gemini API Key (Opsiyonel)"
+            label="Gemini API Key"
             type="password"
             value={form.geminiApiKey}
             onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}
             placeholder="https://aistudio.google.com/app/apikey adresinden alın"
-            helperText="Kendi Gemini API key'inizi girin (ücretsiz) - https://aistudio.google.com/app/apikey adresinden alabilirsiniz"
+            helperText="Kendi Gemini API key'inizi girin (ücretsiz) - https://aistudio.google.com/app/apikey adresinden alabilirsiniz."
             sx={{
               mb: 3,
               '& .MuiOutlinedInput-root': {

@@ -48,7 +48,8 @@ import {
   Analytics as AnalyticsIcon,
   Notifications as NotificationsIcon,
   Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon
+  CheckCircle as CheckCircleIcon,
+  Clear as ClearIcon
 } from '@mui/icons-material';
 
 const Admin = () => {
@@ -223,6 +224,40 @@ const Admin = () => {
       setSnackbar({
         open: true,
         message: 'Gönderi başarıyla geri yüklendi',
+        severity: 'success'
+      });
+
+      // Posts listesini güncelle
+      fetchPosts();
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: err.message,
+        severity: 'error'
+      });
+    }
+  };
+
+  const permanentDeletePost = async (postId) => {
+    // Kullanıcıdan onay al
+    if (!window.confirm('Bu gönderiyi kalıcı olarak silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_ENDPOINTS.ADMIN_FORUM_PERMANENT_DELETE}/${postId}/permanent_delete`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Gönderi kalıcı olarak silinemedi');
+      }
+
+      setSnackbar({
+        open: true,
+        message: 'Gönderi kalıcı olarak silindi',
         severity: 'success'
       });
 
@@ -424,14 +459,30 @@ const Admin = () => {
               
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {post.is_removed ? (
-                  <Tooltip title="Gönderiyi Geri Yükle">
-                    <IconButton
-                      onClick={() => restorePost(post.id)}
-                      sx={{ color: '#4CAF50' }}
-                    >
-                      <RestoreIcon />
-                    </IconButton>
-                  </Tooltip>
+                  <>
+                    <Tooltip title="Gönderiyi Geri Yükle">
+                      <IconButton
+                        onClick={() => restorePost(post.id)}
+                        sx={{ color: '#4CAF50' }}
+                      >
+                        <RestoreIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Gönderiyi Kalıcı Olarak Sil">
+                      <IconButton
+                        onClick={() => permanentDeletePost(post.id)}
+                        sx={{ 
+                          color: '#d32f2f',
+                          '&:hover': { 
+                            bgcolor: 'rgba(211, 47, 47, 0.1)',
+                            transform: 'scale(1.1)' 
+                          }
+                        }}
+                      >
+                        <ClearIcon sx={{ fontSize: '1.3rem' }} />
+                      </IconButton>
+                    </Tooltip>
+                  </>
                 ) : (
                   <Tooltip title="Gönderiyi Kaldır">
                     <IconButton

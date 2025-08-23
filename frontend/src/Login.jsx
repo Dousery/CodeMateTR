@@ -152,7 +152,7 @@ export default function Login({ setIsLoggedIn }) {
           
           <TextField
             fullWidth
-            label="Gemini API Key (Opsiyonel)"
+            label="Gemini API Key"
             type="password"
             value={form.geminiApiKey}
             onChange={(e) => setForm({ ...form, geminiApiKey: e.target.value })}

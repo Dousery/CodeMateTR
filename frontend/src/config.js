@@ -72,6 +72,7 @@ export const API_ENDPOINTS = {
   // Admin endpoints
   ADMIN_SEND_NOTIFICATION: `${API_BASE_URL}/admin/send-notification`,
   ADMIN_FORUM_POSTS: `${API_BASE_URL}/admin/forum/posts`,
+  ADMIN_FORUM_PERMANENT_DELETE: `${API_BASE_URL}/admin/forum/posts`,
   ADMIN_USERS: `${API_BASE_URL}/admin/users`,
   ADMIN_STATS: `${API_BASE_URL}/admin/stats`,
 
