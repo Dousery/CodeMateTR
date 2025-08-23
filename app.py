@@ -1730,14 +1730,21 @@ def interview_simulation_evaluate():
     user = User.query.filter_by(username=session['username']).first()
     if not user.interest:
         return jsonify({'error': 'İlgi alanı seçmelisiniz.'}), 400
+    
     data = request.json
     question = data.get('question')
     user_answer = data.get('user_answer')
     if not question or not user_answer:
         return jsonify({'error': 'Soru ve cevap gerekli.'}), 400
     
-                agent = InterviewAIAgent(user.interest, get_user_api_key())
+    # API key kontrolü
+    api_key_check = check_api_key_required()
+    if api_key_check:
+        return api_key_check
+    
     try:
+        agent = InterviewAIAgent(user.interest, get_user_api_key())
+        
         # CV analizi varsa, CV bağlamında değerlendirme yap
         if user.cv_analysis:
             evaluation = agent.evaluate_cv_answer(question, user_answer, user.cv_analysis)
@@ -1748,6 +1755,7 @@ def interview_simulation_evaluate():
         return jsonify({'error': f'Gemini API hatası: {str(e)}'}), 500
     
     # Geçmişe kaydet
+    # TODO: Interview history kaydetme işlemi eklenebilir
     
     return jsonify({
         'evaluation': evaluation,
