@@ -128,7 +128,7 @@ const interestTypes = [
   useEffect(() => {
     const checkAdminStatus = async () => {
       try {
-        const response = await fetch(API_ENDPOINTS.PROFILE, {
+        const response = await fetch('/api/profile', {
           credentials: 'include'
         });
         if (response.ok) {
@@ -1074,11 +1074,6 @@ const interestTypes = [
                     </IconButton>
                   )}
                   
-                  {/* Debug: Silme butonu görünürlüğü */}
-                  <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', mr: 1 }}>
-                    Debug: post.author={post.author}, username={localStorage.getItem('username')}, isAdmin={isAdmin.toString()}
-                  </Typography>
-                  
                   {/* Sadece gönderi sahibi veya admin silebilir */}
                   {(post.author === localStorage.getItem('username') || isAdmin) && (
                     <IconButton
@@ -1562,8 +1557,7 @@ const interestTypes = [
                             {/* Solution Button */}
                       {(selectedPost.post.author_username === localStorage.getItem('username') || 
                         selectedPost.post.author === localStorage.getItem('username')) && 
-                       !selectedPost.post.is_solved && !comment.is_solution && 
-                       comment.author_username !== localStorage.getItem('username') && (
+                       !selectedPost.post.is_solved && !comment.is_solution && (
                         <Button
                           size="small"
                           variant="contained"

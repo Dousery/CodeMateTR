@@ -418,10 +418,6 @@ const Admin = () => {
   const renderPosts = () => (
     <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
       <CardContent>
-        {/* Debug: Posts sayısı */}
-        <Typography sx={{ color: 'white', mb: 2 }}>
-          Toplam {posts.length} gönderi bulundu
-        </Typography>
         <List>
           {posts.map((post) => (
             <ListItem key={post.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -460,11 +456,6 @@ const Admin = () => {
                   </Box>
                 }
               />
-              
-              {/* Debug: Post bilgileri */}
-              <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', mr: 1 }}>
-                Debug: is_removed={post.is_removed.toString()}, author={post.author_username}
-              </Typography>
               
               <Box sx={{ display: 'flex', gap: 1 }}>
                 {post.is_removed ? (
