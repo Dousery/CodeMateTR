@@ -266,7 +266,7 @@ const interestTypes = [
       });
 
       if (response.ok) {
-        setSnackbar({ open: true, message: 'Gönderi başarıyla silindi!', severity: 'success' });
+        setSnackbar({ open: true, message: 'Gönderi başarıyla kaldırıldı!', severity: 'success' });
         setShowDeleteDialog(false);
         setPostToDelete(null);
         
@@ -1074,8 +1074,8 @@ const interestTypes = [
                     </IconButton>
                   )}
                   
-                  {/* Sadece gönderi sahibi silebilir */}
-                  {post.author === localStorage.getItem('username') && (
+                  {/* Sadece gönderi sahibi veya admin silebilir */}
+                  {(post.author === localStorage.getItem('username') || isAdmin) && (
                     <IconButton
                       size="small"
                       onClick={(e) => {
@@ -1843,7 +1843,7 @@ const interestTypes = [
           borderBottom: '1px solid rgba(255,255,255,0.1)',
           fontWeight: 600
         }}>
-          Gönderiyi Sil
+          Gönderiyi Kaldır
         </DialogTitle>
         <DialogContent sx={{ 
           background: 'rgba(20, 20, 40, 0.9)',
@@ -1851,10 +1851,10 @@ const interestTypes = [
           pt: 3
         }}>
           <Typography variant="body1" sx={{ mb: 2, color: 'white' }}>
-            Bu gönderiyi silmek istediğinizden emin misiniz?
+            Bu gönderiyi kaldırmak istediğinizden emin misiniz?
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 3 }}>
-            Bu işlem geri alınamaz. Gönderi ve tüm yorumları kalıcı olarak silinecektir.
+            Gönderi gizlenecek ancak yorumlar korunacaktır. Bu işlem geri alınabilir.
           </Typography>
           {postToDelete && (
             <Card sx={{ 
@@ -1905,7 +1905,7 @@ const interestTypes = [
               transition: 'all 0.2s ease'
             }}
           >
-            Sil
+            Kaldır
           </Button>
         </DialogActions>
       </Dialog>

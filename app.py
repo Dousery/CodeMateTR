@@ -2351,20 +2351,23 @@ def delete_forum_post(post_id):
     """Forum gönderisini siler"""
     post = ForumPost.query.get_or_404(post_id)
     
-    # Sadece yazar silebilir
-    if post.author_username != session['username']:
+    # Sadece yazar veya admin silebilir
+    user = User.query.filter_by(username=session['username']).first()
+    if not user:
+        return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
+    
+    if post.author_username != session['username'] and not user.is_admin:
         return jsonify({'error': 'Bu gönderiyi silme yetkiniz yok.'}), 403
     
     try:
-        # İlişkili yorumları ve beğenileri sil
-        ForumComment.query.filter_by(post_id=post_id).delete()
-        ForumLike.query.filter_by(post_id=post_id).delete()
+        # Soft delete - gönderiyi tamamen silme, sadece gizle
+        post.is_removed = True
+        post.removed_by = session['username']
+        post.removed_at = datetime.utcnow()
         
-        # Postu sil
-        db.session.delete(post)
         db.session.commit()
         
-        return jsonify({'message': 'Gönderi başarıyla silindi.'})
+        return jsonify({'message': 'Gönderi başarıyla kaldırıldı.'})
         
     except Exception as e:
         db.session.rollback()
