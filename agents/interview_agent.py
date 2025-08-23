@@ -6,6 +6,8 @@ import tempfile
 import os
 import base64
 from dotenv import load_dotenv
+import atexit
+import glob
 
 load_dotenv()
 
@@ -13,6 +15,7 @@ class InterviewAIAgent:
     def __init__(self, interest, api_key=None):
         self.interest = interest
         self.api_key = api_key or os.getenv('GEMINI_API_KEY')
+        self.temp_files = []  # Geçici dosyaları takip etmek için
         
         if self.api_key:
             genai.configure(api_key=self.api_key)
@@ -31,6 +34,37 @@ class InterviewAIAgent:
             except Exception as e2:
                 print(f"Fallback client initialization error: {e2}")
                 self.client = None
+        
+        # Cleanup fonksiyonunu register et
+        atexit.register(self.cleanup_temp_files)
+
+    def cleanup_temp_files(self):
+        """Geçici dosyaları temizler"""
+        for temp_file in self.temp_files:
+            try:
+                if os.path.exists(temp_file):
+                    os.unlink(temp_file)
+                    print(f"Cleaned up temp file: {temp_file}")
+            except Exception as e:
+                print(f"Error cleaning up temp file {temp_file}: {e}")
+        self.temp_files.clear()
+
+    def cleanup_old_temp_files(self, max_age_hours=1):
+        """Belirli bir yaştan eski geçici dosyaları temizler"""
+        import time
+        current_time = time.time()
+        temp_dir = tempfile.gettempdir()
+        
+        # .wav dosyalarını ara
+        pattern = os.path.join(temp_dir, "*.wav")
+        for temp_file in glob.glob(pattern):
+            try:
+                file_age = current_time - os.path.getmtime(temp_file)
+                if file_age > (max_age_hours * 3600):  # Saati saniyeye çevir
+                    os.unlink(temp_file)
+                    print(f"Cleaned up old temp file: {temp_file}")
+            except Exception as e:
+                print(f"Error cleaning up old temp file {temp_file}: {e}")
 
     def generate_dynamic_question(self, previous_questions=None, user_answers=None, conversation_context=None):
         """
@@ -97,10 +131,13 @@ class InterviewAIAgent:
                     
                     audio_data = response.candidates[0].content.parts[0].inline_data.data
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                    self._save_wave_file(temp_file.name, audio_data)
+                    temp_file_path = temp_file.name
+                    temp_file.close()  # Dosyayı kapat
+                    self._save_wave_file(temp_file_path, audio_data)
+                    self.temp_files.append(temp_file_path)  # Takip listesine ekle
                     
                     return {
-                        'audio_file': temp_file.name,
+                        'audio_file': temp_file_path,
                         'question_text': question_text,
                         'audio_data': audio_data
                     }
@@ -177,10 +214,13 @@ class InterviewAIAgent:
                     
                     audio_data = response.candidates[0].content.parts[0].inline_data.data
                     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                    self._save_wave_file(temp_file.name, audio_data)
+                    temp_file_path = temp_file.name
+                    temp_file.close()  # Dosyayı kapat
+                    self._save_wave_file(temp_file_path, audio_data)
+                    self.temp_files.append(temp_file_path)  # Takip listesine ekle
                     
                     return {
-                        'audio_file': temp_file.name,
+                        'audio_file': temp_file_path,
                         'question_text': question_text,
                         'audio_data': audio_data
                     }
@@ -311,10 +351,13 @@ class InterviewAIAgent:
             
             audio_data = response.candidates[0].content.parts[0].inline_data.data
             temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-            self._save_wave_file(temp_file.name, audio_data)
+            temp_file_path = temp_file.name
+            temp_file.close()  # Dosyayı kapat
+            self._save_wave_file(temp_file_path, audio_data)
+            self.temp_files.append(temp_file_path)  # Takip listesine ekle
             
             return {
-                'audio_file': temp_file.name,
+                'audio_file': temp_file_path,
                 'feedback_text': text_feedback,
                 'audio_data': audio_data
             }

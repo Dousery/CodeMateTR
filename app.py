@@ -23,6 +23,63 @@ from sqlalchemy import text
 import json
 from functools import wraps
 import logging
+import gc
+import psutil
+
+# Bellek yönetimi fonksiyonları
+def get_memory_usage():
+    """Mevcut bellek kullanımını döndürür"""
+    try:
+        process = psutil.Process(os.getpid())
+        memory_info = process.memory_info()
+        return {
+            'rss': memory_info.rss / 1024 / 1024,  # MB
+            'vms': memory_info.vms / 1024 / 1024,  # MB
+            'percent': process.memory_percent()
+        }
+    except Exception as e:
+        logger.error(f"Memory usage check failed: {e}")
+        return {'rss': 0, 'vms': 0, 'percent': 0}
+
+def cleanup_memory():
+    """Bellek temizliği yapar"""
+    try:
+        # Garbage collection'ı zorla
+        collected = gc.collect()
+        logger.info(f"Garbage collection completed: {collected} objects collected")
+        
+        # Bellek kullanımını logla
+        memory_usage = get_memory_usage()
+        logger.info(f"Memory usage after cleanup: {memory_usage}")
+        
+        return memory_usage
+    except Exception as e:
+        logger.error(f"Memory cleanup failed: {e}")
+        return None
+
+def cleanup_temp_files():
+    """Geçici dosyaları temizler"""
+    try:
+        temp_dir = tempfile.gettempdir()
+        cleaned_count = 0
+        
+        # .wav ve .webm dosyalarını ara ve temizle
+        for pattern in ['*.wav', '*.webm']:
+            import glob
+            for temp_file in glob.glob(os.path.join(temp_dir, pattern)):
+                try:
+                    # 1 saatten eski dosyaları sil
+                    if time.time() - os.path.getmtime(temp_file) > 3600:
+                        os.unlink(temp_file)
+                        cleaned_count += 1
+                except Exception as e:
+                    logger.error(f"Error cleaning temp file {temp_file}: {e}")
+        
+        logger.info(f"Cleaned {cleaned_count} temporary files")
+        return cleaned_count
+    except Exception as e:
+        logger.error(f"Temp file cleanup failed: {e}")
+        return 0
 
 # Admin yetki kontrolü için decorator
 def admin_required(f):
@@ -1263,6 +1320,10 @@ def interview_speech_evaluation():
             # Geçici dosyayı sil
             os.unlink(temp_audio_path)
             
+            # Bellek temizliği yap
+            cleanup_memory()
+            cleanup_temp_files()
+            
             if result.get('audio_file'):
                 audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
                 audio_path = os.path.join(app.static_folder, 'audio', audio_filename)
@@ -1310,6 +1371,10 @@ def interview_speech_evaluation():
             cv_context = user.cv_analysis if user.cv_analysis else None
             
             result = agent.generate_speech_feedback(question, user_answer, cv_context, voice_name)
+            
+            # Bellek temizliği yap
+            cleanup_memory()
+            cleanup_temp_files()
             
             if result.get('audio_file'):
                 audio_filename = f"feedback_{session['username']}_{int(time.time())}.wav"
@@ -1945,6 +2010,10 @@ def submit_auto_interview_answer():
             
             # Geçici dosyayı sil
             os.unlink(temp_audio_path)
+            
+            # Bellek temizliği yap
+            cleanup_memory()
+            cleanup_temp_files()
             
             # Transcript edilen metni cevap olarak kullan
             answer = transcribed_text
@@ -3691,6 +3760,76 @@ def recommend_adaptive_test():
         
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
+
+# Health check endpoint
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Sistem sağlık durumunu kontrol eder"""
+    try:
+        # Database bağlantısını kontrol et
+        db.session.execute(text('SELECT 1'))
+        
+        # Bellek kullanımını kontrol et
+        memory_usage = get_memory_usage()
+        
+        # Geçici dosyaları temizle
+        temp_files_cleaned = cleanup_temp_files()
+        
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.utcnow().isoformat(),
+            'memory_usage': memory_usage,
+            'temp_files_cleaned': temp_files_cleaned,
+            'database': 'connected'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 500
+
+# Debug endpoint'leri
+@app.route('/debug/memory_status', methods=['GET'])
+@admin_required
+def get_memory_status():
+    """Bellek durumunu döndürür (Admin only)"""
+    try:
+        memory_usage = get_memory_usage()
+        temp_files_cleaned = cleanup_temp_files()
+        
+        return jsonify({
+            'memory_usage': memory_usage,
+            'temp_files_cleaned': temp_files_cleaned,
+            'timestamp': datetime.utcnow().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'Bellek durumu alınamadı: {str(e)}'}), 500
+
+@app.route('/debug/clear_auto_interview_sessions', methods=['POST'])
+@admin_required
+def clear_auto_interview_sessions():
+    """Tüm aktif auto interview session'larını temizler (Admin only)"""
+    try:
+        # Tüm aktif session'ları tamamla
+        active_sessions = AutoInterviewSession.query.filter_by(status='active').all()
+        for session in active_sessions:
+            session.status = 'completed'
+            session.end_time = datetime.utcnow()
+            session.final_evaluation = 'Session manually cleared by admin'
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f'{len(active_sessions)} aktif session temizlendi',
+            'cleared_count': len(active_sessions)
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': f'Session temizleme hatası: {str(e)}'}), 500
 
 if __name__ == '__main__':
     init_app()  # Database'i başlat ve session'ları yükle
