@@ -848,6 +848,7 @@ def profile():
         return jsonify({
             'username': user.username,
             'interest': user.interest,
+            'is_admin': user.is_admin,
             'stats': {
                 'total_tests': total_tests,
                 'average_score': round(avg_score, 1),
