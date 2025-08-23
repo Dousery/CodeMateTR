@@ -74,7 +74,6 @@ export const API_ENDPOINTS = {
   ADMIN_FORUM_POSTS: `${API_BASE_URL}/admin/forum/posts`,
   ADMIN_USERS: `${API_BASE_URL}/admin/users`,
   ADMIN_STATS: `${API_BASE_URL}/admin/stats`,
-  ADMIN_COMMENTS: `${API_BASE_URL}/admin/comments`,
 
 
 

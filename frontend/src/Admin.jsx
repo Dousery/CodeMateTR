@@ -48,15 +48,13 @@ import {
   Analytics as AnalyticsIcon,
   Notifications as NotificationsIcon,
   Warning as WarningIcon,
-  CheckCircle as CheckCircleIcon,
-  Comment as CommentIcon
+  CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 
 const Admin = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [users, setUsers] = useState([]);
   const [posts, setPosts] = useState([]);
-  const [comments, setComments] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -82,8 +80,6 @@ const Admin = () => {
       fetchUsers();
     } else if (activeTab === 'posts') {
       fetchPosts();
-    } else if (activeTab === 'comments') {
-      fetchComments();
     }
   }, [activeTab, currentPage]);
 
@@ -241,85 +237,6 @@ const Admin = () => {
     }
   };
 
-  const fetchComments = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/admin/comments?page=${currentPage}&per_page=${perPage}`, {
-        credentials: 'include'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Yorumlar alınamadı');
-      }
-      
-      const data = await response.json();
-      setComments(data.comments);
-      setTotalPages(data.pagination.pages);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const removeComment = async (commentId) => {
-    try {
-      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/admin/comments/${commentId}/remove`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Yorum kaldırılamadı');
-      }
-
-      setSnackbar({
-        open: true,
-        message: 'Yorum başarıyla kaldırıldı',
-        severity: 'success'
-      });
-
-      // Comments listesini güncelle
-      fetchComments();
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.message,
-        severity: 'error'
-      });
-    }
-  };
-
-  const restoreComment = async (commentId) => {
-    try {
-      const response = await fetch(`${API_ENDPOINTS.BASE_URL}/admin/comments/${commentId}/restore`, {
-        method: 'POST',
-        credentials: 'include'
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Yorum geri yüklenemedi');
-      }
-
-      setSnackbar({
-        open: true,
-        message: 'Yorum başarıyla geri yüklendi',
-        severity: 'success'
-      });
-
-      // Comments listesini güncelle
-      fetchComments();
-    } catch (err) {
-      setSnackbar({
-        open: true,
-        message: err.message,
-        severity: 'error'
-      });
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -336,89 +253,62 @@ const Admin = () => {
     { id: 'dashboard', label: 'Dashboard', icon: <AnalyticsIcon /> },
     { id: 'users', label: 'Kullanıcılar', icon: <PeopleIcon /> },
     { id: 'posts', label: 'Forum Gönderileri', icon: <ViewIcon /> },
-    { id: 'comments', label: 'Yorumlar', icon: <CommentIcon /> },
     { id: 'notifications', label: 'Bildirimler', icon: <NotificationsIcon /> }
   ];
 
   const renderDashboard = () => (
     <Grid container spacing={3}>
-                    <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: 'white', mb: 1 }}>
-               {stats?.users?.total || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Toplam Kullanıcı
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
-       
-       <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: '#4CAF50', mb: 1 }}>
-               {stats?.users?.admins || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Admin Kullanıcı
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
-       
-       <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: '#2196F3', mb: 1 }}>
-               {stats?.forum?.total_posts || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Toplam Gönderi
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
-       
-       <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: '#FF9800', mb: 1 }}>
-               {stats?.forum?.removed_posts || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Kaldırılan Gönderi
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
-       
-       <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: '#9C27B0', mb: 1 }}>
-               {stats?.forum?.total_comments || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Toplam Yorum
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
-       
-       <Grid item xs={12} md={6} lg={2}>
-         <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-           <CardContent>
-             <Typography variant="h4" sx={{ color: '#E91E63', mb: 1 }}>
-               {stats?.forum?.removed_comments || 0}
-             </Typography>
-             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-               Kaldırılan Yorum
-             </Typography>
-           </CardContent>
-         </Card>
-       </Grid>
+      <Grid item xs={12} md={6} lg={3}>
+        <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+          <CardContent>
+            <Typography variant="h4" sx={{ color: 'white', mb: 1 }}>
+              {stats?.users?.total || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Toplam Kullanıcı
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+      
+      <Grid item xs={12} md={6} lg={3}>
+        <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+          <CardContent>
+            <Typography variant="h4" sx={{ color: '#4CAF50', mb: 1 }}>
+              {stats?.users?.admins || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Admin Kullanıcı
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+      
+      <Grid item xs={12} md={6} lg={3}>
+        <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+          <CardContent>
+            <Typography variant="h4" sx={{ color: '#2196F3', mb: 1 }}>
+              {stats?.forum?.total_posts || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Toplam Gönderi
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
+      
+      <Grid item xs={12} md={6} lg={3}>
+        <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
+          <CardContent>
+            <Typography variant="h4" sx={{ color: '#FF9800', mb: 1 }}>
+              {stats?.forum?.removed_posts || 0}
+            </Typography>
+            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              Kaldırılan Gönderi
+            </Typography>
+          </CardContent>
+        </Card>
+      </Grid>
     </Grid>
   );
 
@@ -573,89 +463,6 @@ const Admin = () => {
     </Card>
   );
 
-  const renderComments = () => (
-    <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
-      <CardContent>
-        <List>
-          {comments.map((comment) => (
-            <ListItem key={comment.id} sx={{ borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <ListItemAvatar>
-                <Avatar sx={{ 
-                  background: comment.is_solution 
-                    ? 'linear-gradient(45deg, #4CAF50 0%, #66BB6A 100%)' 
-                    : 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)'
-                }}>
-                  {comment.author.charAt(0).toUpperCase()}
-                </Avatar>
-              </ListItemAvatar>
-              
-              <ListItemText
-                primary={
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <Typography sx={{ color: 'white', fontWeight: 'bold' }}>
-                      {comment.content.substring(0, 80)}...
-                    </Typography>
-                    {comment.is_solution && (
-                      <Chip label="✅ ÇÖZÜM" size="small" sx={{ background: '#4CAF50', color: 'white' }} />
-                    )}
-                    {comment.is_removed && (
-                      <Chip label="🗑️ KALDIRILDI" size="small" sx={{ background: '#f44336', color: 'white' }} />
-                    )}
-                  </Box>
-                }
-                secondary={
-                  <Box>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      {comment.author} • {comment.post_title} • {formatDate(comment.created_at)}
-                    </Typography>
-                    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                      Beğeni: {comment.likes_count} • {comment.is_solution ? 'Çözüm olarak kabul edildi' : 'Normal yorum'}
-                    </Typography>
-                  </Box>
-                }
-              />
-              
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                {comment.is_removed ? (
-                  <Tooltip title="Yorumu Geri Yükle">
-                    <IconButton
-                      onClick={() => restoreComment(comment.id)}
-                      sx={{ color: '#4CAF50' }}
-                    >
-                      <RestoreIcon />
-                    </IconButton>
-                  </Tooltip>
-                ) : (
-                  <Tooltip title="Yorumu Kaldır">
-                    <IconButton
-                      onClick={() => removeComment(comment.id)}
-                      sx={{ color: '#f44336' }}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Tooltip>
-                )}
-              </Box>
-            </ListItem>
-          ))}
-        </List>
-        
-        <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2 }}>
-          <Pagination
-            count={totalPages}
-            page={currentPage}
-            onChange={(e, page) => setCurrentPage(page)}
-            sx={{
-              '& .MuiPaginationItem-root': {
-                color: 'white'
-              }
-            }}
-          />
-        </Box>
-      </CardContent>
-    </Card>
-  );
-
   const renderNotifications = () => (
     <Card sx={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(20px)' }}>
       <CardContent>
@@ -773,7 +580,6 @@ const Admin = () => {
             {activeTab === 'dashboard' && renderDashboard()}
             {activeTab === 'users' && renderUsers()}
             {activeTab === 'posts' && renderPosts()}
-            {activeTab === 'comments' && renderComments()}
             {activeTab === 'notifications' && renderNotifications()}
           </motion.div>
         </Container>

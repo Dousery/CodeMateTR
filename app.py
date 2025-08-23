@@ -187,7 +187,6 @@ class User(db.Model):
     interest = db.Column(db.String(80), nullable=True)
     cv_analysis = db.Column(db.Text, nullable=True)  # CV analiz sonucu
     is_admin = db.Column(db.Boolean, default=False)  # Admin yetkisi
-    GEMINI_API_KEY = db.Column(db.Text, nullable=True)  # Gemini API key
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def set_password(self, password):
@@ -853,7 +852,6 @@ def profile():
             'username': user.username,
             'interest': user.interest,
             'is_admin': user.is_admin,
-            'GEMINI_API_KEY': user.GEMINI_API_KEY,
             'stats': {
                 'total_tests': total_tests,
                 'average_score': round(avg_score, 1),
@@ -874,34 +872,6 @@ def profile():
         print(f"ERROR in profile endpoint: {str(e)}")
         # Veritabanı hatası durumunda session'ı temizleme, sadece hata döndür
         return jsonify({'error': 'Sunucu hatası. Lütfen daha sonra tekrar deneyin.'}), 500
-
-@app.route('/profile/gemini-api-key', methods=['PUT'])
-@login_required
-def update_gemini_api_key():
-    """Kullanıcının Gemini API key'ini günceller"""
-    try:
-        data = request.json
-        GEMINI_API_KEY = data.get('GEMINI_API_KEY')
-        
-        if not GEMINI_API_KEY:
-            return jsonify({'error': 'API key gerekli.'}), 400
-        
-        # API key formatını kontrol et (basit kontrol)
-        if not GEMINI_API_KEY.startswith('AIza'):
-            return jsonify({'error': 'Geçersiz Gemini API key formatı.'}), 400
-        
-        user = User.query.filter_by(username=session['username']).first()
-        if not user:
-            return jsonify({'error': 'Kullanıcı bulunamadı.'}), 404
-        
-        user.GEMINI_API_KEY = GEMINI_API_KEY
-        db.session.commit()
-        
-        return jsonify({'message': 'Gemini API key başarıyla güncellendi.'})
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': f'API key güncelleme hatası: {str(e)}'}), 500
 
 @app.route('/test', methods=['GET'])
 def test_page():
