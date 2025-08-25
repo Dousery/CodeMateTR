@@ -12,7 +12,7 @@
 
 
 ### Canlı Yayın
-- Site: `https://codematetr.onrender.com`
+- Site: SİTE ŞUAN BAKIMDA
 
 ### Öne Çıkanlar
 - 🎯 AI Test: Kişiselleştirilmiş test ve anlık değerlendirme
