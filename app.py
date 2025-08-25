@@ -3003,8 +3003,8 @@ def mark_post_solved(post_id):
             post.solved_by = comment.author_username
             post.solved_at = datetime.utcnow()
 
-                comment.is_solution = True
-                comment.is_accepted = True
+            comment.is_solution = True
+            comment.is_accepted = True
         else:
             # Yorum belirtilmeden çözüldü işaretlenmesi desteklenmiyorsa engelle
             return jsonify({'error': 'Çözüm için bir yorum seçilmelidir.'}), 400
