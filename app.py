@@ -3003,8 +3003,8 @@ def mark_post_solved(post_id):
             post.solved_by = comment.author_username
             post.solved_at = datetime.utcnow()
 
-            comment.is_solution = True
-            comment.is_accepted = True
+                comment.is_solution = True
+                comment.is_accepted = True
         else:
             # Yorum belirtilmeden çözüldü işaretlenmesi desteklenmiyorsa engelle
             return jsonify({'error': 'Çözüm için bir yorum seçilmelidir.'}), 400
@@ -3919,28 +3919,6 @@ def recommend_adaptive_test():
         
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
-
-# =============== Session API Key Endpoints ===============
-@app.route('/session/api-key', methods=['POST'])
-@login_required
-def set_session_api_key():
-    data = request.json or {}
-    api_key = data.get('apiKey') or data.get('api_key')
-    if not api_key or not isinstance(api_key, str) or len(api_key.strip()) == 0:
-        return jsonify({'error': 'API anahtarı gerekli.'}), 400
-    try:
-        session['gemini_api_key'] = api_key.strip()
-        session.modified = True
-        return jsonify({'message': 'API anahtarı kaydedildi.'})
-    except Exception as e:
-        return jsonify({'error': f'Anahtar kaydedilemedi: {str(e)}'}), 500
-
-
-@app.route('/session/api-key/status', methods=['GET'])
-@login_required
-def get_session_api_key_status():
-    has_key = bool(session.get('gemini_api_key'))
-    return jsonify({'has_key': has_key})
 
 
 # Debug endpoint'leri

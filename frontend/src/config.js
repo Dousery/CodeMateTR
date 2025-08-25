@@ -19,9 +19,6 @@ export const API_ENDPOINTS = {
   SET_INTEREST: `${API_BASE_URL}/set_interest`,
   SESSION_STATUS: `${API_BASE_URL}/session-status`,
   HEALTH: `${API_BASE_URL}/health`,
-  // Session-scoped API key endpoints
-  SESSION_API_KEY: `${API_BASE_URL}/session/api-key`,
-  SESSION_API_KEY_STATUS: `${API_BASE_URL}/session/api-key/status`,
 
   // Test endpoints
   TEST_PAGE: `${API_BASE_URL}/test`,

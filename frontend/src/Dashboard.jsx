@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert, Link } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, Alert } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
@@ -51,10 +51,7 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
-  const [apiKey, setApiKey] = useState('');
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [apiKeySaving, setApiKeySaving] = useState(false);
-  const [apiKeyMsg, setApiKeyMsg] = useState('');
+  const [showApiKeyNotice, setShowApiKeyNotice] = useState(localStorage.getItem('showPostRegisterApiKeyNotice') === '1');
 
   // Add CSS for pulse animation
   React.useEffect(() => {
@@ -97,13 +94,6 @@ export default function Dashboard() {
     }
   }, [alan]);
 
-  // Check if session already has API key
-  useEffect(() => {
-    axios.get(API_ENDPOINTS.SESSION_API_KEY_STATUS, { withCredentials: true })
-      .then(res => setHasApiKey(!!res.data.has_key))
-      .catch(() => setHasApiKey(false));
-  }, []);
-
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -117,26 +107,12 @@ export default function Dashboard() {
     }
   };
 
-  const handleSaveApiKey = async () => {
-    if (!apiKey.trim()) {
-      setApiKeyMsg('Lütfen API anahtarını giriniz.');
-      return;
+  useEffect(() => {
+    if (showApiKeyNotice) {
+      // Mesajı sadece bir kere göster, sonra bayrağı kaldır
+      localStorage.removeItem('showPostRegisterApiKeyNotice');
     }
-    setApiKeySaving(true);
-    setApiKeyMsg('');
-    try {
-      await axios.post(API_ENDPOINTS.SESSION_API_KEY, { apiKey: apiKey.trim() }, { withCredentials: true });
-      setHasApiKey(true);
-      setApiKey('');
-      setApiKeyMsg('API anahtarı kaydedildi.');
-    } catch (e) {
-      setApiKeyMsg('API anahtarı kaydedilemedi.');
-    } finally {
-      setApiKeySaving(false);
-    }
-  };
-
-
+  }, [showApiKeyNotice]);
 
 
 
@@ -273,57 +249,17 @@ export default function Dashboard() {
       >
         Hoş Geldin, {username}!
       </Typography>
+      {showApiKeyNotice && (
+        <Box sx={{ maxWidth: 900, mx: 'auto', mb: 4 }}>
+          <Alert severity="info" onClose={() => setShowApiKeyNotice(false)} sx={{ borderRadius: 2 }}>
+            Kayıt işlemi tamamlandı. Lütfen hesaptan çıkış yapıp kendi API anahtarınız ile tekrar giriş yapın.
+          </Alert>
+        </Box>
+      )}
+
       <Typography textAlign="center" mb={8} color="rgba(255,255,255,0.8)">
         Aşağıdaki modüllerden birini seçerek kendini geliştir!
       </Typography>
-      {/* Session API Key Save (only if not present) */}
-      {!hasApiKey && (
-        <Card sx={{ maxWidth: 520, mx: 'auto', mb: 4, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <CardContent>
-            <Typography variant="h6" color="white" mb={2}>API Anahtarını Kaydet</Typography>
-            <TextField
-              fullWidth
-              type="password"
-              label="Gemini API Key"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'white',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
-                  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
-                  '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
-                  background: 'rgba(255,255,255,0.05)'
-                },
-                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
-                '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
-              }}
-            />
-            <Typography variant="body2" sx={{ mt: 1.5, color: 'rgba(255,255,255,0.75)' }}>
-              Anahtarı ücretsiz olarak{' '}
-              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" sx={{ color: '#4f46e5', fontWeight: 600 }}>
-                Google AI Studio
-              </Link>
-              {' '}üzerinden alabilirsiniz. Doğrudan bağlantı:{' '}
-              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" sx={{ color: '#93c5fd' }}>
-                https://aistudio.google.com/app/apikey
-              </Link>
-              . Anahtar sadece bu oturum süresince saklanır.
-            </Typography>
-            {apiKeyMsg && (
-              <Alert sx={{ mt: 2 }} severity={apiKeyMsg.includes('kaydedildi') ? 'success' : 'warning'}>{apiKeyMsg}</Alert>
-            )}
-          </CardContent>
-          <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
-            <Button
-              variant="contained"
-              onClick={handleSaveApiKey}
-              disabled={apiKeySaving}
-              sx={{ background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)' }}
-            >Kaydet</Button>
-          </CardActions>
-        </Card>
-      )}
       
 
       {!alan ? null : (
