@@ -4,10 +4,7 @@
 
 <p>AI ile test, kodlama ve mülakat deneyimleri. React + Flask mimarisi.</p>
 
-<a href="https://codematetr.onrender.com"><img alt="Live" src="https://img.shields.io/badge/Live-codematetr.onrender.com-22c55e?style=for-the-badge&logo=vercel&logoColor=white"></a>
-<img alt="Frontend" src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=white">
-<img alt="Backend" src="https://img.shields.io/badge/Backend-Flask-000000?style=for-the-badge&logo=flask&logoColor=white">
-<img alt="License" src="https://img.shields.io/badge/License-MIT-0ea5e9?style=for-the-badge">
+### SİTE ŞUAN BAKIMDA
 
 </div>
 
