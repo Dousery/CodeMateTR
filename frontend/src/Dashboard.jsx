@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert, Link } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
@@ -299,6 +299,17 @@ export default function Dashboard() {
                 '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
               }}
             />
+            <Typography variant="body2" sx={{ mt: 1.5, color: 'rgba(255,255,255,0.75)' }}>
+              Anahtarı ücretsiz olarak{' '}
+              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" sx={{ color: '#4f46e5', fontWeight: 600 }}>
+                Google AI Studio
+              </Link>
+              {' '}üzerinden alabilirsiniz. Doğrudan bağlantı:{' '}
+              <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener" sx={{ color: '#93c5fd' }}>
+                https://aistudio.google.com/app/apikey
+              </Link>
+              . Anahtar sadece bu oturum süresince saklanır.
+            </Typography>
             {apiKeyMsg && (
               <Alert sx={{ mt: 2 }} severity={apiKeyMsg.includes('kaydedildi') ? 'success' : 'warning'}>{apiKeyMsg}</Alert>
             )}
