@@ -582,6 +582,7 @@ def register():
     username = data.get('username')
     password = data.get('password')
     interest = data.get('interest')
+    gemini_api_key = data.get('geminiApiKey', '')
     if not username or not password:
         return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
     if not interest:
@@ -598,6 +599,10 @@ def register():
     db.session.add(user)
     db.session.commit()
     session['username'] = username
+    session['user_id'] = user.id
+    if gemini_api_key:
+        session['gemini_api_key'] = gemini_api_key
+    session.modified = True
     return jsonify({'message': 'Kayıt başarılı.'}), 201
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
@@ -660,8 +665,8 @@ def login():
             traceback.print_exc()
             return jsonify({'error': 'Şifre doğrulama hatası. Lütfen daha sonra tekrar deneyin.'}), 500
         
-        # Session'ı kalıcı yap
-        session.permanent = True
+        # Session tarayıcı kapanınca silinsin
+        session.permanent = False
         session['username'] = username
         session['user_id'] = user.id
         
