@@ -43,7 +43,8 @@ export default function Register({ setIsLoggedIn }) {
       const res = await axios.post(API_ENDPOINTS.REGISTER, {
         username: form.username,
         password: form.password,
-        interest: form.interest
+        interest: form.interest,
+        geminiApiKey: form.geminiApiKey
       }, { withCredentials: true });
       
       localStorage.setItem('username', form.username);
