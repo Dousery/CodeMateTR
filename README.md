@@ -1,6 +1,6 @@
 <div align="center">
 
-<h2>🚀 BTK Project — Yapay Zeka Destekli Öğrenme Platformu</h2>
+<h2>🚀 CodeMateTR — Yapay Zeka Destekli Öğrenme Platformu</h2>
 
 <p>AI ile test, kodlama ve mülakat deneyimleri. React + Flask mimarisi.</p>
 
@@ -10,6 +10,9 @@
 <img alt="License" src="https://img.shields.io/badge/License-MIT-0ea5e9?style=for-the-badge">
 
 </div>
+
+<img width="1811" height="977" alt="image" src="https://github.com/user-attachments/assets/f5a6108d-8b09-4432-a4c4-0154f24582c7" />
+
 
 ### Canlı Yayın
 - Site: `https://codematetr.onrender.com`
@@ -51,19 +54,3 @@ cd frontend && npm run dev
 ```bash
 docker-compose up --build
 ```
-
-### 🔧 Ortam Değişkenleri (özet)
-- Backend `.env`: `SECRET_KEY`, `DATABASE_URL`, `FRONTEND_URL`, `FLASK_ENV`
-- Frontend `.env.production`: `VITE_API_BASE_URL`
-
-### 📁 Proje Yapısı (kısa)
-```
-BTK_Project/
-├── app.py
-├── agents/, models/, utils/
-├── frontend/ (React)
-└── docker-compose.yml, Dockerfile, requirements.txt
-```
-
-### 📜 Lisans
-MIT
