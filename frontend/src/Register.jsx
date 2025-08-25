@@ -47,11 +47,9 @@ export default function Register({ setIsLoggedIn }) {
         geminiApiKey: form.geminiApiKey
       }, { withCredentials: true });
       
-      localStorage.setItem('username', form.username);
-      localStorage.setItem('interest', form.interest);
-      if (form.geminiApiKey) {
-        localStorage.setItem('geminiApiKey', form.geminiApiKey);
-      }
+      localStorage.setItem('username', res.data.username || form.username);
+      localStorage.setItem('interest', res.data.interest || form.interest);
+      if (form.geminiApiKey) localStorage.setItem('geminiApiKey', form.geminiApiKey);
       
       // localStorage değişikliğini tetikle
       window.dispatchEvent(new Event('localStorageChange'));

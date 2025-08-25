@@ -598,12 +598,14 @@ def register():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
+    # Session'ı giriş ile aynı şekilde kur
+    session.permanent = True
     session['username'] = username
     session['user_id'] = user.id
     if gemini_api_key:
         session['gemini_api_key'] = gemini_api_key
     session.modified = True
-    return jsonify({'message': 'Kayıt başarılı.'}), 201
+    return jsonify({'message': 'Kayıt başarılı.', 'username': username, 'interest': interest}), 201
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
@@ -665,8 +667,8 @@ def login():
             traceback.print_exc()
             return jsonify({'error': 'Şifre doğrulama hatası. Lütfen daha sonra tekrar deneyin.'}), 500
         
-        # Session tarayıcı kapanınca silinsin
-        session.permanent = False
+        # Session'ı kalıcı yap
+        session.permanent = True
         session['username'] = username
         session['user_id'] = user.id
         
