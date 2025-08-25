@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert, Link } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert, Link, IconButton } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
 import QuizIcon from '@mui/icons-material/Quiz';
 import PsychologyIcon from '@mui/icons-material/Psychology';
 import RecordVoiceOverIcon from '@mui/icons-material/RecordVoiceOver';
+import CloseIcon from '@mui/icons-material/Close';
 
 import ForumIcon from '@mui/icons-material/Forum';
 import axios from 'axios';
@@ -143,8 +144,7 @@ export default function Dashboard() {
       {/* API Key Dialog */}
       <Dialog
         open={apiKeyOpen}
-        onClose={() => {}}
-        disableEscapeKeyDown
+        onClose={() => setApiKeyOpen(false)}
         PaperProps={{
           sx: {
             background: 'rgba(20, 20, 40, 0.95)',
@@ -155,8 +155,15 @@ export default function Dashboard() {
           }
         }}
       >
-        <DialogTitle sx={{ color: 'white', bgcolor: 'rgba(30, 30, 50, 0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 600 }}>
+        <DialogTitle sx={{ color: 'white', bgcolor: 'rgba(30, 30, 50, 0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 600, position: 'relative' }}>
           Gemini API Key Kaydet
+          <IconButton
+            aria-label="close"
+            onClick={() => setApiKeyOpen(false)}
+            sx={{ position: 'absolute', right: 8, top: 8, color: 'rgba(255,255,255,0.7)' }}
+          >
+            <CloseIcon />
+          </IconButton>
         </DialogTitle>
         <DialogContent sx={{ bgcolor: 'rgba(20, 20, 40, 0.9)', pt: 3 }}>
           <TextField
@@ -166,7 +173,6 @@ export default function Dashboard() {
             value={apiKey}
             onChange={(e) => setApiKey(e.target.value)}
             placeholder="https://aistudio.google.com/app/apikey adresinden alın"
-            helperText="Login'deki mantıkla aynı: Key'i kaydedince form kaybolur."
             sx={{
               mb: 2,
               '& .MuiOutlinedInput-root': {
