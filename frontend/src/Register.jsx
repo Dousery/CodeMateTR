@@ -43,13 +43,14 @@ export default function Register({ setIsLoggedIn }) {
       const res = await axios.post(API_ENDPOINTS.REGISTER, {
         username: form.username,
         password: form.password,
-        interest: form.interest,
-        geminiApiKey: form.geminiApiKey
+        interest: form.interest
       }, { withCredentials: true });
       
-      localStorage.setItem('username', res.data.username || form.username);
-      localStorage.setItem('interest', res.data.interest || form.interest);
-      if (form.geminiApiKey) localStorage.setItem('geminiApiKey', form.geminiApiKey);
+      localStorage.setItem('username', form.username);
+      localStorage.setItem('interest', form.interest);
+      if (form.geminiApiKey) {
+        localStorage.setItem('geminiApiKey', form.geminiApiKey);
+      }
       
       // localStorage değişikliğini tetikle
       window.dispatchEvent(new Event('localStorageChange'));

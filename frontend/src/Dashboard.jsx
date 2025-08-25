@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
@@ -51,6 +51,10 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [hasApiKey, setHasApiKey] = useState(false);
+  const [apiKeySaving, setApiKeySaving] = useState(false);
+  const [apiKeyMsg, setApiKeyMsg] = useState('');
 
   // Add CSS for pulse animation
   React.useEffect(() => {
@@ -93,6 +97,13 @@ export default function Dashboard() {
     }
   }, [alan]);
 
+  // Check if session already has API key
+  useEffect(() => {
+    axios.get(API_ENDPOINTS.SESSION_API_KEY_STATUS, { withCredentials: true })
+      .then(res => setHasApiKey(!!res.data.has_key))
+      .catch(() => setHasApiKey(false));
+  }, []);
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -103,6 +114,25 @@ export default function Dashboard() {
       alert('Alan kaydedilemedi!');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveApiKey = async () => {
+    if (!apiKey.trim()) {
+      setApiKeyMsg('Lütfen API anahtarını giriniz.');
+      return;
+    }
+    setApiKeySaving(true);
+    setApiKeyMsg('');
+    try {
+      await axios.post(API_ENDPOINTS.SESSION_API_KEY, { apiKey: apiKey.trim() }, { withCredentials: true });
+      setHasApiKey(true);
+      setApiKey('');
+      setApiKeyMsg('API anahtarı kaydedildi.');
+    } catch (e) {
+      setApiKeyMsg('API anahtarı kaydedilemedi.');
+    } finally {
+      setApiKeySaving(false);
     }
   };
 
@@ -246,6 +276,43 @@ export default function Dashboard() {
       <Typography textAlign="center" mb={8} color="rgba(255,255,255,0.8)">
         Aşağıdaki modüllerden birini seçerek kendini geliştir!
       </Typography>
+      {/* Session API Key Save (only if not present) */}
+      {!hasApiKey && (
+        <Card sx={{ maxWidth: 520, mx: 'auto', mb: 4, background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <CardContent>
+            <Typography variant="h6" color="white" mb={2}>API Anahtarını Kaydet</Typography>
+            <TextField
+              fullWidth
+              type="password"
+              label="Gemini API Key"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: 'white',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                  '&.Mui-focused fieldset': { borderColor: '#4f46e5' },
+                  background: 'rgba(255,255,255,0.05)'
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.7)' },
+                '& .MuiInputLabel-root.Mui-focused': { color: '#4f46e5' }
+              }}
+            />
+            {apiKeyMsg && (
+              <Alert sx={{ mt: 2 }} severity={apiKeyMsg.includes('kaydedildi') ? 'success' : 'warning'}>{apiKeyMsg}</Alert>
+            )}
+          </CardContent>
+          <CardActions sx={{ justifyContent: 'flex-end', px: 2, pb: 2 }}>
+            <Button
+              variant="contained"
+              onClick={handleSaveApiKey}
+              disabled={apiKeySaving}
+              sx={{ background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)' }}
+            >Kaydet</Button>
+          </CardActions>
+        </Card>
+      )}
       
 
       {!alan ? null : (

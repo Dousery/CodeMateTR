@@ -582,7 +582,6 @@ def register():
     username = data.get('username')
     password = data.get('password')
     interest = data.get('interest')
-    gemini_api_key = data.get('geminiApiKey', '')
     if not username or not password:
         return jsonify({'error': 'Kullanıcı adı ve şifre gerekli.'}), 400
     if not interest:
@@ -598,14 +597,8 @@ def register():
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    # Session'ı giriş ile aynı şekilde kur
-    session.permanent = True
     session['username'] = username
-    session['user_id'] = user.id
-    if gemini_api_key:
-        session['gemini_api_key'] = gemini_api_key
-    session.modified = True
-    return jsonify({'message': 'Kayıt başarılı.', 'username': username, 'interest': interest}), 201
+    return jsonify({'message': 'Kayıt başarılı.'}), 201
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
@@ -3926,6 +3919,28 @@ def recommend_adaptive_test():
         
     except Exception as e:
         return jsonify({'error': f'Öneri alma hatası: {str(e)}'}), 500
+
+# =============== Session API Key Endpoints ===============
+@app.route('/session/api-key', methods=['POST'])
+@login_required
+def set_session_api_key():
+    data = request.json or {}
+    api_key = data.get('apiKey') or data.get('api_key')
+    if not api_key or not isinstance(api_key, str) or len(api_key.strip()) == 0:
+        return jsonify({'error': 'API anahtarı gerekli.'}), 400
+    try:
+        session['gemini_api_key'] = api_key.strip()
+        session.modified = True
+        return jsonify({'message': 'API anahtarı kaydedildi.'})
+    except Exception as e:
+        return jsonify({'error': f'Anahtar kaydedilemedi: {str(e)}'}), 500
+
+
+@app.route('/session/api-key/status', methods=['GET'])
+@login_required
+def get_session_api_key_status():
+    has_key = bool(session.get('gemini_api_key'))
+    return jsonify({'has_key': has_key})
 
 
 # Debug endpoint'leri
