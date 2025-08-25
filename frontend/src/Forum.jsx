@@ -1556,7 +1556,9 @@ const interestTypes = [
                       
                             {/* Solution Button */}
                       {(selectedPost.post.author_username === localStorage.getItem('username') || 
-                        selectedPost.post.author === localStorage.getItem('username')) && 
+                        selectedPost.post.author === localStorage.getItem('username')) &&
+                       comment.author !== selectedPost.post.author &&
+                       comment.author !== selectedPost.post.author_username &&
                        !selectedPost.post.is_solved && !comment.is_solution && (
                         <Button
                           size="small"

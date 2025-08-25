@@ -2988,24 +2988,34 @@ def mark_post_solved(post_id):
         if post.author_username != session['username']:
             return jsonify({'error': 'Bu işlemi yapma yetkiniz yok.'}), 403
         
-        post.is_solved = True
-        post.solved_by = solved_by
-        post.solved_at = datetime.utcnow()
-        
         # Çözüm yorumunu kabul et
         if comment_id:
             comment = ForumComment.query.get(comment_id)
-            if comment:
-                comment.is_solution = True
-                comment.is_accepted = True
+            if not comment:
+                return jsonify({'error': 'Yorum bulunamadı.'}), 404
+            
+            # Güvenlik: Gönderi sahibi kendi yorumunu çözüm olarak işaretleyemez
+            if post.author_username == session['username'] and comment.author_username == session['username']:
+                return jsonify({'error': 'Kendi yorumunuzu çözüm olarak işaretleyemezsiniz.'}), 400
+
+            # Post'u çözüldü olarak işaretle (solved_by sunucuda, yorumun yazarından alınır)
+            post.is_solved = True
+            post.solved_by = comment.author_username
+            post.solved_at = datetime.utcnow()
+
+            comment.is_solution = True
+            comment.is_accepted = True
+        else:
+            # Yorum belirtilmeden çözüldü işaretlenmesi desteklenmiyorsa engelle
+            return jsonify({'error': 'Çözüm için bir yorum seçilmelidir.'}), 400
         
         db.session.commit()
         
         # Bildirim gönder
-        if solved_by and solved_by != session['username']:  # Kendine notification gönderme
+        if post.solved_by and post.solved_by != session['username']:  # Kendine notification gönderme
             try:
                 notification = ForumNotification(
-                    username=solved_by,
+                    username=post.solved_by,
                     notification_type='solution_accepted',
                     title='Çözümünüz kabul edildi!',
                     message=f'"{post.title}" gönderisindeki çözümünüz kabul edildi.',

@@ -1,243 +1,69 @@
-# BTK Project - AI-Powered Learning Platform
+<div align="center">
 
-Bu proje, yapay zeka destekli bir öğrenme platformudur. React frontend ve Flask backend kullanılarak geliştirilmiştir..
+<h2>🚀 BTK Project — Yapay Zeka Destekli Öğrenme Platformu</h2>
 
-## 🚀 Özellikler
+<p>AI ile test, kodlama ve mülakat deneyimleri. React + Flask mimarisi.</p>
 
-- **AI Test Sistemi**: Kişiselleştirilmiş testler ve değerlendirmeler
-- **Kodlama Odası**: AI destekli kod yazma ve değerlendirme
-- **Mülakat Simülasyonu**: Gerçek zamanlı AI mülakat deneyimi
-- **Otomatik Mülakat**: Sesli ve metin tabanlı mülakat sistemi
-- **Akıllı İş Bulma**: CV analizi ve kariyer önerileri
-- **Forum Sistemi**: Topluluk etkileşimi ve bilgi paylaşımı
+<a href="https://codematetr.onrender.com"><img alt="Live" src="https://img.shields.io/badge/Live-codematetr.onrender.com-22c55e?style=for-the-badge&logo=vercel&logoColor=white"></a>
+<img alt="Frontend" src="https://img.shields.io/badge/Frontend-React%20%2B%20Vite-61DAFB?style=for-the-badge&logo=react&logoColor=white">
+<img alt="Backend" src="https://img.shields.io/badge/Backend-Flask-000000?style=for-the-badge&logo=flask&logoColor=white">
+<img alt="License" src="https://img.shields.io/badge/License-MIT-0ea5e9?style=for-the-badge">
 
-## 🛠️ Teknolojiler
+</div>
 
-### Backend
-- **Flask**: Python web framework
-- **SQLAlchemy**: ORM
-- **PostgreSQL**: Veritabanı
-- **Gunicorn**: WSGI server
-- **Google Gemini AI**: AI servisleri
+### Canlı Yayın
+- Site: `https://codematetr.onrender.com`
 
-### Frontend
-- **React**: UI framework
-- **Vite**: Build tool
-- **Material-UI**: UI components
-- **Axios**: HTTP client
-- **Framer Motion**: Animasyonlar
+### Öne Çıkanlar
+- 🎯 AI Test: Kişiselleştirilmiş test ve anlık değerlendirme
+- 💻 Kodlama Odası: Çalıştır, değerlendir, iyileştir — tek akışta
+- 🧠 Mülakat: Gerçek zamanlı ve otomatik (ses/metin) senaryolar
 
-## 📦 Kurulum
+### Teknolojiler
+- Backend: Flask, SQLAlchemy, PostgreSQL, Gunicorn
+- Frontend: React, Vite, MUI, Axios
 
-### Gereksinimler
-- Python 3.11+
-- Node.js 18+
-- PostgreSQL
-- Docker (opsiyonel)
+---
 
-### Local Development
-
-1. **Repository'yi klonlayın**
+### ⚡ Hızlı Başlangıç (Yerel)
+1) Depoyu klonlayın ve köke geçin.
+2) Backend: sanal ortamı kurun ve bağımlılıkları yükleyin.
 ```bash
-git clone <repository-url>
-cd BTK_Project
-```
-
-2. **Backend kurulumu**
-```bash
-# Virtual environment oluşturun
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
-# veya
-venv\Scripts\activate  # Windows
-
-# Bağımlılıkları yükleyin
+venv\\Scripts\\activate  # Windows
 pip install -r requirements.txt
-
-# Environment değişkenlerini ayarlayın
 cp env.example .env
-# .env dosyasını düzenleyin
 ```
-
-3. **Frontend kurulumu**
+3) Frontend: bağımlılıkları yükleyin.
 ```bash
-cd frontend
-npm install
+cd frontend && npm install
 ```
-
-4. **Veritabanını ayarlayın**
+4) Geliştirme modunda çalıştırın.
 ```bash
-# PostgreSQL'de veritabanı oluşturun
-createdb btk_project
-
-# Backend'de veritabanı tablolarını oluşturun
-python -c "from app import app, db; app.app_context().push(); db.create_all()"
-```
-
-5. **Uygulamayı çalıştırın**
-```bash
-# Backend (bir terminal'de)
+# Backend
 python app.py
 
-# Frontend (başka bir terminal'de)
-cd frontend
-npm run dev
+# Frontend
+cd frontend && npm run dev
 ```
 
-### Docker ile Kurulum
-
-1. **Docker Compose ile çalıştırın**
+### 🐳 Docker ile Çalıştırma
 ```bash
 docker-compose up --build
 ```
 
-2. **Uygulamaya erişin**
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
+### 🔧 Ortam Değişkenleri (özet)
+- Backend `.env`: `SECRET_KEY`, `DATABASE_URL`, `FRONTEND_URL`, `FLASK_ENV`
+- Frontend `.env.production`: `VITE_API_BASE_URL`
 
-## 🌐 Production Deployment
-
-### Render.com ile Deploy
-
-1. **Repository'yi Render'a bağlayın**
-2. **Environment variables'ları ayarlayın:**
-   - `FLASK_ENV=production`
-   - `SECRET_KEY=<your-secret-key>`
-   - `DATABASE_URL=<postgresql-url>`
-   - `FRONTEND_URL=<your-frontend-url>`
-   ~~- `GEMINI_API_KEY=<your-gemini-api-key>`~~ (artık kullanılmıyor, kullanıcılar kendi API key'lerini giriyorlar)
-
-3. **Build ve start komutları:**
-   - Build: `pip install -r requirements.txt`
-   - Start: `gunicorn --bind 0.0.0.0:$PORT app:app`
-
-### Manuel Deploy
-
-1. **Backend için:**
-```bash
-# Production dependencies
-pip install -r requirements.txt
-
-# Environment variables
-export FLASK_ENV=production
-export DATABASE_URL=<your-database-url>
-export SECRET_KEY=<your-secret-key>
-export FRONTEND_URL=<your-frontend-url>
-# export GEMINI_API_KEY=<your-gemini-api-key> # Artık kullanılmıyor
-
-# Start with gunicorn
-gunicorn --bind 0.0.0.0:8000 --workers 4 --timeout 120 app:app
-```
-
-2. **Frontend için:**
-```bash
-cd frontend
-npm install
-npm run build
-# dist/ klasörünü web server'a deploy edin
-```
-
-## 🔧 Environment Variables
-
-### Backend (.env)
-```env
-FLASK_ENV=development
-SECRET_KEY=your-secret-key-here
-DATABASE_URL=postgresql://username:password@localhost:5432/btk_project
-FRONTEND_URL=http://localhost:5173
-# GEMINI_API_KEY=your-gemini-api-key-here # Artık kullanılmıyor
-```
-
-### Frontend (.env.production)
-```env
-VITE_API_BASE_URL=https://your-backend-domain.com
-```
-
-## 📁 Proje Yapısı
-
+### 📁 Proje Yapısı (kısa)
 ```
 BTK_Project/
-├── app.py                 # Flask uygulaması
-├── requirements.txt       # Python bağımlılıkları
-├── Dockerfile            # Backend Docker
-├── docker-compose.yml    # Docker Compose
-├── render.yaml           # Render.com config
-├── build.sh              # Build script
-├── start.sh              # Start script
-├── agents/               # AI agent'ları
-├── models/               # Veritabanı modelleri
-├── utils/                # Yardımcı fonksiyonlar
-├── frontend/             # React uygulaması
-│   ├── src/
-│   ├── package.json
-│   ├── Dockerfile        # Frontend Docker
-│   └── nginx.conf        # Nginx config
-└── uploads/              # Yüklenen dosyalar
+├── app.py
+├── agents/, models/, utils/
+├── frontend/ (React)
+└── docker-compose.yml, Dockerfile, requirements.txt
 ```
 
-## 🔒 Güvenlik
-
-- CORS ayarları production'da sıkılaştırılmıştır
-- Session güvenliği için secure cookies kullanılır
-- API key'ler environment variables ile yönetilir
-- File upload güvenliği için boyut ve tip kontrolleri
-
-## 🧪 Test
-
-```bash
-# Backend testleri
-python -m pytest tests/
-
-# Frontend testleri
-cd frontend
-npm test
-```
-
-## 📝 API Documentation
-
-### Authentication
-- `POST /register` - Kullanıcı kaydı
-- `POST /login` - Kullanıcı girişi
-- `POST /logout` - Kullanıcı çıkışı
-
-### Test Sistemi
-- `POST /test_your_skill` - Test başlat
-- `POST /test_your_skill/evaluate` - Test değerlendir
-
-### Mülakat Sistemi
-- `POST /interview_simulation` - Mülakat başlat
-- `POST /interview_simulation/evaluate` - Cevap değerlendir
-- `POST /auto_interview/start` - Otomatik mülakat başlat
-
-### Kodlama Sistemi
-- `POST /code_room` - Kod sorusu al
-- `POST /code_room/evaluate` - Kod değerlendir
-- `POST /code_room/run` - Kod çalıştır
-
-## 🤝 Katkıda Bulunma
-
-1. Fork yapın
-2. Feature branch oluşturun (`git checkout -b feature/amazing-feature`)
-3. Commit yapın (`git commit -m 'Add amazing feature'`)
-4. Push yapın (`git push origin feature/amazing-feature`)
-5. Pull Request oluşturun
-
-## 📄 Lisans
-
-Bu proje MIT lisansı altında lisanslanmıştır.
-
-## 🆘 Destek
-
-Herhangi bir sorun yaşarsanız:
-1. Issue oluşturun
-2. Documentation'ı kontrol edin
-3. Environment variables'ları kontrol edin
-4. Log dosyalarını inceleyin
-
-## 🔄 Güncellemeler
-
-- **v1.0.0**: İlk production release
-- AI test sistemi
-- Mülakat simülasyonu
-- Kodlama odası
-- Forum sistemi
+### 📜 Lisans
+MIT
