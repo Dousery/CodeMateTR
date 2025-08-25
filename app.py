@@ -704,6 +704,18 @@ def logout():
     session.modified = True
     return jsonify({'message': 'Çıkış başarılı.'})
 
+@app.route('/set_api_key', methods=['POST'])
+@login_required
+def set_api_key():
+    """Giriş sonrası kullanıcıya API key kaydetme imkanı verir (session tabanlı)."""
+    data = request.json or {}
+    api_key = data.get('geminiApiKey') or data.get('api_key') or data.get('key')
+    if not api_key:
+        return jsonify({'error': 'API key gerekli.'}), 400
+    session['gemini_api_key'] = api_key
+    session.modified = True
+    return jsonify({'message': 'API key kaydedildi.'})
+
 @app.route('/session-status', methods=['GET'])
 def session_status():
     """Session durumunu kontrol etmek için test endpoint'i"""

@@ -48,8 +48,6 @@ export default function Register({ setIsLoggedIn }) {
       
       localStorage.setItem('username', form.username);
       localStorage.setItem('interest', form.interest);
-      // Bir kerelik dashboard mesajını tetikle
-      localStorage.setItem('showPostRegisterApiKeyNotice', '1');
       
       // localStorage değişikliğini tetikle
       window.dispatchEvent(new Event('localStorageChange'));
@@ -225,7 +223,7 @@ export default function Register({ setIsLoggedIn }) {
             </Select>
           </FormControl>
           
-          {/* API key alanı kaldırıldı */}
+          {/* API key artık kayıt ekranında istenmiyor */}
           
           {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
           

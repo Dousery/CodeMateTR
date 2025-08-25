@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, Alert } from '@mui/material';
+import { Box, Typography, Grid, Card, CardContent, CardActions, Button, Avatar, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Select, FormControl, InputLabel, Chip, TextField, Alert, Link } from '@mui/material';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import CodeIcon from '@mui/icons-material/Code';
@@ -51,7 +51,10 @@ export default function Dashboard() {
   const [open, setOpen] = useState(false);
   const [alan, setAlan] = useState(localStorage.getItem('interest') || '');
   const [saving, setSaving] = useState(false);
-  const [showApiKeyNotice, setShowApiKeyNotice] = useState(localStorage.getItem('showPostRegisterApiKeyNotice') === '1');
+  const [apiKeyOpen, setApiKeyOpen] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [apiSaving, setApiSaving] = useState(false);
+  const [apiError, setApiError] = useState('');
 
   // Add CSS for pulse animation
   React.useEffect(() => {
@@ -92,6 +95,12 @@ export default function Dashboard() {
         })
         .catch(() => setOpen(true));
     }
+    // API key kontrolü: Eğer login sırasında localStorage'da varsa formu hiç gösterme
+    const lsKey = localStorage.getItem('geminiApiKey');
+    if (!lsKey) {
+      // Sunucu tarafında var mı kontrol etmeye gerek yok; session bazlı ve sadece login ile set ediliyor
+      setApiKeyOpen(true);
+    }
   }, [alan]);
 
   const handleSave = async () => {
@@ -107,17 +116,89 @@ export default function Dashboard() {
     }
   };
 
-  useEffect(() => {
-    if (showApiKeyNotice) {
-      // Mesajı sadece bir kere göster, sonra bayrağı kaldır
-      localStorage.removeItem('showPostRegisterApiKeyNotice');
+  const handleSaveApiKey = async () => {
+    setApiError('');
+    if (!apiKey) {
+      setApiError('API key gerekli.');
+      return;
     }
-  }, [showApiKeyNotice]);
+    setApiSaving(true);
+    try {
+      await axios.post(API_ENDPOINTS.SET_API_KEY, { geminiApiKey: apiKey }, { withCredentials: true });
+      localStorage.setItem('geminiApiKey', apiKey);
+      setApiKeyOpen(false);
+    } catch (err) {
+      setApiError(err.response?.data?.error || 'API key kaydedilemedi.');
+    } finally {
+      setApiSaving(false);
+    }
+  };
+
+
 
 
 
   return (
     <Box sx={{ minHeight: '100vh', width: '100vw', py: 18 }}>
+      {/* API Key Dialog */}
+      <Dialog
+        open={apiKeyOpen}
+        onClose={() => {}}
+        disableEscapeKeyDown
+        PaperProps={{
+          sx: {
+            background: 'rgba(20, 20, 40, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            borderRadius: 3,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: 'white', bgcolor: 'rgba(30, 30, 50, 0.9)', borderBottom: '1px solid rgba(255,255,255,0.1)', fontWeight: 600 }}>
+          Gemini API Key Kaydet
+        </DialogTitle>
+        <DialogContent sx={{ bgcolor: 'rgba(20, 20, 40, 0.9)', pt: 3 }}>
+          <TextField
+            fullWidth
+            label="Gemini API Key"
+            type="password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            placeholder="https://aistudio.google.com/app/apikey adresinden alın"
+            helperText="Login'deki mantıkla aynı: Key'i kaydedince form kaybolur."
+            sx={{
+              mb: 2,
+              '& .MuiOutlinedInput-root': {
+                color: 'white',
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.3)' },
+                '&:hover fieldset': { borderColor: 'rgba(255,255,255,0.5)' },
+                '&.Mui-focused fieldset': { borderColor: '#4f46e5' }
+              },
+              '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.6)' }
+            }}
+          />
+          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
+            API key almak için{' '}
+            <Link href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" sx={{ color: '#4f46e5', fontWeight: 600 }}>
+              aistudio.google.com/app/apikey
+            </Link>
+            {' '}adresine gidin.
+          </Typography>
+          {apiError && <Alert severity="error" sx={{ mb: 1 }}>{apiError}</Alert>}
+        </DialogContent>
+        <DialogActions sx={{ bgcolor: 'rgba(30, 30, 50, 0.9)', borderTop: '1px solid rgba(255,255,255,0.1)', p: 2 }}>
+          <Button onClick={handleSaveApiKey} variant="contained" disabled={apiSaving || !apiKey}
+            sx={{
+              background: 'linear-gradient(45deg, #4f46e5 0%, #7c3aed 100%)',
+              borderRadius: '20px', px: 3, py: 1, textTransform: 'none', fontWeight: 600,
+              '&:hover': { background: 'linear-gradient(45deg, #4338ca 0%, #6d28d9 100%)' }
+            }}
+          >
+            Kaydet
+          </Button>
+        </DialogActions>
+      </Dialog>
       <Dialog 
         open={open} 
         disableEscapeKeyDown 
@@ -249,14 +330,6 @@ export default function Dashboard() {
       >
         Hoş Geldin, {username}!
       </Typography>
-      {showApiKeyNotice && (
-        <Box sx={{ maxWidth: 900, mx: 'auto', mb: 4 }}>
-          <Alert severity="info" onClose={() => setShowApiKeyNotice(false)} sx={{ borderRadius: 2 }}>
-            Kayıt işlemi tamamlandı. Lütfen hesaptan çıkış yapıp kendi API anahtarınız ile tekrar giriş yapın.
-          </Alert>
-        </Box>
-      )}
-
       <Typography textAlign="center" mb={8} color="rgba(255,255,255,0.8)">
         Aşağıdaki modüllerden birini seçerek kendini geliştir!
       </Typography>
