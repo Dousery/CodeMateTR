@@ -11,7 +11,7 @@
 
 </div>
 
-<img width="1811" height="977" alt="image" src="https://github.com/user-attachments/assets/f5a6108d-8b09-4432-a4c4-0154f24582c7" />
+<img width="1817" height="977" alt="image" src="https://github.com/user-attachments/assets/ca759938-4e3c-4dfd-9bfe-956c6f4ed460" />
 
 
 ### Canlı Yayın
