@@ -142,6 +142,26 @@ if DATABASE_URL and DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 
 if DATABASE_URL:
+    # Render.com database connection string validation and fix
+    # If the hostname doesn't have a port, add :5432
+    if 'postgresql://' in DATABASE_URL:
+        try:
+            # Parse the connection string to check if port is specified
+            # Format: postgresql://user:pass@host:port/db
+            parts = DATABASE_URL.split('@')
+            if len(parts) == 2:
+                host_part = parts[1].split('/')[0]
+                # If no port specified, add default port 5432
+                if ':' not in host_part:
+                    # This shouldn't happen with Render, but handle it just in case
+                    logger.warning("Database URL missing port, attempting to add default port")
+                    db_name = parts[1].split('/')[1] if '/' in parts[1] else ''
+                    host_with_port = f"{host_part}:5432"
+                    DATABASE_URL = f"{parts[0]}@{host_with_port}/{db_name}"
+        except Exception as e:
+            logger.error(f"Error parsing DATABASE_URL: {e}")
+            logger.error(f"DATABASE_URL value: {DATABASE_URL[:50]}...")  # Log first 50 chars only
+    
     app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
     # PostgreSQL için connection pooling optimizasyonları
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
