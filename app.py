@@ -18,6 +18,7 @@ from agents.interview_agent import InterviewAIAgent
 from agents.code_agent import CodeAIAgent
 
 from utils.code_formatter import code_indenter
+from utils.config_utils import configure_session, get_cors_config, is_production_environment
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import text
 import json
@@ -84,57 +85,12 @@ CORS(app, supports_credentials=True, origins=[
 # Production settings
 app.secret_key = os.getenv('SECRET_KEY', 'supersecretkey')
 
-# Production'da session ayarlarını düzenle
-if os.getenv('FLASK_ENV') == 'production':
-    app.config['SESSION_COOKIE_SECURE'] = True
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-    app.config['SESSION_COOKIE_PATH'] = '/'
-    app.config['SESSION_COOKIE_DOMAIN'] = None
-    # Production'da session'ları kalıcı yap
-    app.config['PERMANENT_SESSION_LIFETIME'] = 86400  # 24 saat
-    app.config['SESSION_COOKIE_MAX_AGE'] = 86400  # 24 saat
-    app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # Her istekte session'ı yenileme - performans için
-    # Session'ları server-side sakla
-    app.config['SESSION_TYPE'] = 'filesystem'
-    # Session dosya yolu optimizasyonu
-    app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
-    app.config['SESSION_FILE_THRESHOLD'] = 500
-else:
-    app.config['SESSION_COOKIE_SECURE'] = False
-    app.config['SESSION_COOKIE_HTTPONLY'] = False
-    app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-    app.config['SESSION_COOKIE_PATH'] = '/'
-    app.config['SESSION_COOKIE_DOMAIN'] = None
-    app.config['PERMANENT_SESSION_LIFETIME'] = 3600  # 1 saat
-    app.config['SESSION_COOKIE_MAX_AGE'] = 3600  # 1 saat
-    app.config['SESSION_REFRESH_EACH_REQUEST'] = False  # Her istekte session'ı yenileme - performans için
-    app.config['SESSION_TYPE'] = 'filesystem'
+# Configure session based on environment
+configure_session(app, is_production=is_production_environment())
 
 # CORS configuration for production
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5173')
-
-# Production'da tüm origin'lere izin ver (güvenlik için daha sonra kısıtlanabilir)
-if os.getenv('FLASK_ENV') == 'production':
-    CORS_ORIGINS = ['*']
-else:
-    CORS_ORIGINS = [FRONTEND_URL, 'http://localhost:3000', 'http://127.0.0.1:5173']
-
-# Production'da CORS ayarlarını güçlendir
-if os.getenv('FLASK_ENV') == 'production':
-    CORS(app, 
-         origins=['https://codematetr.onrender.com', 'https://btk-project-frontend.onrender.com'],
-         supports_credentials=True,
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
-         expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
-else:
-    CORS(app, 
-         origins=CORS_ORIGINS,
-         supports_credentials=True,
-         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Origin", "Accept", "Access-Control-Allow-Origin"],
-         expose_headers=["Content-Type", "Authorization", "Access-Control-Allow-Origin"])
+cors_config = get_cors_config(is_production=is_production_environment())
+CORS(app, **cors_config)
 
 # Database configuration
 DATABASE_URL = os.getenv('DATABASE_URL')

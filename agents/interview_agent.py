@@ -1,11 +1,15 @@
 import google.generativeai as genai
 from google import genai as google_genai_new
 from google.genai import types
-import wave
 import tempfile
 import os
 import base64
 from dotenv import load_dotenv
+
+# Import audio utilities
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.audio_utils import save_wave_file, create_audio_response
 
 load_dotenv()
 
@@ -76,50 +80,7 @@ class InterviewAIAgent:
         """
         try:
             question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
-            
-            # Sesli özellik aktifse ses üret
-            if self.client:
-                try:
-                    response = self.client.models.generate_content(
-                        model="gemini-2.5-flash-preview-tts",
-                        contents=question_text,
-                        config=types.GenerateContentConfig(
-                            response_modalities=["AUDIO"],
-                            speech_config=types.SpeechConfig(
-                                voice_config=types.VoiceConfig(
-                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                        voice_name=voice_name,
-                                    )
-                                )
-                            ),
-                        )
-                    )
-                    
-                    audio_data = response.candidates[0].content.parts[0].inline_data.data
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                    self._save_wave_file(temp_file.name, audio_data)
-                    
-                    return {
-                        'audio_file': temp_file.name,
-                        'question_text': question_text,
-                        'audio_data': audio_data
-                    }
-                except Exception as audio_error:
-                    print(f"Audio generation error: {audio_error}")
-                    return {
-                        'audio_file': None,
-                        'question_text': question_text,
-                        'audio_data': None,
-                        'error': f'Ses üretilemedi: {str(audio_error)}'
-                    }
-            else:
-                return {
-                    'audio_file': None,
-                    'question_text': question_text,
-                    'audio_data': None,
-                    'error': 'Sesli özellik kullanılamıyor'
-                }
-            
+            return create_audio_response(question_text, self.client, voice_name)
         except Exception as e:
             # Hata durumunda sadece metin döndür
             question_text = self.generate_dynamic_question(previous_questions, user_answers, conversation_context)
@@ -156,50 +117,7 @@ class InterviewAIAgent:
         """
         try:
             question_text = self.generate_cv_based_question(cv_analysis)
-            
-            # Sesli özellik aktifse ses üret
-            if self.client:
-                try:
-                    response = self.client.models.generate_content(
-                        model="gemini-2.5-flash-preview-tts",
-                        contents=question_text,
-                        config=types.GenerateContentConfig(
-                            response_modalities=["AUDIO"],
-                            speech_config=types.SpeechConfig(
-                                voice_config=types.VoiceConfig(
-                                    prebuilt_voice_config=types.PrebuiltVoiceConfig(
-                                        voice_name=voice_name,
-                                    )
-                                )
-                            ),
-                        )
-                    )
-                    
-                    audio_data = response.candidates[0].content.parts[0].inline_data.data
-                    temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.wav')
-                    self._save_wave_file(temp_file.name, audio_data)
-                    
-                    return {
-                        'audio_file': temp_file.name,
-                        'question_text': question_text,
-                        'audio_data': audio_data
-                    }
-                except Exception as audio_error:
-                    print(f"Audio generation error: {audio_error}")
-                    return {
-                        'audio_file': None,
-                        'question_text': question_text,
-                        'audio_data': None,
-                        'error': f'Ses üretilemedi: {str(audio_error)}'
-                    }
-            else:
-                return {
-                    'audio_file': None,
-                    'question_text': question_text,
-                    'audio_data': None,
-                    'error': 'Sesli özellik kullanılamıyor'
-                }
-            
+            return create_audio_response(question_text, self.client, voice_name)
         except Exception as e:
             # Hata durumunda sadece metin döndür
             question_text = self.generate_cv_based_question(cv_analysis)
@@ -578,15 +496,7 @@ class InterviewAIAgent:
             print(f"Audio file path: {audio_file_path}")
             return f"Ses transcript hatası: {str(e)}. Manuel cevap yazabilirsiniz."
 
-    def _save_wave_file(self, filename, pcm_data, channels=1, rate=24000, sample_width=2):
-        """
-        PCM verisini wave dosyası olarak kaydeder
-        """
-        with wave.open(filename, "wb") as wf:
-            wf.setnchannels(channels)
-            wf.setsampwidth(sample_width)
-            wf.setframerate(rate)
-            wf.writeframes(pcm_data)
+
 
     def analyze_cv(self, cv_data, mime_type):
         """

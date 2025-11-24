@@ -1,10 +1,14 @@
 import os
 import json
-
 import re
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+
+# Import text utilities
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from utils.text_utils import clean_markdown, extract_code_from_markdown, extract_score_from_text
 
 load_dotenv()
 
@@ -272,13 +276,7 @@ class CodeAIAgent:
                                ['error', 'hata', 'exception', 'traceback', 'failed', 'başarısız'])
             
             # Markdown formatını temizle
-            import re
-            # # ve ## işaretlerini kaldır
-            evaluation_text = re.sub(r'^#+\s*', '', evaluation_text, flags=re.MULTILINE)
-            # ** işaretlerini kaldır
-            evaluation_text = re.sub(r'\*\*(.*?)\*\*', r'\1', evaluation_text)
-            # Fazla boşlukları temizle
-            evaluation_text = re.sub(r'\n\s*\n\s*\n', '\n\n', evaluation_text)
+            evaluation_text = clean_markdown(evaluation_text)
             
             result = {
                 "evaluation": evaluation_text,
@@ -291,17 +289,7 @@ class CodeAIAgent:
             }
             
             # Puan çıkarmaya çalış
-            score_match = re.search(r'puan[:\s]*(\d+)', evaluation_text.lower())
-            if score_match:
-                result["score"] = int(score_match.group(1))
-            else:
-                # Puan bulunamazsa, doğruluk durumuna göre tahmin et
-                if any(word in evaluation_text.lower() for word in ['doğru', 'correct', 'başarılı', 'successful']):
-                    result["score"] = 85
-                elif any(word in evaluation_text.lower() for word in ['kısmen', 'partial', 'yarım']):
-                    result["score"] = 60
-                else:
-                    result["score"] = 30
+            result["score"] = extract_score_from_text(evaluation_text)
             
             return result
             
@@ -396,9 +384,9 @@ class CodeAIAgent:
                 result["explanation"] = response_text
                 
                 # Kod bloğunu manuel olarak bul
-                code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+                code_matches = extract_code_from_markdown(response_text)
                 if code_matches:
-                    result["code"] = code_matches[0].strip()
+                    result["code"] = code_matches[0]
             
             # Boş alanları temizle
             result["explanation"] = result["explanation"].strip()
@@ -452,13 +440,7 @@ class CodeAIAgent:
             response_text = response.text.strip()
             
             # Markdown formatını temizle
-            import re
-            # # ve ## işaretlerini kaldır
-            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
-            # ** işaretlerini kaldır
-            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
-            # Fazla boşlukları temizle
-            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            response_text = clean_markdown(response_text)
             
             debug_result = {
                 "error_explanation": response_text,
@@ -468,9 +450,9 @@ class CodeAIAgent:
             }
             
             # Try to extract corrected code
-            code_matches = re.findall(r'```(?:python|javascript|java)?\n(.*?)```', response_text, re.DOTALL)
+            code_matches = extract_code_from_markdown(response_text)
             if code_matches:
-                debug_result["corrected_code"] = code_matches[0].strip()
+                debug_result["corrected_code"] = code_matches[0]
             
             return debug_result
             
@@ -516,13 +498,7 @@ class CodeAIAgent:
             response_text = response.text.strip()
             
             # Markdown formatını temizle
-            import re
-            # # ve ## işaretlerini kaldır
-            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
-            # ** işaretlerini kaldır
-            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
-            # Fazla boşlukları temizle
-            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            response_text = clean_markdown(response_text)
             
             return response_text
             
@@ -862,13 +838,7 @@ class CodeAIAgent:
             response_text = response.text.strip()
             
             # Markdown formatını temizle
-            import re
-            # # ve ## işaretlerini kaldır
-            response_text = re.sub(r'^#+\s*', '', response_text, flags=re.MULTILINE)
-            # ** işaretlerini kaldır
-            response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
-            # Fazla boşlukları temizle
-            response_text = re.sub(r'\n\s*\n\s*\n', '\n\n', response_text)
+            response_text = clean_markdown(response_text)
             
             return response_text
             
