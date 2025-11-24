@@ -7,9 +7,13 @@ import base64
 from dotenv import load_dotenv
 
 # Import audio utilities
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.audio_utils import save_wave_file, create_audio_response
+try:
+    from utils.audio_utils import create_audio_response
+except ImportError:
+    # Fallback for different import paths
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from utils.audio_utils import create_audio_response
 
 load_dotenv()
 

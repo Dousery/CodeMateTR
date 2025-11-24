@@ -6,9 +6,13 @@ from google import genai
 from google.genai import types
 
 # Import text utilities
-import sys
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.text_utils import clean_markdown, extract_code_from_markdown, extract_score_from_text
+try:
+    from utils.text_utils import clean_markdown, extract_code_from_markdown, extract_score_from_text
+except ImportError:
+    # Fallback for different import paths
+    import sys
+    sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from utils.text_utils import clean_markdown, extract_code_from_markdown, extract_score_from_text
 
 load_dotenv()
 

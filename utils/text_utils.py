@@ -17,10 +17,10 @@ def clean_markdown(text):
     
     # Remove # and ## headers
     text = re.sub(r'^#+\s*', '', text, flags=re.MULTILINE)
-    # Remove ** bold markers
-    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)
-    # Remove * italic markers
-    text = re.sub(r'\*(.*?)\*', r'\1', text)
+    # Remove ** bold markers (non-greedy)
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text)
+    # Remove * italic markers (non-greedy)
+    text = re.sub(r'\*(.+?)\*', r'\1', text)
     # Clean up excessive newlines
     text = re.sub(r'\n\s*\n\s*\n', '\n\n', text)
     
@@ -37,8 +37,8 @@ def extract_code_from_markdown(text):
     Returns:
         list: List of extracted code strings
     """
-    # Match code blocks with optional language specifier
-    code_matches = re.findall(r'```(?:\w+)?\n(.*?)```', text, re.DOTALL)
+    # Match code blocks with optional language specifier and optional newline
+    code_matches = re.findall(r'```(?:\w+)?\n?(.*?)```', text, re.DOTALL)
     return [code.strip() for code in code_matches]
 
 
